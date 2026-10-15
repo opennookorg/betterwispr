@@ -11,7 +11,30 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        Group {
+        Form {
+            if !filteredHistory.isEmpty {
+                Section {
+                    ForEach(filteredHistory) { transcript in
+                        TranscriptRow(
+                            transcript: transcript,
+                            onCopy: { model.copyTranscript(transcript) },
+                            onDelete: { transcriptToDelete = transcript },
+                            onEdit: { model.updateTranscript(transcript, text: $0) },
+                            onRestore: { model.restoreOriginal(transcript) },
+                            expanded: true
+                        )
+                    }
+                } header: {
+                    Text("^[\(filteredHistory.count) dictation](inflect: true)")
+                } footer: {
+                    if model.settings.learnCorrections {
+                        Text("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time.")
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .overlay {
             if filteredHistory.isEmpty {
                 if query.isEmpty {
                     ContentUnavailableView(
@@ -22,28 +45,6 @@ struct HistoryView: View {
                 } else {
                     ContentUnavailableView.search(text: query)
                 }
-            } else {
-                Form {
-                    Section {
-                        ForEach(filteredHistory) { transcript in
-                            TranscriptRow(
-                                transcript: transcript,
-                                onCopy: { model.copyTranscript(transcript) },
-                                onDelete: { transcriptToDelete = transcript },
-                                onEdit: { model.updateTranscript(transcript, text: $0) },
-                                onRestore: { model.restoreOriginal(transcript) },
-                                expanded: true
-                            )
-                        }
-                    } header: {
-                        Text("^[\(filteredHistory.count) dictation](inflect: true)")
-                    } footer: {
-                        if model.settings.learnCorrections {
-                            Text("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time.")
-                        }
-                    }
-                }
-                .formStyle(.grouped)
             }
         }
         .searchable(text: $query, prompt: "Search dictations")
@@ -104,6 +105,7 @@ struct TranscriptRow: View {
             if let text = Binding($draft), let onEdit {
                 TextEditor(text: text)
                     .font(.body)
+                    .scrollContentBackground(.visible)
                     .frame(minHeight: 60)
                     .accessibilityLabel("Dictation text")
                 HStack {

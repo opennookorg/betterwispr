@@ -544,15 +544,9 @@ private struct CapsuleCardButtonStyle: ButtonStyle {
 private struct RecordingLimitLabel: View {
     let model: AppModel
 
-    private var secondsLeft: Int? {
-        guard model.phase == .recording else { return nil }
-        let left = Int((AudioRecorder.maximumDuration - model.recordingDuration).rounded(.up))
-        return left <= 30 ? max(0, left) : nil
-    }
-
     var body: some View {
         Group {
-            if let secondsLeft {
+            if let secondsLeft = model.recordingSecondsLeft {
                 Text("Stops in \(Duration.seconds(secondsLeft).formatted(.time(pattern: .minuteSecond)))")
                     .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
@@ -563,7 +557,7 @@ private struct RecordingLimitLabel: View {
                     .allowsHitTesting(false)
             }
         }
-        .onChange(of: secondsLeft != nil) { _, warning in
+        .onChange(of: model.recordingSecondsLeft != nil) { _, warning in
             guard warning else { return }
             AccessibilityNotification.Announcement("Dictation stops in 30 seconds.").post()
         }

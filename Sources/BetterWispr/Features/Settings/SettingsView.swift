@@ -23,6 +23,7 @@ struct SettingsView: View {
                         Picker("Theme", selection: setting(\.theme)) {
                             Text("System").tag(AppTheme.system)
                             Text("Light").tag(AppTheme.light)
+                            Text("Cream").tag(AppTheme.cream)
                             Text("Dark").tag(AppTheme.dark)
                         }
                         .pickerStyle(.segmented)
@@ -136,12 +137,29 @@ struct SettingsView: View {
                     SettingToggle("Show in Dock", caption: "When off, use the menu bar to open BetterWispr. Your dictation shortcut still works.", isOn: setting(\.showInDock))
                     RowDivider()
                     SettingToggle("Dictation sounds", caption: "Soft cues when dictation starts listening, finishes, cancels or needs attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
+                    if model.settings.soundEffects {
+                        ForEach(DictationSound.allCases, id: \.self) { cue in
+                            let overridden = cue.url(in: DictationSound.overrideDirectory) != nil
+                            RowDivider()
+                            SettingRow("\(cue.title) sound", caption: overridden ? "Plays \(cue.rawValue).wav from your SoundOverrides folder instead." : nil) {
+                                Picker("\(cue.title) sound", selection: sound(cue)) {
+                                    ForEach(DictationSound.systemSoundNames, id: \.self) { Text($0).tag($0) }
+                                }
+                                .labelsHidden()
+                                .fixedSize()
+                                .disabled(overridden)
+                            }
+                        }
+                    }
                     RowDivider()
                     SettingToggle("Pause music while dictating", caption: "Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on.", isOn: pauseMediaWhileDictating)
                     RowDivider()
                     SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))
                     RowDivider()
+                    SettingToggle("Hide capsule while dictating", caption: "Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak.", isOn: setting(\.hideCapsuleWhileDictating))
+                    RowDivider()
                     SettingToggle("Show words as you speak", caption: "Previews Parakeet’s recognition in the capsule while you record. The pasted text is still the full recognition.", isOn: setting(\.showLiveText))
+                        .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
                     SettingToggle("Detect meetings", caption: "Offer the notetaker when Zoom, Google Meet, Teams, a Slack huddle or another call starts using the microphone. Calls in a browser need Accessibility.", isOn: setting(\.detectMeetings))
                     RowDivider()
@@ -291,6 +309,13 @@ struct SettingsView: View {
         Binding(
             get: { model.settings[keyPath: keyPath] },
             set: { model.settings[keyPath: keyPath] = $0; model.saveSettings() }
+        )
+    }
+
+    private func sound(_ cue: DictationSound) -> Binding<String> {
+        Binding(
+            get: { model.settings.soundName(for: cue) },
+            set: { model.settings.sounds[cue] = $0; model.saveSettings(); model.playFeedback(cue) }
         )
     }
 }

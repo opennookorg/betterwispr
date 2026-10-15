@@ -21,6 +21,7 @@ struct BetterWisprApp: App {
                 delegate.model.refreshPermissions()
             }
             .frame(minWidth: 760, minHeight: 520)
+            .environment(\.appTheme, delegate.model.settings.theme)
             .animation(.easeInOut(duration: 0.4), value: delegate.model.needsOnboarding)
         }
         .defaultSize(width: 920, height: 680)

@@ -210,7 +210,7 @@ struct MeetingDetailView: View {
             .padding(.leading, 14)
             .padding(.trailing, 8)
             .frame(minHeight: 48)
-            .background(Color.cardFill, in: .rect(cornerRadius: 14, style: .continuous))
+            .background(.cardFill, in: .rect(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.cardStroke))
             .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
             .accessibilityElement(children: .contain)

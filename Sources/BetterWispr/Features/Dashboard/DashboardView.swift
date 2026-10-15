@@ -80,6 +80,7 @@ struct DashboardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.ui, value: model.selectedPage)
+            .modifier(ThemedPage())
             .navigationTitle(model.selectedPage.title)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !model.statusMessage.isEmpty { statusBar }

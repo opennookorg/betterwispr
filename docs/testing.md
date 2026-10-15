@@ -806,10 +806,28 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   (microphone denied, no input, model missing). Turning the setting off silences
   them; recording meeting audio also suppresses them. Start a new dictation during
   a cue: playback stops before capture. Check reduced motion and increased contrast.
+- [ ] In Settings > App with Dictation sounds on, each of Start, Finish, Cancel
+  and Needs attention lists the files in `/System/Library/Sounds` and shows
+  Tink, Purr, Bottle and Basso on a fresh install. Picking a sound plays it once
+  and the next dictation uses it, also after relaunch. With a meeting recording,
+  picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
+  Settings: the Finish picker is greyed out, says the file plays instead, and
+  dictation plays the file. Turning Dictation sounds off hides the pickers.
 - [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
   connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
   VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
   its own and pastes the whole transcript. Hold mode behaves the same while held.
+- [ ] Turn on Hide capsule while dictating, with the floating capsule both on
+  and off. Dictate in hold and toggle mode. No capsule appears while listening
+  or transcribing, the menu bar icon is a microphone while listening, the text
+  pastes, and
+  Show words as you speak is greyed out. Escape, the cancel shortcut and the menu
+  bar Cancel still cancel, and the Cancelled card with Undo appears. A failed
+  dictation, copy-only and Transcript ready still show their cards. Dictate past
+  9:30: the capsule appears with "Stops in 0:30" and VoiceOver announces it.
+  Meeting recording still shows its pill. Dictating during a meeting hides the
+  pill and a meeting prompt until the dictation ends, then both return. Turning
+  the setting off restores the capsule during dictation.
 - [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
   bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
@@ -857,6 +875,24 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
 - [ ] Disconnect the input device during capture; retry after reconnecting.
 - [ ] Move between Spaces, fullscreen windows and monitors. Confirm capsule
   positioning, keyboard controls, VoiceOver labels and reduced-motion behavior.
+
+## Appearance
+
+- [ ] Choose Cream in Settings > Appearance with macOS in Dark Mode. The app
+  switches to the light appearance and every dashboard page has a cream page,
+  including under the toolbar, with lighter cream cards on Home and Transcribe.
+  Check empty and filled History and Insights, Notetaker with and without a
+  selected meeting, Settings, Models, Vocabulary, Style and About. Forms show
+  no white scroll background, and buttons, pop-ups, segmented controls, search
+  fields and the sidebar look as they do in Light.
+- [ ] With Cream on, open the Welcome Guide on macOS 14 and on 15 or later, and
+  start a meeting so the Notetaker panel docks. Both are cream, including the
+  area under the title bar.
+- [ ] Measure primary and secondary text on the cream page and cards with a
+  contrast checker. Primary text is at least 4.5:1. Secondary text matches Light.
+  Check increased contrast and reduced transparency.
+- [ ] Switch between System, Light, Cream and Dark. Light and Dark look as they
+  did before Cream, and the theme survives relaunch.
 
 ## Pausing music while dictating
 

@@ -74,6 +74,8 @@ private struct NotetakerCard: View {
     var body: some View {
         MeetingDetailView(model: model, id: id)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(ThemedPage())
+            .environment(\.appTheme, model.settings.theme)
             .onChange(of: model.meetings.meeting(id) == nil) { _, removed in if removed { close() } }
     }
 }

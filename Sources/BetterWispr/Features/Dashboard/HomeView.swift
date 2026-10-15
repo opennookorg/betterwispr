@@ -133,7 +133,7 @@ private struct DictationPanel: View {
         .frame(minHeight: 120)
         .background {
             ZStack {
-                Color.cardFill
+                Rectangle().fill(.cardFill)
                 RadialGradient(
                     colors: [(recording ? Color.red : .accentColor).opacity(recording ? 0.22 : 0.12), .clear],
                     center: .topLeading, startRadius: 0, endRadius: 420
@@ -463,7 +463,7 @@ private struct SetupTile: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? Color.primary.opacity(0.07) : .cardFill, in: .rect(cornerRadius: 12, style: .continuous))
+            .background(hovering ? AnyShapeStyle(Color.primary.opacity(0.07)) : AnyShapeStyle(.cardFill), in: .rect(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.cardStroke))
             .contentShape(.rect(cornerRadius: 12))
         }

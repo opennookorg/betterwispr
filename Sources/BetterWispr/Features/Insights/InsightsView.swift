@@ -37,13 +37,16 @@ struct InsightsView: View {
 
     var body: some View {
         if history.isEmpty {
-            ContentUnavailableView(
-                "No Insights Yet",
-                systemImage: "chart.bar",
-                description: Text(savesHistory
-                    ? "Dictate a few times and your pace, time saved and top apps appear here."
-                    : "Insights are built from saved dictations. Turn on Save history in Settings to see them.")
-            )
+            ScrollView {}
+                .overlay {
+                    ContentUnavailableView(
+                        "No Insights Yet",
+                        systemImage: "chart.bar",
+                        description: Text(savesHistory
+                            ? "Dictate a few times and your pace, time saved and top apps appear here."
+                            : "Insights are built from saved dictations. Turn on Save history in Settings to see them.")
+                    )
+                }
         } else {
             content(UsageInsights(history, period: period))
         }

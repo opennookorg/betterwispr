@@ -40,12 +40,14 @@ the policy immediately and persist through the existing workspace store.
 
 1. A dashboard action or the global shortcut (**Option–Space** unless changed in
    Settings) starts a session. Capture the previously focused external app before
-   showing the nonactivating capsule. While the session is preparing, recording
-   or transcribing, a second Carbon hot key makes Escape (also with the dictation
-   shortcut's held modifiers unless they include Command, so Command-Option-Escape
-   stays Force Quit) cancel it from any app through the same Undo path;
-   it is unregistered as soon as the session leaves those phases, so other apps
-   keep Escape.
+   showing the nonactivating capsule. With "Hide capsule while dictating" on,
+   `AppModel.showsCapsule` keeps it hidden until the session leaves the busy
+   phases or the 30-second limit warning starts. While the session is preparing,
+   recording or transcribing, a second Carbon hot key makes Escape (also with the
+   dictation shortcut's held modifiers unless they include Command, so
+   Command-Option-Escape stays Force Quit) cancel it from any app through the
+   same Undo path; it is unregistered as soon as the session leaves those phases,
+   so other apps keep Escape.
 2. Validate the selected provider and check microphone permission. Apple speech
    authorization and API-key checks still precede capture. Installed neural-model
    warm-up runs independently, so it need not delay capture; readiness is checked
@@ -73,6 +75,7 @@ the policy immediately and persist through the existing workspace store.
    one exception: `LiveTranscriber` re-recognizes the unconfirmed tail of the
    16 kHz capture copy about once a second while recording and shows the
    agreed words in the capsule, but the pasted text is always this batch pass.
+   It does not run while the capsule is hidden for dictation.
    With automatic language and a Whisper model, a non-empty
    `AppSettings.dictationLanguages` limits detection. `WhisperKitProvider`
    runs Whisper's language detection once on the first 30 seconds, allowing

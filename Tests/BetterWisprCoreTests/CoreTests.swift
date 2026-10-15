@@ -35,6 +35,8 @@ import Testing
     #expect(settings.unloadModelWhenIdle == .never)
     #expect(!settings.copyToClipboard)
     #expect(settings.soundEffects)
+    #expect(!settings.hideCapsuleWhileDictating)
+    #expect(DictationSound.allCases.map(settings.soundName) == ["Tink", "Purr", "Bottle", "Basso"])
     #expect(!settings.pauseMediaWhileDictating)
     #expect(!settings.showInDock)
     #expect(settings.theme == .dark)
@@ -50,12 +52,24 @@ import Testing
     toggled.onboardingStep = 2
     toggled.copyToClipboard = true
     toggled.soundEffects = false
+    toggled.hideCapsuleWhileDictating = true
+    toggled.sounds = [.started: "Pop", .attention: "Funk"]
     toggled.pauseMediaWhileDictating = true
     toggled.showInDock = true
     toggled.theme = .system
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     toggled.cancelShortcut = DictationShortcut(keyCode: 53, modifiers: .control, key: "Esc")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
+}
+
+@Test func pickedDictationSoundsSaveByCueAndOtherCuesKeepTheirDefault() throws {
+    var settings = AppSettings()
+    settings.sounds[.finished] = "Glass"
+    let saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any]
+    #expect(saved?["sounds"] as? [String: String] == ["finished": "Glass"])
+    let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(loaded.soundName(for: .finished) == "Glass")
+    #expect(loaded.soundName(for: .started) == "Tink")
 }
 
 @Test func microphoneIsTheChosenDeviceWhileConnectedOtherwiseTheMacOSDefaultIncludingBluetooth() {

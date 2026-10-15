@@ -4,14 +4,16 @@ import Testing
 @testable import BetterWisprCore
 @testable import BetterWispr
 
-@Test(arguments: DictationSound.allCases) @MainActor func everyCueFallsBackToAStockSystemSoundWithoutAnOverride(cue: DictationSound) throws {
+@Test(arguments: DictationSound.allCases) @MainActor func everyCuePlaysItsPickedSystemSoundOrFallsBackToItsDefault(cue: DictationSound) throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     #expect(cue.url(in: directory) == nil)
-    let sound = try #require(cue.sound(in: directory))
-    #expect(sound.name == cue.systemSoundName)
+    #expect(DictationSound.systemSoundNames.contains(cue.defaultSoundName))
+    #expect(try #require(cue.sound(named: AppSettings().soundName(for: cue), in: directory)).name == cue.defaultSoundName)
+    #expect(try #require(cue.sound(named: "Glass", in: directory)).name == "Glass")
+    #expect(try #require(cue.sound(named: "No Such Sound", in: directory)).name == cue.defaultSoundName)
 }
 
-@Test @MainActor func overrideFileWinsOverTheSystemSoundAndABrokenOverrideStaysSilent() throws {
+@Test @MainActor func overrideFileWinsOverThePickedSoundAndABrokenOverrideStaysSilent() throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -19,11 +21,45 @@ import Testing
     let custom = directory.appendingPathComponent("finished.wav")
     try Data(contentsOf: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff")).write(to: custom)
     #expect(DictationSound.finished.url(in: directory) == custom)
-    let override = try #require(DictationSound.finished.sound(in: directory))
+    let override = try #require(DictationSound.finished.sound(named: "Ping", in: directory))
     #expect(override.name == nil)
-    #expect(DictationSound.attention.sound(in: directory)?.name == DictationSound.attention.systemSoundName)
+    #expect(DictationSound.attention.sound(named: "Ping", in: directory)?.name == "Ping")
     try Data().write(to: custom)
-    #expect(DictationSound.finished.sound(in: directory) == nil)
+    #expect(DictationSound.finished.sound(named: "Ping", in: directory) == nil)
+}
+
+@Test @MainActor func hiddenCapsuleStaysAwayWhileDictatingButReturnsForTheLimitWarningAndCards() {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    defer {
+        model.phase = .idle
+        try? FileManager.default.removeItem(at: folder)
+    }
+    model.settings.showCapsule = false
+    model.phase = .recording
+    var presentations = 0
+    model.onPresentationChange = { presentations += 1 }
+    model.advanceRecording(to: AudioRecorder.maximumDuration - 30)
+    #expect(model.showsCapsule && presentations == 0)
+    model.advanceRecording(to: 0)
+    model.settings.hideCapsuleWhileDictating = true
+    #expect(!model.showsCapsule)
+
+    model.advanceRecording(to: AudioRecorder.maximumDuration - 31)
+    #expect(model.recordingSecondsLeft == nil && !model.showsCapsule && presentations == 0)
+    model.advanceRecording(to: AudioRecorder.maximumDuration - 30)
+    #expect(model.recordingSecondsLeft == 30 && model.showsCapsule && presentations == 1)
+    model.advanceRecording(to: AudioRecorder.maximumDuration - 12)
+    #expect(model.recordingSecondsLeft == 12 && presentations == 1)
+
+    model.phase = .transcribing
+    #expect(!model.showsCapsule)
+    model.phase = .cancelled
+    #expect(model.showsCapsule)
+    model.phase = .failed(DictationFailure(title: "Couldn’t start dictation.", message: "Microphone access is off."))
+    #expect(model.showsCapsule)
+    model.phase = .idle
+    #expect(!model.showsCapsule)
 }
 
 @Test @MainActor func capsuleHoverTracksEachControlAcrossExpansionAndExit() {
@@ -193,6 +229,10 @@ import Testing
     model.settings.theme = .dark
     model.saveSettings()
     #expect(NSApplication.shared.appearance?.name == .darkAqua)
+    model.settings.theme = .cream
+    model.saveSettings()
+    #expect(NSApplication.shared.appearance?.name == .aqua)
+    #expect(try LocalStore(directory: folder).load().settings.theme == .cream)
     model.settings.theme = .system
     model.saveSettings()
     #expect(NSApplication.shared.appearance == nil)

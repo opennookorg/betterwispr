@@ -1,26 +1,28 @@
 import AppKit
+import BetterWisprCore
 import Foundation
 
-enum DictationSound: String, CaseIterable {
-    case started, finished, cancelled, attention
-
+extension DictationSound {
     static let overrideDirectory = URL.applicationSupportDirectory
         .appendingPathComponent("BetterWispr/SoundOverrides", isDirectory: true)
+    static let systemSoundNames = ((try? FileManager.default.contentsOfDirectory(atPath: "/System/Library/Sounds")) ?? [])
+        .map { ($0 as NSString).deletingPathExtension }
+        .sorted()
 
-    var systemSoundName: String {
+    var title: String {
         switch self {
-        case .started: "Tink"
-        case .finished: "Purr"
-        case .cancelled: "Bottle"
-        case .attention: "Basso"
+        case .started: "Start"
+        case .finished: "Finish"
+        case .cancelled: "Cancel"
+        case .attention: "Needs attention"
         }
     }
 
-    var sound: NSSound? { sound(in: Self.overrideDirectory) }
+    func sound(named name: String) -> NSSound? { sound(named: name, in: Self.overrideDirectory) }
 
-    func sound(in directory: URL) -> NSSound? {
+    func sound(named name: String, in directory: URL) -> NSSound? {
         if let override = url(in: directory) { return NSSound(contentsOf: override, byReference: false) }
-        return NSSound(named: systemSoundName)
+        return NSSound(named: name) ?? NSSound(named: defaultSoundName)
     }
 
     func url(in directory: URL) -> URL? {

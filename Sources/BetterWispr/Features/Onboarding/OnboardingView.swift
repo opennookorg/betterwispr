@@ -64,6 +64,7 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             bottomBar
         }
+        .modifier(ThemedPage())
         .task {
             while !Task.isCancelled {
                 model.refreshPermissions()

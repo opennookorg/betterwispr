@@ -31,7 +31,7 @@ struct TranscribeView: View {
                 TranscribeHome(model: model) { transcriptToDelete = $0 }
             }
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(.pageFill)
         .alert("Delete this transcript?", isPresented: Binding(
             get: { transcriptToDelete != nil },
             set: { if !$0 { transcriptToDelete = nil } }
@@ -120,7 +120,7 @@ private struct TranscribeHome: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 26)
-        .background(dropTargeted ? Color.accentColor.opacity(0.08) : Color.cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(dropTargeted ? AnyShapeStyle(Color.accentColor.opacity(0.08)) : AnyShapeStyle(.cardFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(dropTargeted ? Color.accentColor : Color.primary.opacity(0.18), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))

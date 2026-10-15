@@ -82,6 +82,13 @@ private final class CapsuleHostingView: NSHostingView<CapsuleView> {
     }
 }
 
+extension AppModel {
+    var showsCapsule: Bool {
+        if isBusy && settings.hideCapsuleWhileDictating && recordingSecondsLeft == nil { return false }
+        return settings.showCapsule || phase != .idle || !meetings.runs.isEmpty || meetings.message != nil || meetingDetector.meeting != nil
+    }
+}
+
 @MainActor
 final class CapsuleController {
     private let panel: NSPanel
@@ -109,9 +116,7 @@ final class CapsuleController {
     }
 
     func update() {
-        if model.settings.showCapsule || model.phase != .idle || !model.meetings.runs.isEmpty || model.meetings.message != nil
-            || model.meetingDetector.meeting != nil { show() }
-        else { panel.orderOut(nil) }
+        if model.showsCapsule { show() } else { panel.orderOut(nil) }
     }
 
     private func observeMeetings() {

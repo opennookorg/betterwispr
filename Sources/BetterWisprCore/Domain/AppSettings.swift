@@ -5,7 +5,21 @@ public enum DictationMode: String, Codable, CaseIterable, Sendable {
 }
 
 public enum AppTheme: String, Codable, CaseIterable, Sendable {
-    case system, light, dark
+    case system, light, cream, dark
+}
+
+/// A moment in a dictation that can play a sound.
+public enum DictationSound: String, Codable, CodingKeyRepresentable, CaseIterable, Sendable {
+    case started, finished, cancelled, attention
+
+    public var defaultSoundName: String {
+        switch self {
+        case .started: "Tink"
+        case .finished: "Purr"
+        case .cancelled: "Bottle"
+        case .attention: "Basso"
+        }
+    }
 }
 
 /// Minutes a loaded speech model may sit unused before the app releases it.
@@ -34,7 +48,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
+    public var hideCapsuleWhileDictating: Bool = false
     public var soundEffects: Bool = true
+    /// macOS system sound names picked per cue; missing cues use `DictationSound.defaultSoundName`.
+    public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
     public var pauseMediaWhileDictating: Bool = false
     /// Offers the notetaker when a known call app or web meeting starts recording.
@@ -113,6 +130,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public func tone(for context: StyleContext) -> StyleTone { styles[context] ?? .formal }
 
+    public func soundName(for cue: DictationSound) -> String { sounds[cue] ?? cue.defaultSoundName }
+
     public func cliModel(_ cli: NotesCLI) -> String { cli == .claudeCode ? claudeNotesModel : codexNotesModel }
 
     public mutating func setCLIModel(_ model: String, for cli: NotesCLI) {
@@ -146,7 +165,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
+        hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
+        sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         useCalendar = try container.decodeIfPresent(Bool.self, forKey: .useCalendar) ?? false
