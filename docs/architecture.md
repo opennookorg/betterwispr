@@ -88,13 +88,15 @@ the policy immediately and persist through the existing workspace store.
    so a misheard "Kocia Mark" becomes "question mark". Then apply voice
    commands, spoken numbers as digits and the @, # and % symbols for English
    and Auto. For English
-   text, **Medium** then asks the notes model the user chose in Models (Apple
-   Intelligence, the built-in model, Ollama, a signed-in CLI or an API connection) for a clarity edit
+   text, **Medium** then asks the cleanup provider chosen on the Style page, or
+   the notes model chosen in Models while it stays Same as notes
+   (`AppSettings.cleanupSettings`; Apple Intelligence, the built-in model,
+   Ollama, a signed-in CLI or an API connection), for a clarity edit
    with `TranscriptPolisher` instructions, plus the selected text, clipboard and
    window text when "Use screen context" is on and the dictation started in
    Medium. Screen context is captured when it is on and either Parakeet with
    the phrase booster is selected for English or automatic language, or Medium
-   has an available notes model. Only the Medium case reads the clipboard. The edit is bounded by a timeout and
+   has an available cleanup model. Only the Medium case reads the clipboard. The edit is bounded by a timeout and
    rejected when it answers the dictation, adds new words or changes length too
    much; any failure keeps the Light text, and Medium never picks a different
    model than the one selected.
@@ -126,6 +128,23 @@ paused that still report paused. Operations run one at a time, address the
 running process so a closed app is never launched, and never prompt during
 dictation; consent is asked once when the setting turns on. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
+
+The optional Clean up selected text shortcut (`AppSettings.selectedTextShortcut`,
+`GlobalShortcut` id 4) edits text outside a dictation and is refused while one
+runs. A dictation that starts while an edit runs cancels the edit, so the two
+never paste at once. Escape with any modifier is refused as this shortcut
+because Escape cancels dictation. `AppModel.cleanUpSelectedText` reads the
+frontmost app's selection through Accessibility with
+`DictationContext.selectedText(in:)`, which returns nothing
+under secure input or from a password field. Empty, short (under
+`TranscriptPolisher.minimumWords`) and non-English selections are refused. The
+trimmed text goes to `TranscriptPolisher` with `AppSettings.cleanupSettings` and
+vocabulary hints, without screen context or mode instructions. Before pasting,
+the selection is read again. An unchanged selection is replaced through
+`FocusedAppIntegration`, which still requires the same frontmost app and
+restores the clipboard. Any other case copies the edit for manual paste. Each
+ending is one `SelectedTextCleanupOutcome` toast. Cancel on the progress toast
+drops the result, and nothing is saved to history.
 
 Swift UI-facing state and speech-provider methods are isolated to `@MainActor`.
 Audio callbacks must not mutate view state unsafely. Cancelled operations must

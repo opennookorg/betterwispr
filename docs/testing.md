@@ -784,7 +784,8 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Escape reaches TextEdit again. Escape never stops a running notetaker. With a
   ⌘ ⌥ dictation shortcut, ⌘ ⌥ Escape still opens Force Quit while dictating.
   With an Fn shortcut, pressing Esc while holding Fn cancels.
-- [ ] Hold mode: hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
+- [ ] Hold mode: Settings > Shortcut names it "Hold or tap" and its caption
+  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
   shows only the wider waveform, with no cancel or finish buttons. Text is
   inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
   expands to the 108 × 28 point pill with separate × and ✓ controls.
@@ -1002,6 +1003,52 @@ player; real playback and the Automation prompt need these steps.
   notes model; outside the mode, American spelling stays.
 - [ ] Revoke Accessibility. Website modes stop matching, app modes still work and
   dictation is not delayed by more than half a second.
+
+### Cleanup provider
+
+- [ ] Choose Medium on the Style page. The Cleanup provider picker shows "Same
+  as notes" with the notes model's name. Dictate an English sentence with a
+  repair ("at 5, no, at 6"); the capsule says "Editing with" the notes model.
+- [ ] Choose another Ollama model or a notes API connection as the cleanup
+  provider. Medium dictation uses it while meeting notes and Ask keep theirs.
+  The footer under Auto cleanup names that provider and no longer says it is
+  the meeting notes model. Remove that API connection; the picker returns to
+  "Same as notes".
+- [ ] Choose Light and set the selected text shortcut. The Cleanup provider
+  picker stays visible, and the footer says the shortcut sends your selection
+  to it. Clear the shortcut; the picker and that sentence hide.
+- [ ] Choose an unavailable cleanup provider (Apple Intelligence off, or a CLI
+  with no model). The Style page shows the reason, Medium dictations get Light
+  cleanup and no other provider is asked.
+
+### Selected text cleanup
+
+- [ ] On a fresh install, Settings > Shortcut shows "Clean up selected text"
+  with "Set Shortcut…". Record ⌃⌥C. In TextEdit, select "so um we should
+  probably ship it on friday i think" and press ⌃⌥C. A "Cleaning up…" toast
+  names the cleanup provider, then the edit replaces the selection and the
+  toast says "Cleaned up". ⌘Z in TextEdit brings the original back, and the
+  clipboard holds what it held before.
+- [ ] Press ⌃⌥C with nothing selected, with three words, with a French
+  sentence and in a password field. Each shows its own toast and changes
+  nothing. With an unavailable cleanup provider the toast gives the reason and
+  no other provider is asked.
+- [ ] Press ⌃⌥C, then switch apps or change the selection before the edit
+  arrives. Nothing is pasted, the toast says "Copied, not pasted" and ⌘V pastes
+  the edit. Click Cancel on the progress toast in another run; nothing is
+  pasted or copied. Pressing ⌃⌥C while an edit runs shows the progress toast
+  again.
+- [ ] Press ⌃⌥C during a dictation. The toast says "Finish dictating first" and
+  the dictation continues. Press ⌃⌥C with a slow provider, then start a
+  dictation before the edit arrives. The same toast appears, and nothing is
+  pasted or copied. Revoke Accessibility and press it; the toast offers Allow.
+- [ ] Try a modifier alone, Escape with a modifier, the dictation shortcut and
+  the Cancel shortcut as this shortcut, and this shortcut as the other two.
+  Each is refused with a toast, and Escape's toast says Esc cancels a
+  dictation. Clear turns it off, ⌃⌥C reaches other apps again, and relaunching
+  keeps the setting you left.
+- [ ] Repeat in Safari or Chrome text areas, Notes, Mail and Slack. Record the
+  apps whose selection can't be read; they show "No selected text found".
 
 ## Dictation languages and Chinese script
 

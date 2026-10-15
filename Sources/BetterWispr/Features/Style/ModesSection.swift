@@ -170,8 +170,8 @@ private struct WritingModeEditor: View {
 
     private var writingFooter: String {
         let screen = "With Parakeet and the phrase booster, screen context is read on this Mac when you start dictating, so it follows this mode’s apps and websites, and the names in it fix misspelled English words\(model.settings.recognizeScreenText ? ". It may read the window from a screenshot because Read window text from the screen is on" : "")."
-        guard (mode.cleanup ?? model.settings.cleanup) == .medium else { return "\(screen) Choose Medium cleanup to add instructions for your notes model." }
-        return "Instructions go to your notes model with each Medium dictation in this mode. \(screen) Medium also reads it and sends it to your notes model, which may be a cloud service, and a trigger word can turn that off but not on."
+        guard (mode.cleanup ?? model.settings.cleanup) == .medium else { return "\(screen) Choose Medium cleanup to add instructions for your cleanup model." }
+        return "Instructions go to your cleanup model with each Medium dictation in this mode. \(screen) Medium also reads it and sends it to your cleanup model, which may be a cloud service, and a trigger word can turn that off but not on."
     }
 
     private var instructions: Binding<String> {

@@ -58,6 +58,32 @@ import Testing
     #expect(restored.tone(for: .email) == .formal)
 }
 
+@Test func cleanupProviderFollowsNotesUntilChosenAndResetsWithItsConnection() throws {
+    let legacy = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"apple","showCapsule":true,"silenceThreshold":0.002,"notesModel":"llama3.1:8b"}"#
+    var settings = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
+    #expect(settings.cleanupSelection == nil)
+    settings.askSelection = .apple
+    #expect(settings.cleanupSettings.notesSelection == .ollama("llama3.1:8b"))
+
+    settings.cleanupSelection = .ollama("qwen3:4b")
+    let restored = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(restored == settings)
+    #expect(restored.cleanupSettings.notesModelName == "Ollama · qwen3:4b")
+    #expect(restored.notesSelection == .ollama("llama3.1:8b"))
+    #expect(restored.askSettings.notesSelection == .apple)
+
+    let unknown = legacy.dropLast() + #","cleanupSelection":{"telepathy":{}}}"#
+    let fallback = try JSONDecoder().decode(AppSettings.self, from: Data(unknown.utf8))
+    #expect(fallback.cleanupSelection == nil)
+    #expect(fallback.notesSelection == .ollama("llama3.1:8b"))
+
+    let removed = UUID()
+    settings.cleanupSelection = .connection(removed)
+    settings.deselectNotesConnection(removed)
+    #expect(settings.cleanupSelection == nil)
+    #expect(settings.notesSelection == .ollama("llama3.1:8b"))
+}
+
 @Test func transcriptsSavedBeforeAppTrackingStillLoad() throws {
     let saved = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","createdAt":0,"text":"Hi","rawText":"hi","duration":1,"modelName":"Parakeet","language":"auto"}"#
     let transcript = try JSONDecoder().decode(Transcript.self, from: Data(saved.utf8))

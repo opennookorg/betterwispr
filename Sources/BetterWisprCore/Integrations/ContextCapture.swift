@@ -20,7 +20,7 @@ extension DictationContext {
         return Task.detached(priority: .userInitiated) {
             let element = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(element, 0.25)
-            let selected = element.element(kAXFocusedUIElementAttribute).flatMap { $0.isSecureField ? nil : $0.string(kAXSelectedTextAttribute) }
+            let selected = element.selectedText
             guard let window = element.element(kAXFocusedWindowAttribute) else { return DictationContext(selectedText: selected, clipboard: clipboard) }
             let title = window.string(kAXTitleAttribute), frame = window.frame
             var text = accessibilityText(of: window)
@@ -31,6 +31,18 @@ extension DictationContext {
             let content = text.isEmpty ? nil : "Active Window: \(title ?? name ?? "Unknown")\nApplication: \(name ?? "Unknown")\n\nWindow Content:\n\(text)"
             return DictationContext(selectedText: selected, clipboard: clipboard, window: content)
         }
+    }
+
+    /// The text selected in `app`; nil while secure input is on, without Accessibility, or for this app.
+    @MainActor
+    public static func selectedText(in app: NSRunningApplication) async -> String? {
+        let pid = app.processIdentifier
+        guard !IsSecureEventInputEnabled(), AXIsProcessTrusted(), pid != ProcessInfo.processInfo.processIdentifier else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            let element = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(element, 0.25)
+            return element.selectedText
+        }.value
     }
 
     /// The mixed-case names on screen and those macOS English spell checking does not know, for Parakeet to spell.

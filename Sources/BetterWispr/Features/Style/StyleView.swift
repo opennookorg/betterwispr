@@ -66,7 +66,7 @@ extension CleanupLevel {
         switch self {
         case .none: "Keeps exactly what you said, including filler words."
         case .light: "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”."
-        case .medium: "Also has your notes model fix self-corrections, numbers, punctuation and spoken lists in English dictation."
+        case .medium: "Also has your cleanup model fix self-corrections, numbers, punctuation and spoken lists in English dictation."
         }
     }
 }
@@ -102,13 +102,13 @@ struct StyleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 8, style: .continuous))
                     .padding([.horizontal, .bottom], 16)
-                    if model.settings.cleanup == .medium {
+                    if model.settings.cleanup == .medium || model.settings.selectedTextShortcut != nil {
                         RowDivider()
                         VStack(alignment: .leading, spacing: 8) {
-                            NotesModelPicker(model: model)
-                                .disabled(!model.canEditConnections)
-                            if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings) {
-                                Label("\(reason) Until then, Medium dictations get Light cleanup.", systemImage: "exclamationmark.triangle")
+                            NotesModelPicker(model: model, title: "Cleanup provider", overrideSelection: \.cleanupSelection)
+                            if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings.cleanupSettings) {
+                                Label(model.settings.cleanup == .medium ? "\(reason) Until then, Medium dictations get Light cleanup." : reason,
+                                      systemImage: "exclamationmark.triangle")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                             }
@@ -206,15 +206,19 @@ struct StyleView: View {
 
     private var cleanupFooter: String {
         let original = "Your original words are never lost. In History, open Original transcription and choose Use Original."
-        guard model.settings.cleanup == .medium else { return original }
-        let destination = switch model.settings.notesSelection {
+        guard model.settings.cleanup == .medium else {
+            return model.settings.selectedTextShortcut == nil ? original : "Clean up selected text sends your selection to the cleanup provider. \(original)"
+        }
+        let provider = model.settings.cleanupSettings
+        let destination = switch provider.notesSelection {
         case .apple: "Medium edits with Apple Intelligence on this Mac."
         case .builtIn: "Medium edits with the built-in model on this Mac."
         case .ollama: "Medium edits with Ollama on this Mac."
         case .cli(let cli): "Medium sends English dictation to \(cli.name) through your subscription, which adds a few seconds."
-        case .connection: "Medium sends English dictation to \(model.settings.notesModelName) with your API key."
+        case .connection: "Medium sends English dictation to \(provider.notesModelName) with your API key."
         }
-        return "\(destination) It uses the same model as meeting notes, and results vary by model. Other languages, very short dictations and edits that fail, take too long or rewrite too much get Light cleanup. \(original)"
+        let results = model.settings.cleanupSelection == nil ? "It uses the same model as meeting notes, and results vary by model." : "Results vary by model."
+        return "\(destination) \(results) Other languages, very short dictations and edits that fail, take too long or rewrite too much get Light cleanup. \(original)"
     }
 
     private func example(_ title: String, _ text: String, emphasized: Bool) -> some View {
@@ -234,11 +238,11 @@ struct StyleView: View {
                 set: { model.settings.styles[context] = $0; model.saveSettings() })
     }
 
-    private static let screenContextCaption = "When you speak English to Parakeet with the phrase booster installed, reads your selected text and the window you dictate into on this Mac, and uses the names in them to fix words Parakeet heard as misspellings, such as superbase becoming Supabase. Correctly spelled words stay as heard. With Medium cleanup, your selected text, clipboard and window text also go to your notes model, which may be a cloud service. Nothing is read while a password field is active, and clipboard items marked as passwords are skipped."
+    private static let screenContextCaption = "When you speak English to Parakeet with the phrase booster installed, reads your selected text and the window you dictate into on this Mac, and uses the names in them to fix words Parakeet heard as misspellings, such as superbase becoming Supabase. Correctly spelled words stay as heard. With Medium cleanup, your selected text, clipboard and window text also go to your cleanup model, which may be a cloud service. Nothing is read while a password field is active, and clipboard items marked as passwords are skipped."
 
     private var screenTextCaption: String {
         let status = CGPreflightScreenCaptureAccess() ? "Screen Recording is allowed." : "Needs Screen Recording. Allow BetterWispr under Privacy & Security, Screen & System Audio Recording in System Settings, then reopen BetterWispr."
-        return "When an app shares too little text, reads its window from a screenshot on this Mac. With Medium cleanup, that text also goes to your notes model, which may be a cloud service. \(status)"
+        return "When an app shares too little text, reads its window from a screenshot on this Mac. With Medium cleanup, that text also goes to your cleanup model, which may be a cloud service. \(status)"
     }
 
     private var recognizeScreenText: Binding<Bool> {

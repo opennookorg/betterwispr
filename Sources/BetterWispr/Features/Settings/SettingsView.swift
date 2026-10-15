@@ -36,11 +36,13 @@ struct SettingsView: View {
                     RowDivider()
                     ShortcutRecorder(model: model, kind: .cancel)
                     RowDivider()
+                    ShortcutRecorder(model: model, kind: .selectedText)
+                    RowDivider()
                     SettingRow("Behavior", caption: model.settings.dictationMode == .hold
-                        ? "Hold to speak and release to finish. A quick tap starts hands-free dictation."
+                        ? "Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish."
                         : "Press once to speak. Press again or click ✓ to finish.") {
                         Picker("Behavior", selection: setting(\.dictationMode)) {
-                            Text("Hold to talk").tag(DictationMode.hold)
+                            Text("Hold or tap").tag(DictationMode.hold)
                             Text("Press to toggle").tag(DictationMode.toggle)
                         }
                         .pickerStyle(.segmented)
@@ -181,7 +183,7 @@ struct SettingsView: View {
                 SettingsSection("Permissions") {
                     PermissionStatusRow(title: "Microphone", caption: "Needed to hear your voice.", granted: model.microphoneGranted, action: model.requestMicrophone)
                     RowDivider()
-                    PermissionStatusRow(title: "Accessibility", caption: "Needed for automatic paste and modifier-key shortcuts.", granted: model.accessibilityGranted, action: model.requestAccessibility)
+                    PermissionStatusRow(title: "Accessibility", caption: "Needed for automatic paste, modifier-key shortcuts and cleaning up selected text.", granted: model.accessibilityGranted, action: model.requestAccessibility)
                     RowDivider()
                     PermissionStatusRow(title: "Calendar", caption: "Optional. Turns on Use Calendar for meeting notes.", granted: model.calendarGranted) { model.useCalendar(true) }
                 } footer: {
@@ -296,7 +298,7 @@ struct SettingsView: View {
 }
 
 private struct ShortcutRecorder: View {
-    enum Kind { case dictation, cancel }
+    enum Kind { case dictation, cancel, selectedText }
 
     let model: AppModel
     let kind: Kind
@@ -307,9 +309,19 @@ private struct ShortcutRecorder: View {
 
     private var isCapturing: Bool { monitor != nil }
     private var shortcut: DictationShortcut? {
-        kind == .dictation ? model.settings.shortcut : model.settings.cancelShortcut
+        switch kind {
+        case .dictation: model.settings.shortcut
+        case .cancel: model.settings.cancelShortcut
+        case .selectedText: model.settings.selectedTextShortcut
+        }
     }
-    private var title: String { kind == .dictation ? "Keyboard shortcut" : "Cancel shortcut" }
+    private var title: String {
+        switch kind {
+        case .dictation: "Keyboard shortcut"
+        case .cancel: "Cancel shortcut"
+        case .selectedText: "Clean up selected text"
+        }
+    }
     private var placeholder: String { kind == .dictation ? "" : "Set Shortcut…" }
 
     var body: some View {
@@ -325,12 +337,12 @@ private struct ShortcutRecorder: View {
                     .foregroundStyle(.secondary)
                     .help("Reset to \(DictationShortcut.optionSpace.displayName)")
                     .transition(.opacity)
-                } else if kind == .cancel, shortcut != nil, !isCapturing {
-                    Button("Clear", systemImage: "xmark.circle") { model.changeCancelShortcut(nil) }
+                } else if kind != .dictation, shortcut != nil, !isCapturing {
+                    Button("Clear", systemImage: "xmark.circle") { change(nil) }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help("Remove the cancel shortcut")
+                    .help(kind == .cancel ? "Remove the cancel shortcut" : "Remove the clean up shortcut")
                     .transition(.opacity)
                 }
                 recordButton
@@ -356,6 +368,7 @@ private struct ShortcutRecorder: View {
             if shortcut?.keyCode == UInt32(kVK_Function) { return "Needs Accessibility. Set “Press 🌐 key to” to “Do Nothing” in Keyboard settings." }
             return shortcut?.isModifierOnly == true ? "Needs Accessibility. Uses the left or right key you recorded." : "Starts dictation from any app."
         case .cancel: return "Also cancels a dictation from any app. Esc always does."
+        case .selectedText: return "Edits the text you select in any app with your cleanup provider from Style. English only."
         }
     }
 
@@ -389,8 +402,12 @@ private struct ShortcutRecorder: View {
         model.registerShortcut()
     }
 
-    private func change(_ shortcut: DictationShortcut) {
-        kind == .dictation ? model.changeShortcut(shortcut) : model.changeCancelShortcut(shortcut)
+    private func change(_ shortcut: DictationShortcut?) {
+        switch kind {
+        case .dictation: if let shortcut { model.changeShortcut(shortcut) }
+        case .cancel: model.changeCancelShortcut(shortcut)
+        case .selectedText: model.changeSelectedTextShortcut(shortcut)
+        }
     }
 
     private func capture(_ event: NSEvent) {

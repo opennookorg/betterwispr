@@ -73,7 +73,7 @@ struct ModelsView: View {
             } header: {
                 Text("Meeting notes · Bring your own LLM")
             } footer: {
-                Text("The selected notes model processes the transcript and your thoughts after recording, and whenever you generate a summary. The built-in model runs on this Mac and needs an internet connection only to download. Claude Code and Codex use their signed-in subscriptions. API connections use your key and provider billing. Cloud choices send meeting text to that provider; speech recognition is selected separately. When Auto cleanup in Style is Medium, this model also edits your English dictation.")
+                Text("The selected notes model processes the transcript and your thoughts after recording, and whenever you generate a summary. The built-in model runs on this Mac and needs an internet connection only to download. Claude Code and Codex use their signed-in subscriptions. API connections use your key and provider billing. Cloud choices send meeting text to that provider; speech recognition is selected separately. When Auto cleanup in Style is Medium, this model also edits your English dictation unless you choose another cleanup provider in Style.")
             }
 
             Section {

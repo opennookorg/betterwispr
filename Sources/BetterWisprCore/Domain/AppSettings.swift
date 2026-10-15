@@ -54,9 +54,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var shortcut: DictationShortcut = .optionSpace
     /// Optional extra shortcut that cancels a dictation without pasting it; Escape always cancels.
     public var cancelShortcut: DictationShortcut?
+    public var selectedTextShortcut: DictationShortcut?
     public var learnCorrections: Bool = true
     public var cleanup: CleanupLevel = .light
-    /// Sends selected text, clipboard text and the focused window's text to the notes model during Medium cleanup.
+    /// Sends selected text, clipboard text and the focused window's text to the cleanup provider during Medium cleanup.
     public var useScreenContext: Bool = false
     /// Reads window text from pixels when the app exposes too little through Accessibility; needs Screen Recording.
     public var recognizeScreenText: Bool = false
@@ -71,6 +72,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var notesModel: String?
     /// Nil asks questions with the notes model.
     public var askSelection: NotesModelSelection?
+    public var cleanupSelection: NotesModelSelection?
     public var notesBuiltIn: Bool = false
     /// The newest onboarding the user finished or skipped; 0 shows it again.
     public var completedOnboardingVersion: Int = 0
@@ -104,9 +106,16 @@ public struct AppSettings: Codable, Equatable, Sendable {
         return settings
     }
 
+    public var cleanupSettings: AppSettings {
+        var settings = self
+        if let cleanupSelection { settings.notesSelection = cleanupSelection }
+        return settings
+    }
+
     public mutating func deselectNotesConnection(_ id: UUID) {
         if notesConnectionID == id { notesSelection = .apple }
         if askSelection == .connection(id) { askSelection = nil }
+        if cleanupSelection == .connection(id) { cleanupSelection = nil }
     }
 
     public init() {}
@@ -160,6 +169,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         unloadModelWhenIdle = try container.decodeIfPresent(ModelIdleUnload.self, forKey: .unloadModelWhenIdle) ?? .never
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
         cancelShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .cancelShortcut)
+        selectedTextShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .selectedTextShortcut)
         microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
         dismissedSpeakerDetectionOffer = try container.decodeIfPresent(Bool.self, forKey: .dismissedSpeakerDetectionOffer) ?? false
         learnCorrections = try container.decodeIfPresent(Bool.self, forKey: .learnCorrections) ?? true
@@ -170,6 +180,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         modes = try container.decodeIfPresent([WritingMode].self, forKey: .modes) ?? []
         notesModel = try container.decodeIfPresent(String.self, forKey: .notesModel)
         askSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .askSelection)
+        cleanupSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .cleanupSelection)
         notesBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .notesBuiltIn) ?? false
         completedOnboardingVersion = try container.decodeIfPresent(Int.self, forKey: .completedOnboardingVersion) ?? 0
         onboardingStep = try container.decodeIfPresent(Int.self, forKey: .onboardingStep) ?? 0

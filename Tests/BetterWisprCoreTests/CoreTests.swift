@@ -40,6 +40,7 @@ import Testing
     #expect(settings.theme == .dark)
     #expect(settings.shortcut == .optionSpace)
     #expect(settings.cancelShortcut == nil)
+    #expect(settings.selectedTextShortcut == nil)
     #expect(settings.microphone == nil)
     #expect(settings.completedOnboardingVersion == 0)
     #expect(settings.onboardingStep == 0)
@@ -55,6 +56,7 @@ import Testing
     toggled.theme = .system
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     toggled.cancelShortcut = DictationShortcut(keyCode: 53, modifiers: .control, key: "Esc")
+    toggled.selectedTextShortcut = DictationShortcut(keyCode: 8, modifiers: [.control, .option], key: "C")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }
 
