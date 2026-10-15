@@ -14,6 +14,18 @@ extension AXUIElement {
         return (value as! AXUIElement)
     }
 
+    func elements(_ attribute: String) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(self, attribute as CFString, &value) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    func bool(_ attribute: String) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(self, attribute as CFString, &value) == .success else { return nil }
+        return value as? Bool
+    }
+
     var isSecureField: Bool { string(kAXSubroleAttribute) == kAXSecureTextFieldSubrole }
 
     var frame: CGRect? {

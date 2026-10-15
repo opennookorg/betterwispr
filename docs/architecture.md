@@ -772,6 +772,24 @@ Accessibility checks and cancellation behavior in the shared path. Clipboard
 restoration after automated paste uses a bounded delay because arbitrary apps
 do not acknowledge receipt; slow recipient apps need explicit manual testing.
 
+Screen Sharing sends the clipboard to the other computer only when its window
+becomes key, so for `com.apple.ScreenSharing` `FocusedAppIntegration` first
+presses Edit > Send Clipboard through Accessibility. It finds menu items by
+their `MainMenu.loctable` keys (`281.title` for Send Clipboard, `100521.title`
+for Use Shared Clipboard), so any language matches. Screen Sharing disables
+Send Clipboard while Use Shared Clipboard is on and the user is controlling the
+other computer. In that case it presses Use Shared Clipboard off, waits until
+Accessibility reports Send Clipboard enabled, presses it, and presses Use Shared
+Clipboard back on. The wait is needed because AppKit refreshes menu state for
+Accessibility about once a second and ignores presses on an item it still
+treats as disabled; turning the setting off and on sends only a flag and moves
+no clipboard data. Accessibility presses run before the call returns, so the
+clipboard is queued before the Command-V events. When Send Clipboard cannot be
+pressed it returns `copiedForManualPaste` rather than paste the other
+computer's older clipboard, and it checks the target is still frontmost after
+the wait. The text is not restored afterwards, because the other computer reads
+it after an unknown delay.
+
 Add only the concrete integration and its required settings. Do not introduce
 per-app speech providers or duplicate recording code. Any future network
 integration must require explicit opt-in and preserve the local default.
