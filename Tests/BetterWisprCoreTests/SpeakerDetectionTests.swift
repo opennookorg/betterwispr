@@ -60,7 +60,7 @@ private func turn(_ voice: Int, _ start: Float, _ end: Float) -> SpeakerSegment 
     }) { _, start, duration in
         if start >= 17 { throw CocoaError(.fileReadCorruptFile) }
         return MeetingSegment(speaker: .them, start: start, duration: duration, text: start == 7 ? "I can take it." : "No, let me.", rawText: "")
-    }
+    }.segments
 
     #expect(labelled.map(\.text) == ["Shall we start?", "Sure.", "I can take it.", "No, let me.", "Fine by me, thanks.", "Hmm."])
     #expect(labelled.map(\.start) == [0, 3, 7, 13, 17, 23])
@@ -69,27 +69,64 @@ private func turn(_ voice: Int, _ start: Float, _ end: Float) -> SpeakerSegment 
     #expect(written.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
 }
 
+@MainActor
+@Test func roomVoicesGetNumbersWhileTheMostHeardMicrophoneVoiceStaysMe() async throws {
+    let mine = MeetingSegment(speaker: .me, start: 0, duration: 6, text: "Morning, let us look at the launch plan.", rawText: "")
+    let remote = MeetingSegment(speaker: .them, start: 6, duration: 4, text: "Sounds good.", rawText: "")
+    let room = MeetingSegment(speaker: .me, start: 10, duration: 3, text: "I can take the slides.", rawText: "")
+    let mixed = MeetingSegment(speaker: .me, start: 13, duration: 8, text: "Great, thanks. Then I will draft the email.", rawText: "")
+    let echo = MeetingSegment(speaker: .me, start: 21, duration: 20, text: "We should move the launch to next Friday.", rawText: "")
+    let echoed = MeetingSegment(speaker: .them, start: 21, duration: 20, text: "We should move the launch to next Friday.", rawText: "")
+    let myVoiceOnTheCall = MeetingSegment(speaker: .them, start: 45, duration: 2, text: "Can you hear me?", rawText: "")
+    let turns = [
+        mine.id: [VoiceTurn(voice: "A", start: 0, end: 6)],
+        remote.id: [VoiceTurn(voice: "C", start: 0, end: 4)],
+        room.id: [VoiceTurn(voice: "B", start: 0, end: 3)],
+        mixed.id: [VoiceTurn(voice: "A", start: 0, end: 4), VoiceTurn(voice: "B", start: 4, end: 8)],
+        echo.id: [VoiceTurn(voice: "E", start: 0, end: 20)],
+        echoed.id: [VoiceTurn(voice: "D", start: 0, end: 20)],
+        myVoiceOnTheCall.id: [VoiceTurn(voice: "A", start: 0, end: 2)],
+    ]
+
+    let embeddings: [String: [Float]] = ["A": [1, 0, 0], "B": [0, 1, 0], "C": [0, 0, 1], "D": [1, 1, 0], "E": [0, 1, 1]]
+
+    let (labelled, voices) = try await SpeakerDetection.label([mine, remote, room, mixed, echo, echoed, myVoiceOnTheCall], turns: turns, embeddings: embeddings, audio: { _, _ in
+        let url = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try Data().write(to: url)
+        return url
+    }) { _, start, duration in
+        MeetingSegment(speaker: .them, start: start, duration: duration, text: start == 13 ? "Great, thanks." : "Then I will draft the email.", rawText: "")
+    }
+
+    #expect(labelled.map(\.speaker) == [.me, .them, .me, .me, .me, .me, .them, .them])
+    #expect(labelled.map(\.participant) == [nil, 1, 2, nil, 2, nil, 3, 4])
+    #expect(labelled.map { $0.label() } == ["Me", "Speaker 1", "Speaker 2", "Me", "Speaker 2", "Me", "Speaker 3", "Speaker 4"])
+    #expect(voices == [1: [0, 0, 1], 2: [0, 1, 0], 3: [1, 1, 0], 4: [1, 0, 0]])
+}
+
 @Test func speakerLabelsUseGivenNamesAndFallBackToNumbers() {
-    let me = MeetingSegment(speaker: .me, start: 0, duration: 2, text: "Can we ship Friday?", rawText: "", participant: 1)
+    let me = MeetingSegment(speaker: .me, start: 0, duration: 2, text: "Can we ship Friday?", rawText: "")
     let them = MeetingSegment(speaker: .them, start: 2, duration: 2, text: "Probably.", rawText: "")
     let ana = MeetingSegment(speaker: .them, start: 4, duration: 2, text: "Only if QA signs off.", rawText: "", participant: 2)
     let bo = MeetingSegment(speaker: .them, start: 6, duration: 2, text: "Agreed.", rawText: "", participant: 1)
+    let cy = MeetingSegment(speaker: .me, start: 8, duration: 2, text: "I can test it tonight.", rawText: "", participant: 3)
 
     #expect(me.label(names: [1: "Ana"]) == "Me")
     #expect(them.label(names: [1: "Ana"]) == "Them")
     #expect(ana.label() == "Speaker 2")
     #expect(ana.label(names: [2: "  Ana "]) == "Ana")
     #expect(ana.label(names: [2: " "]) == "Speaker 2")
+    #expect(cy.label() == "Speaker 3")
 
     var meeting = Meeting(modelName: "Parakeet", language: "en")
-    for segment in [bo, ana, them, me] { meeting.insert(segment) }
-    meeting.participantNames = [2: "Ana"]
-    #expect(meeting.participants == [1, 2])
+    for segment in [cy, bo, ana, them, me] { meeting.insert(segment) }
+    meeting.participantNames = [2: "Ana", 3: "Cy"]
+    #expect(meeting.participants == [1, 2, 3])
     #expect(meeting.transcript.components(separatedBy: "\n").map { $0.components(separatedBy: "] ").last ?? "" } == [
-        "Me: Can we ship Friday?", "Them: Probably.", "Ana: Only if QA signs off.", "Speaker 1: Agreed.",
+        "Me: Can we ship Friday?", "Them: Probably.", "Ana: Only if QA signs off.", "Speaker 1: Agreed.", "Cy: I can test it tonight.",
     ])
     #expect(TranscriptChunker.chunks(meeting.segments, names: meeting.participantNames, budget: 500) == [
-        "Me: Can we ship Friday?\nThem: Probably.\nAna: Only if QA signs off.\nSpeaker 1: Agreed.",
+        "Me: Can we ship Friday?\nThem: Probably.\nAna: Only if QA signs off.\nSpeaker 1: Agreed.\nCy: I can test it tonight.",
     ])
 }
 

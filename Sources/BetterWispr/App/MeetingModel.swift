@@ -28,7 +28,8 @@ final class MeetingRun {
     @ObservationIgnored var drain: Task<Void, Never>?
     @ObservationIgnored var work: Task<Void, Never>?
     @ObservationIgnored var voices: SpeakerRecording?
-    @ObservationIgnored var detection: Task<[MeetingSegment], Error>?
+    @ObservationIgnored var separatesRoomVoices = false
+    @ObservationIgnored var detection: Task<(segments: [MeetingSegment], voices: [Int: [Float]]), Error>?
 
     init(meetingID: UUID, phase: MeetingPhase, language: String? = nil, vocabulary: [VocabularyEntry] = []) {
         self.meetingID = meetingID
@@ -49,12 +50,16 @@ final class MeetingModel {
     var elapsed: TimeInterval = 0
     var message: String?
     var allMeetingsThread: [AskExchange] = []
+    var voicesMessage: String?
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
     var showsCallAudioHint = false
     var notesSettings = AppSettings()
     var ollamaModels: [String] = []
     var builtInModelInstalled = false
+    var remembersVoices = false {
+        didSet { if !remembersVoices { heardVoices = [:] } }
+    }
     var notesAvailability: NotesAvailability {
         _ = builtInModelInstalled
         return MeetingNotesGenerator.availability(settings: notesSettings)
@@ -62,6 +67,8 @@ final class MeetingModel {
 
     @ObservationIgnored private let store: MeetingStore
     @ObservationIgnored private var writableAskStore: AllMeetingsAskStore?
+    @ObservationIgnored private let voiceStore: VoiceStore
+    private var heardVoices: [UUID: HeardVoices] = [:]
     @ObservationIgnored private let recorder = MeetingRecorder()
     /// The run that receives the recorder's chunks, including the last ones a stopped meeting hands off.
     @ObservationIgnored private var recorderOwner: MeetingRun?
@@ -74,6 +81,7 @@ final class MeetingModel {
 
     init(store: MeetingStore? = nil) {
         self.store = store ?? MeetingStore()
+        voiceStore = VoiceStore(url: self.store.directory.deletingLastPathComponent().appendingPathComponent("Voices.json"))
         if store == nil { Self.removeLeftoverAudio() }
         let loaded = self.store.load()
         meetings = loaded.meetings
@@ -107,7 +115,7 @@ final class MeetingModel {
     var activeMeetingID: UUID? { meetings.first { runs[$0.id] != nil }?.id }
 
     func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], silenceThreshold: Float, microphone: AudioInputDevice?,
-               event: CalendarEvent? = nil) {
+               event: CalendarEvent? = nil, separateRoomVoices: Bool = false) {
         guard capturing == nil else { return }
         var meeting = Meeting(title: event?.title ?? "", modelName: model.name, language: language ?? "auto")
         meeting.attendees = event?.attendees
@@ -123,6 +131,7 @@ final class MeetingModel {
         showsCallAudioHint = false
         heard = (false, false)
         run.voices = SpeakerDetection.isInstalled() ? try? SpeakerRecording() : nil
+        run.separatesRoomVoices = separateRoomVoices
         elapsed = 0
         let releasing = releasingRecorder
         run.work = Task { [weak self] in
@@ -268,6 +277,8 @@ final class MeetingModel {
             message = "Couldn’t delete the meeting. \(error.localizedDescription)"
             return
         }
+        heardVoices[id] = nil
+        do { try voiceStore.replaceVoices(from: id, with: []) } catch { voicesMessage = voicesError(error) }
         meetings.removeAll { $0.id == id }
         if selectedID == id { selectedID = nil }
         let kept = allMeetingsThread.filter { !$0.answer.citations.contains { $0.line.meetingID == id } }
@@ -345,8 +356,7 @@ final class MeetingModel {
         do {
             let labelled = try await detection.value
             guard owns(run) else { return }
-            edit(id, save: false) { $0.segments = labelled }
-            saveNow(id)
+            applySpeakers(labelled, to: id)
         } catch {
             guard owns(run) else { return }
             if !(error is CancellationError), !detection.isCancelled {
@@ -354,6 +364,14 @@ final class MeetingModel {
             }
         }
         run.detection = nil
+    }
+
+    func applySpeakers(_ labelled: (segments: [MeetingSegment], voices: [Int: [Float]]), to id: UUID) {
+        if remembersVoices {
+            do { heardVoices[id] = HeardVoices(labelled.voices, among: try voiceStore.load()) } catch { voicesMessage = voicesError(error) }
+        }
+        edit(id, save: false) { $0.segments = labelled.segments }
+        saveNow(id)
     }
 
     private func writeNotes(for run: MeetingRun) async {
@@ -414,7 +432,7 @@ final class MeetingModel {
                 guard let segment else { continue }
                 edit(id, save: false) { $0.insert(segment) }
                 saveNow(id)
-                if chunk.speaker == .them, let voices = run.voices { try? await voices.append(chunk.url, for: segment.id) }
+                if chunk.speaker == .them || run.separatesRoomVoices, let voices = run.voices { try? await voices.append(chunk.url, for: segment.id) }
             } catch {
                 guard owns(run) else { return }
                 if !(error is CancellationError) {
@@ -464,10 +482,43 @@ final class MeetingModel {
         }
     }
 
-    private func saveNow(_ id: UUID) {
+    func saveNow(_ id: UUID) {
         saves.removeValue(forKey: id)?.cancel()
         guard let meeting = meeting(id) else { return }
         do { try store.save(meeting) } catch { message = "This meeting couldn’t be saved. \(error.localizedDescription)" }
+        rememberNamedVoices(in: meeting)
+    }
+
+    func forgetVoices() throws {
+        heardVoices = [:]
+        try voiceStore.forget()
+    }
+
+    func suggestedName(for number: Int, in meeting: Meeting) -> String? {
+        heardVoices[meeting.id]?.suggestion(for: number, in: meeting)
+    }
+
+    func merge(_ source: Int, into target: Int, in id: UUID) {
+        heardVoices[id]?.drop(source)
+        edit(id) { $0.mergeParticipant(source, into: target) }
+    }
+
+    /// Forgets the remembered voice behind a speaker's suggestion once the user commits another name, including from the meeting it was remembered in.
+    func commitName(of number: Int, in id: UUID) {
+        guard let meeting = meeting(id) else { return }
+        do {
+            guard let rejected = try heardVoices[id]?.reject(number, in: meeting, from: voiceStore) else { return }
+            heardVoices[rejected.meetingID]?.drop(rejected.participant)
+        } catch { voicesMessage = voicesError(error) }
+    }
+
+    private func rememberNamedVoices(in meeting: Meeting) {
+        guard remembersVoices else { return }
+        do { try heardVoices[meeting.id]?.remember(in: meeting, to: voiceStore) } catch { voicesMessage = voicesError(error) }
+    }
+
+    private func voicesError(_ error: any Error) -> String {
+        "Remembered voices in \(voiceStore.url.path) couldn’t be used and were left as they were. \(error.localizedDescription)"
     }
 
     private func saveAllMeetingsThread() {

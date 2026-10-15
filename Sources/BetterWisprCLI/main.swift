@@ -193,7 +193,7 @@ func meeting(_ url: URL, provider: any SpeechProvider, language: String?, vocabu
         }
     }
     if let voices {
-        segments = try await SpeakerDetection.label(segments, voices: voices, transcribe: segment)
+        segments = try await SpeakerDetection.label(segments, voices: voices, transcribe: segment).segments
     }
     let encoder = JSONEncoder()
     encoder.outputFormatting = .withoutEscapingSlashes

@@ -147,6 +147,82 @@ FLAC, MOV and M4V files were not tried, and a WAV file was tried only in
   transcribes. No yt-dlp process keeps running after the quit, and after a
   relaunch no chunk audio is left.
 
+## Meeting speakers check, 2026-10-15, version 0.1.6
+
+Apple M4 Pro, macOS 27.0.1, debug builds. `swift build`, all 291 tests in
+`swift test` and `./scripts/build-app.sh` passed. The new tests cover these
+behaviors:
+
+- With room voices, the voice heard longest on the microphone outside echoes
+  stays Me, and every other voice on either side gets a number and its
+  embedding.
+- Moving a Me line to a speaker, merging a room voice, and
+  `Meeting.unusedAttendees`.
+- A remembered voice is recognised at a distance of 0.591 and not at 0.610.
+  Each name goes to the nearest voice only. An embedding of another size, or of
+  length zero, never matches.
+- A remembered voice is only suggested, and taking the suggestion stores
+  nothing new. After detection through `MeetingModel`, the suggestion is
+  offered and no name is written to the meeting in memory or on disk.
+- Typing a name into a suggested speaker's field and erasing it, with a save
+  in between, keeps the profile. Committing a different name deletes the
+  profile behind the suggestion and stops suggesting it, and saving the meeting
+  the profile came from doesn't store it again.
+- After a merge through `MeetingModel.merge`, only the voice that kept the
+  lines is stored, a reused number stores nothing, and a named speaker without
+  lines is not stored. Deleting a meeting deletes its profiles and
+  keeps other meetings' profiles.
+- `VoiceStore` replaces one meeting's voices, sets an existing 0755 folder to
+  0700, writes mode 0600, leaves an unreadable file unchanged, rejects version
+  2, and `forget()` deletes the file.
+
+The recognition and store tests failed when the code was broken on purpose
+with a cutoff of 0.62 or 0.58, with `replaceVoices` ignoring a load error, and
+with a voice that kept its recognised name being stored. The new tests also
+failed when the code was broken on purpose in each of these ways: storing a
+named speaker without lines, keeping a merged speaker's embedding, keeping a
+rejected profile in the store, suggesting a rejected profile again, skipping
+the cleanup on delete, and leaving the folder's mode unchanged. They also
+failed when detection wrote a suggestion into the speaker names, when `merge`
+kept the merged speaker's embedding, when every save rejected suggestions
+again, and when a rejected voice stayed in the meeting it came from. The name
+field's Return and focus handling, the invitee pick and the delete
+confirmation were not run in the app. No real meeting, real
+voice, onboarding screen or Models setting was exercised. How well room voices
+are separated, and how often a remembered voice gets the right name, have not
+been measured. Measuring either needs recorded meetings with known speakers:
+`fetch_bench_corpus.py --meetings` and `scripts/evaluate_meetings.py` cover
+call audio, and an in-room corpus with far-field microphones would have to be
+added.
+
+- [ ] Run setup on a fresh user. Speaker detection shows below the speech model
+  and downloads nothing until Download is clicked. Clicking it during the
+  speech model download shows "Downloads when the speech model is ready" and it
+  starts after that download. Its Cancel takes it off the queue, and
+  cancelling the speech model download drops it too.
+- [ ] With Use Calendar on, record during an event with invitees. The button
+  beside a speaker's name field lists the invitees, and picking one fills the
+  name and removes it from the other speakers' lists.
+- [ ] Turn on Tell apart people in the room. Hold a meeting with a second
+  person beside the Mac and a call on headphones. Your lines stay Me, the
+  person in the room gets a speaker number, and the call's people get others.
+  Repeat with the call on the Mac's speakers.
+- [ ] Turn on Remember named voices. Name a speaker in a meeting recorded since
+  BetterWispr opened, and check that `Voices.json` appears with mode 0600. In
+  the next meeting with the same person, their speaker's name menu starts with
+  "Sounds like" and the name, and the name field stays empty until you pick it.
+  Type a different name, erase it, click elsewhere, and check the profile is
+  still in the file. Name that speaker someone else, press Return, and check
+  the old profile leaves the file. Delete the meeting, check the confirmation
+  says it forgets the voices named in it, and check its profiles leave the
+  file. With Remember named voices off, the confirmation doesn't mention
+  voices.
+- [ ] Forget Voices asks first, then deletes `Voices.json`. Replace the file
+  with text that isn't JSON. The next meeting shows an error naming the file
+  and leaves it as it was, and Forget Voices still deletes it.
+- [ ] Turn off Wi-Fi and repeat the remembered voice check. Suggestions
+  appear without network access.
+
 ## Speaker detection check, 2026-10-14, version 0.1.6
 
 Apple M4 Pro, macOS 27.0.1, debug builds. `swift build`, all 180 tests in
@@ -263,8 +339,9 @@ download card have not been exercised in the app, and no download was run.
   Them line's speaker name, choose New speaker, and check it reads Speaker 1 and a
   name field appears. Right-click the line's bubble and check the same menu opens
   rather than only the text menu.
-- [ ] Move a line to another speaker and back to Them. Me lines show no speaker
-  menu, and right-clicking a Me line's selected text still offers Copy.
+- [ ] Move a Them line to another speaker and back to Them, and a Me line to a
+  speaker and back to Me. Right-clicking a line's selected text still offers
+  Copy.
 - [ ] With two or more speakers, use Merge into on one. Its lines take the other
   speaker's label, a typed name moves across when the target has none, and the
   summary shows as out of date.

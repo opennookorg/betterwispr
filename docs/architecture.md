@@ -173,7 +173,8 @@ tabs backed by the existing meeting fields.
    time and saves. A failed chunk shows a message and the meeting continues.
    When speaker detection is installed, each transcribed "Them" chunk is also
    resampled to 16 kHz mono and appended to one `SpeakerRecording` file, which
-   remembers where each segment sits in it.
+   remembers where each segment sits in it. With
+   `AppSettings.separateRoomVoices` on, "Me" chunks are appended too.
 4. Stopping closes both sources and transcribes the remaining chunks. The next
    meeting can start as soon as the recorder has handed those chunks off, while
    the stopped one keeps transcribing, finding speakers and writing notes. If a
@@ -183,7 +184,11 @@ tabs backed by the existing meeting fields.
    `argmaxinc/speakerkit-coreml` and live in
    `BetterWispr/Models/models/argmaxinc/speakerkit-coreml`. Each "Them"
    segment gets the voice heard longest within it, numbered 1, 2, 3 by first
-   appearance, in `MeetingSegment.participant`. Skip stops waiting at once and
+   appearance, in `MeetingSegment.participant`. When "Me" segments were
+   appended, the voice heard longest in them, outside the lines
+   `MeetingTranscript.removingEchoes` drops, stays Me. A "Me" segment with any
+   other voice gets a number the same way and keeps `speaker == .me`, so echo
+   removal still treats it as microphone audio. Skip stops waiting at once and
    leaves the segments as "Them"; detection already running finishes in the
    background on audio held in memory, so the recording file is deleted
    normally. An error also leaves the segments as "Them". Names typed above the transcript are saved in
@@ -203,22 +208,64 @@ tabs backed by the existing meeting fields.
    speaker detection file is deleted after detection, on cancel and at quit, and
    shares the chunk prefix, so launch cleanup removes it too.
 
-Speaker labels can be fixed after a meeting. A remote line's speaker name in the
+Speaker labels can be fixed after a meeting. A line's speaker name in the
 transcript opens a menu, also on right-click, that calls
 `Meeting.assign(segment:toParticipant:)` to move that line to another speaker, to
-plain "Them" while some remote lines have no speaker, or to a new speaker
-numbered by `Meeting.nextParticipant`, the lowest number no line or non-blank
-saved name uses. The Merge into menu beside each name
+a new speaker numbered by `Meeting.nextParticipant`, the lowest number no line or
+non-blank saved name uses, or back to nil. Nil shows "Me" on a microphone line
+and "Them" on a remote line, which the menu offers only while some remote lines
+have no speaker. A line keeps its `speaker`, so echo removal is unaffected. The
+invitee menu beside each name lists `Meeting.unusedAttendees`, the invitees no
+speaker is named after yet, and fills the name field with one. The Merge into menu beside each name
 calls `Meeting.mergeParticipant(_:into:)`, which relabels every line of one
 speaker as another, moves the name across when the target has none and drops the
-old number's name. Me lines never move, because echo removal and the notes prompt
-treat Me as the person recording. Both menus are hidden while the meeting is
+old number's name. The speaker and merge menus are hidden while the meeting is
 active, because detection replaces the segments when it finishes. A relabel
 changes `summarySourceFingerprint`, so an existing summary shows as out of date.
 When the Mac supports speaker detection but it is not installed, a meeting with
 remote lines shows a card that downloads it only when tapped. It applies from the
 next meeting, because chunk audio is already deleted. "Don’t show again" sets
-`AppSettings.dismissedSpeakerDetectionOffer`.
+`AppSettings.dismissedSpeakerDetectionOffer`. Onboarding offers the same download
+below the speech model. Clicking it while another download runs sets
+`AppModel.speakerDetectionQueued`, and the download starts only if that one
+succeeds.
+
+With `AppSettings.rememberVoices` on, `MeetingModel` keeps each detected
+meeting's speaker embeddings in memory as a `HeardVoices`, never in the meeting
+file. `SpeakerRecording.voiceTurns()` runs SpeakerKit with
+`SpeakerDetection.sameVoiceDistance`, 0.6, as `clusterDistanceThreshold`. That
+value is SpeakerKit's own default, so diarization is unchanged, and the
+constant states it once for both uses. The embeddings are
+`DiarizationResult.speakerCentroidEmbeddings`, one mean per speaker. After
+detection, `SpeakerDetection.recognise` compares each new speaker with every
+stored voice by Euclidean distance between length-normalised embeddings, the
+measure SpeakerKit clusters with. It matches a speaker to the nearest stored
+voice within 0.6, giving each name to one speaker. SpeakerKit's doc comment on
+`speakerCentroidEmbeddings` says there is no universal same-speaker threshold
+across runs and asks callers to calibrate one. BetterWispr has no corpus to
+calibrate against, so a match is only a suggestion. While a speaker has no
+name, `HeardVoices.suggestion(for:in:)` puts "Sounds like" and the stored name
+first in that speaker's name menu. Nothing writes `participantNames` until the
+user picks a name, so the transcript and the notes prompt hold only names the
+user chose.
+
+When a meeting saves, `HeardVoices.remember(in:to:)` passes each speaker that
+has a non-blank name and still has lines to
+`VoiceStore.replaceVoices(from:with:removing:)`, which replaces that meeting's
+entries in `Application Support/BetterWispr/Voices.json`. `VoiceStore.save`
+writes the file atomically and then sets it to 0600, as `MeetingStore` does. It
+also sets the folder to 0700, even when the folder already exists. A speaker that took its suggested name is not stored again,
+so the file grows only when the user names someone new. Saving never
+removes a stored voice. When the user commits a speaker's name with Return, by
+leaving the field or by picking an invitee, `MeetingModel.commitName(of:in:)`
+calls `HeardVoices.reject(_:in:from:)`. A committed name other than the
+suggestion removes the stored voice behind it and ends the suggestion, and the
+model drops that voice's embedding from the meeting it was remembered in, so
+saving that meeting again can't store it back. Merging speakers drops the merged speaker's embedding, so a number
+reused later can't inherit it. Deleting a meeting removes its stored voices. A
+`Voices.json` that fails to load is reported in `MeetingModel.voicesMessage`
+and never overwritten. Forget Voices deletes it, readable or not. Embeddings in
+memory are lost at quit, so speakers named after a relaunch are not stored.
 
 Each meeting being captured or processed is a `MeetingRun` in
 `MeetingModel.runs`. One run records at a time and any number process. Every

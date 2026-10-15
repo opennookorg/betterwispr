@@ -144,11 +144,12 @@ struct OnboardingView: View {
     private var modelChoice: some View {
         Form {
             modelRow
+            speakerDetectionRow
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
         .scrollContentBackground(.hidden)
-        .frame(height: 100)
+        .frame(height: 170)
     }
 
     @ViewBuilder private var modelRow: some View {
@@ -170,17 +171,50 @@ struct OnboardingView: View {
                     .disabled(model.isInstalling)
                 }
             } else {
-                Label {
-                    Text("Ready")
-                } icon: {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                }
-                .foregroundStyle(.secondary)
+                ready
             }
         } label: {
             Text(recommended?.name ?? selected.name)
             Text(modelDetail)
         }
+    }
+
+    @ViewBuilder private var speakerDetectionRow: some View {
+        let installation = model.installation?.id == AppModel.speakerDetectionID ? model.installation : nil
+        LabeledContent {
+            if model.speakerDetectionInstalled {
+                ready
+            } else if let installation, installation.failure == nil {
+                HStack {
+                    ProgressView(value: installation.progress).frame(width: 120)
+                    Button("Cancel", action: model.cancelInstallation)
+                }
+            } else if model.speakerDetectionQueued {
+                Button("Cancel") { model.speakerDetectionQueued = false }
+            } else {
+                Button(installation == nil ? "Download" : "Retry", action: model.installSpeakerDetection)
+            }
+        } label: {
+            Text("Speaker detection")
+            Text(speakerDetectionDetail(installation))
+        }
+    }
+
+    private func speakerDetectionDetail(_ installation: ModelInstallation?) -> String {
+        if let installation, !model.speakerDetectionInstalled {
+            return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
+        }
+        if model.speakerDetectionQueued { return "Downloads when the speech model is ready." }
+        return "Optional. Tells the voices in your meetings apart, on this Mac."
+    }
+
+    private var ready: some View {
+        Label {
+            Text("Ready")
+        } icon: {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        }
+        .foregroundStyle(.secondary)
     }
 
     private var modelDetail: String {

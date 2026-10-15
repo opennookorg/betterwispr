@@ -12,6 +12,7 @@ struct MeetingDetailView: View {
     @State private var transcriptQuery = ""
     @State private var showsSearch = false
     @State private var showsEchoes = false
+    @FocusState private var focusedName: Int?
     @Namespace private var tabUnderline
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -441,7 +442,7 @@ struct MeetingDetailView: View {
             LazyVStack(alignment: .leading, spacing: 18) {
                 ForEach(segments) { segment in
                     SegmentRow(segment: segment, label: segment.label(names: meeting.participantNames), isCited: segment.id == citedID,
-                               canChangeSpeaker: segment.speaker == .them && !isActive) {
+                               canChangeSpeaker: !isActive) {
                         speakerChoices(meeting, segment)
                     }
                     .id(segment.id)
@@ -488,13 +489,45 @@ struct MeetingDetailView: View {
                         .accessibilityHidden(true)
                     TextField("Speaker \(number)", text: participantName(number))
                         .textFieldStyle(.roundedBorder)
+                        .focused($focusedName, equals: number)
+                        .onSubmit { meetings.commitName(of: number, in: id) }
                         .accessibilityLabel("Name for speaker \(number)")
+                    let suggestion = meetings.suggestedName(for: number, in: meeting)
+                    if suggestion != nil || !meeting.unusedAttendees.isEmpty { nameMenu(meeting, number, suggestion: suggestion) }
                     if meeting.participants.count > 1, !isActive { mergeMenu(meeting, number) }
                 }
             }
         }
         .font(.callout)
-        .help("Name the voices on the call. Names appear in the transcript and the notes.")
+        .help("Name the voices in this meeting. Names appear in the transcript and the notes.")
+        .onChange(of: focusedName) { left, _ in
+            if let left { meetings.commitName(of: left, in: id) }
+        }
+    }
+
+    private func nameMenu(_ meeting: Meeting, _ number: Int, suggestion: String?) -> some View {
+        let name = MeetingSegment.label(of: number, names: meeting.participantNames)
+        let hint = suggestion.map { "\(name) sounds like \($0)" } ?? "Name \(name) after someone invited"
+        return Menu {
+            Section("Name \(name)") {
+                if let suggestion {
+                    Button("Sounds like \(suggestion)") { participantName(number).wrappedValue = suggestion }
+                }
+                ForEach(meeting.unusedAttendees, id: \.self) { attendee in
+                    Button(attendee) {
+                        participantName(number).wrappedValue = attendee
+                        meetings.commitName(of: number, in: id)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: suggestion == nil ? "person.crop.circle.badge.plus" : "person.crop.circle.badge.questionmark")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(hint)
+        .accessibilityLabel(hint)
     }
 
     private func mergeMenu(_ meeting: Meeting, _ number: Int) -> some View {
@@ -503,7 +536,7 @@ struct MeetingDetailView: View {
             Section("Merge \(name) into") {
                 ForEach(meeting.participants.filter { $0 != number }, id: \.self) { target in
                     Button(MeetingSegment.label(of: target, names: meeting.participantNames)) {
-                        meetings.edit(id) { $0.mergeParticipant(number, into: target) }
+                        meetings.merge(number, into: target, in: id)
                     }
                 }
             }
@@ -525,7 +558,9 @@ struct MeetingDetailView: View {
             ForEach(meeting.participants, id: \.self) { number in
                 Text(MeetingSegment.label(of: number, names: meeting.participantNames)).tag(Int?.some(number))
             }
-            if meeting.segments.contains(where: { $0.speaker == .them && $0.participant == nil }) {
+            if segment.speaker == .me {
+                Text(Speaker.me.label).tag(Int?.none)
+            } else if meeting.segments.contains(where: { $0.speaker == .them && $0.participant == nil }) {
                 Text(Speaker.them.label).tag(Int?.none)
             }
         }
@@ -668,7 +703,7 @@ struct SegmentRow<SpeakerChoices: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 if let label {
-                    Circle().fill(segment.speaker == .me ? Color.green : voiceColor(segment.participant)).frame(width: 6, height: 6)
+                    Circle().fill(segment.speaker == .me && segment.participant == nil ? Color.green : voiceColor(segment.participant)).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
                     if canChangeSpeaker {
                         Menu(content: speakerChoices) { Text(label).fontWeight(.semibold) }

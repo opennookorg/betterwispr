@@ -14,7 +14,7 @@ public struct MeetingSegment: Codable, Identifiable, Equatable, Sendable {
     public var duration: TimeInterval
     public var text: String
     public var rawText: String
-    /// Which voice on the call said this; nil for Me and for remote lines with no speaker yet.
+    /// Which voice said this; nil for the user's own microphone lines and for remote lines with no speaker yet.
     public var participant: Int?
 
     public init(id: UUID = UUID(), speaker: Speaker, start: TimeInterval, duration: TimeInterval, text: String, rawText: String, participant: Int? = nil) {
@@ -27,9 +27,9 @@ public struct MeetingSegment: Codable, Identifiable, Equatable, Sendable {
         self.participant = participant
     }
 
-    /// "Me", "Them", or the name given to this voice, else "Speaker 2".
+    /// The name given to this voice, else "Speaker 2"; "Me" or "Them" for a line with no voice.
     public func label(names: [Int: String]? = nil) -> String {
-        speaker == .them ? Self.label(of: participant, names: names) : speaker.label
+        participant == nil ? speaker.label : Self.label(of: participant, names: names)
     }
 
     /// "Them" for a remote line no voice was given, else the voice's name or "Speaker 2".
@@ -85,7 +85,6 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
     public var segments: [MeetingSegment]
     public var modelName: String
     public var language: String
-    /// Names the user gave voices on the call, by participant number.
     public var participantNames: [Int: String]?
     /// Invitees of the Calendar event the meeting was recorded during, other than the user.
     public var attendees: [String]?
@@ -144,7 +143,7 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         transcriptSegments.map { "[\($0.timestamp)] \($0.label(names: participantNames)): \($0.text)" }.joined(separator: "\n")
     }
 
-    /// Speaker numbers used on the call, lowest first.
+    /// Speaker numbers used in the meeting, lowest first.
     public var participants: [Int] { Set(segments.compactMap(\.participant)).sorted() }
 
     /// The lowest speaker number that no line or non-blank saved name uses yet.
@@ -156,9 +155,17 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         return number
     }
 
-    /// Moves a remote line to another voice, or back to plain "Them" with nil; leaves Me lines alone.
+    /// Invitees that no speaker is named after yet, once each, in invite order.
+    public var unusedAttendees: [String] {
+        var taken = Set((participantNames ?? [:]).values.map(Self.nameKey))
+        return (attendees ?? []).filter { !Self.nameKey($0).isEmpty && taken.insert(Self.nameKey($0)).inserted }
+    }
+
+    static func nameKey(_ name: String) -> String { name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+
+    /// Moves a line to another voice, or back to plain "Me" or "Them" with nil.
     public mutating func assign(segment id: UUID, toParticipant participant: Int?) {
-        guard let index = segments.firstIndex(where: { $0.id == id && $0.speaker == .them }) else { return }
+        guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
         segments[index].participant = participant
     }
 

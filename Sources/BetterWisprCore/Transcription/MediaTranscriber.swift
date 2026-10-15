@@ -43,7 +43,7 @@ public enum MediaTranscriber {
         guard let voices, !transcript.segments.isEmpty else { return transcript }
         progress(.findingSpeakers)
         do {
-            transcript.segments = try await SpeakerDetection.label(transcript.segments, voices: voices, transcribe: segment)
+            transcript.segments = try await SpeakerDetection.label(transcript.segments, voices: voices, transcribe: segment).segments
         } catch {
             try Task.checkCancellation()
             transcript.speakerError = error

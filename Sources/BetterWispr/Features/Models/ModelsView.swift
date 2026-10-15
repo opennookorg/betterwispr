@@ -6,6 +6,8 @@ struct ModelsView: View {
     @State private var editing: SpeechConnection?
     @State private var error: String?
     @State private var editingNotes = false
+    @State private var forgettingVoices = false
+    @State private var forgetFailure: String?
 
     var body: some View {
         Form {
@@ -80,6 +82,31 @@ struct ModelsView: View {
                 if model.speakerDetectionInstalled {
                     Label("Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript.", systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
+                    Toggle(isOn: setting(\.separateRoomVoices)) {
+                        Text("Tell apart people in the room")
+                        Text("Also separates the voices on your microphone. The voice your microphone hears longest stays Me and the others get their own speaker numbers, so if someone near you talks more than you do, move your lines back to Me. Your microphone audio is kept on this Mac until the speakers are found, then deleted.")
+                    }
+                    Toggle(isOn: setting(\.rememberVoices)) {
+                        Text("Remember named voices")
+                        Text("When you name a speaker, a profile of that voice is saved on this Mac. In later meetings, a speaker who sounds like a saved voice shows that name as a suggestion in its name menu, and no name is filled in until you choose one. Name speakers before you quit BetterWispr, because a meeting’s voices are held only in memory until then. A voice profile can identify a person, so ask people before you name them. Profiles are never uploaded, but Time Machine backs them up. Suggestions use SpeakerKit’s cutoff for grouping voices within one meeting, which wasn’t tuned for matching across meetings.")
+                    }
+                    LabeledContent {
+                        Button("Forget Voices…", role: .destructive) { forgettingVoices = true }
+                    } label: {
+                        Text("Remembered voices")
+                        Text(forgetFailure ?? "Deletes every saved voice profile. Names already in your meetings stay. Deleting a meeting deletes the profiles named in it.")
+                            .foregroundStyle(forgetFailure == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+                    }
+                    .confirmationDialog("Forget every remembered voice?", isPresented: $forgettingVoices) {
+                        Button("Forget Voices", role: .destructive) {
+                            do {
+                                try model.meetings.forgetVoices()
+                                forgetFailure = nil
+                            } catch {
+                                forgetFailure = "Couldn’t forget voices. \(error.localizedDescription)"
+                            }
+                        }
+                    }
                 } else {
                     let installation = model.installation?.id == AppModel.speakerDetectionID ? model.installation : nil
                     let installing = installation != nil && installation?.failure == nil
@@ -104,7 +131,7 @@ struct ModelsView: View {
             } header: {
                 Text("Meeting speakers")
             } footer: {
-                Text("Your microphone is always Me. People in the room with you share your microphone and stay part of Me.")
+                Text("Your microphone is Me. People in the room with you stay part of Me unless speaker detection tells them apart.")
             }
 
             Section {
@@ -148,6 +175,11 @@ struct ModelsView: View {
                 .font(.caption)
                 .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
         }
+    }
+
+    private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {
+        Binding(get: { model.settings[keyPath: keyPath] },
+                set: { model.settings[keyPath: keyPath] = $0; model.saveSettings() })
     }
 
     private func modelRow(_ speechModel: SpeechModel) -> some View {

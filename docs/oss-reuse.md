@@ -35,7 +35,13 @@ speaker-diarization-community-1, from
 at revision `556fc52a13327837688f02289457cded017802e9`, published under
 CC-BY-4.0. Each model folder's README links the original weights' license:
 pyannote segmentation-3.0, WeSpeaker and VBx. BetterWispr does not bundle them;
-they download only from the explicit Speaker detection installation.
+they download only from the explicit Speaker detection installation. Remember
+named voices stores the speaker embeddings these models compute in `Voices.json`
+on the user's Mac. CC-BY-4.0 sets conditions on sharing the licensed material,
+and BetterWispr shares neither the weights nor the embeddings. Its comparison
+of embeddings, Euclidean distance after scaling to unit length against
+SpeakerKit's default clustering threshold of 0.6, is written in BetterWispr and
+copies no SpeakerKit source.
 
 `Sources/BetterWisprCore/Notes/LlamaEngine.swift` uses
 [llama.swift](https://github.com/mattt/llama.swift) 2.10549.0 (MIT, copyright
