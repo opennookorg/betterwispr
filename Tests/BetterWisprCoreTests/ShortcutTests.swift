@@ -201,9 +201,27 @@ import Testing
 @MainActor @Test func pastePressesCommandAsItsOwnKeyAroundV() throws {
     let events = try #require(FocusedAppIntegration.pasteKeystroke())
     #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
-    #expect(events.map { $0.getIntegerValueField(.keyboardEventKeycode) } == [0x37, 9, 9, 0x37])
+    let v = Int64(FocusedAppIntegration.pasteKeyCode())
+    #expect(events.map { $0.getIntegerValueField(.keyboardEventKeycode) } == [0x37, v, v, 0x37])
     #expect(events.map { $0.flags.contains(.maskCommand) } == [true, true, true, false])
     #expect(events.map { $0.flags.contains(FocusedAppIntegration.leftCommandDeviceFlag) } == [true, true, true, false])
+}
+
+@MainActor @Test func pasteUsesTheKeyThatTypesVWithCommandInEachLayout() throws {
+    func layout(_ id: String) throws -> TISInputSource {
+        let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+        let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource]
+        return try #require(sources?.first)
+    }
+    func pasteKey(_ id: String) throws -> CGKeyCode? {
+        FocusedAppIntegration.keyCode(typing: "v", withCommandIn: try layout(id))
+    }
+    #expect(try pasteKey("com.apple.keylayout.US") == CGKeyCode(kVK_ANSI_V))
+    #expect(try pasteKey("com.apple.keylayout.Dvorak") == CGKeyCode(kVK_ANSI_Period))
+    #expect(try pasteKey("com.apple.keylayout.DVORAK-QWERTYCMD") == CGKeyCode(kVK_ANSI_V))
+    #expect(try pasteKey("com.apple.keylayout.Russian") == CGKeyCode(kVK_ANSI_V))
+    #expect(try pasteKey("com.apple.keylayout.Colemak") == CGKeyCode(kVK_ANSI_V))
+    #expect(FocusedAppIntegration.keyCode(typing: "v", withCommandIn: nil) == nil)
 }
 
 @MainActor @Test func screenSharingClipboardMenuTitlesAreFoundInEveryLanguage() {
