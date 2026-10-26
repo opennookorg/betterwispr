@@ -6,6 +6,23 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Paste keyboard layout check, 2026-10-26
+
+Automatic paste pressed key code 9, QWERTY's V, so Dvorak apps received ⌘K
+(issue #62). It now presses the key that types V with Command held in the
+current layout. Apple Silicon, macOS 27.0.1. `swift test --no-parallel` passed
+all 334 tests and `make lint` reported no warnings. With parallel tests,
+timing assertions in `BuiltInModelTests` and `YTDLPTests` failed intermittently
+on this branch and on unmodified `main`; none involve paste. A unit test reads
+the installed layouts: US, Colemak, Russian and Dvorak – QWERTY ⌘ give key 9,
+Dvorak gives 47 (its V key). No dictation was pasted with Dvorak selected.
+
+- [ ] Select Dvorak, dictate into TextEdit and Notes: the text is pasted, not
+  ⌘K's action, and the clipboard is restored.
+- [ ] Repeat with Dvorak – QWERTY ⌘, US and a non-Latin layout such as Russian.
+- [ ] Switch layouts between two dictations: each paste uses the layout that is
+  current when it is pasted.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,

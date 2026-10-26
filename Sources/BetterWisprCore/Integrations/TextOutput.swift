@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 
 public enum OutputResult: Sendable, Equatable {
     case copied
@@ -138,10 +139,11 @@ public struct FocusedAppIntegration: TextOutputIntegration {
 
     /// Command-V as a physical keyboard sends it, with left Command pressed and released as its own events.
     static func pasteKeystroke() -> [CGEvent]? {
+        let vKey = pasteKeyCode()
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let commandDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true),
-              let vDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-              let vUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false),
+              let vDown = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
+              let vUp = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false),
               let commandUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else { return nil }
         commandDown.type = .flagsChanged
         commandUp.type = .flagsChanged
@@ -151,6 +153,31 @@ public struct FocusedAppIntegration: TextOutputIntegration {
         vUp.flags = leftCommand
         commandUp.flags = []
         return [commandDown, vDown, vUp, commandUp]
+    }
+
+    /// The key that types V with Command held in the current layout: Dvorak's own V key, or QWERTY's for layouts
+    /// such as Dvorak – QWERTY ⌘ and Russian whose Command layer is QWERTY. Apps match ⌘V by character, not key position.
+    static func pasteKeyCode() -> CGKeyCode {
+        let current = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
+        let asciiCapable = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue()
+        return keyCode(typing: "v", withCommandIn: current) ?? keyCode(typing: "v", withCommandIn: asciiCapable)
+            ?? CGKeyCode(kVK_ANSI_V)
+    }
+
+    static func keyCode(typing character: String, withCommandIn source: TISInputSource?) -> CGKeyCode? {
+        guard let source, let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData),
+              let bytes = CFDataGetBytePtr(Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue()) else { return nil }
+        return bytes.withMemoryRebound(to: UCKeyboardLayout.self, capacity: 1) { layout in
+            (0..<CGKeyCode(128)).first { key in
+                var deadKeyState: UInt32 = 0
+                var length = 0
+                var characters = [UniChar](repeating: 0, count: 4)
+                let status = UCKeyTranslate(layout, key, UInt16(kUCKeyActionDown), UInt32(cmdKey >> 8) & 0xFF,
+                                            UInt32(LMGetKbdType()), OptionBits(1 << kUCKeyTranslateNoDeadKeysBit),
+                                            &deadKeyState, characters.count, &length, &characters)
+                return status == noErr && String(utf16CodeUnits: characters, count: length) == character
+            }
+        }
     }
 
     public static func focusedElement(in app: NSRunningApplication?) -> AXUIElement? {
