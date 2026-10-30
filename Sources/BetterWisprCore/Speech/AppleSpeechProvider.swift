@@ -20,7 +20,9 @@ public final class AppleSpeechProvider: SpeechProvider {
 
     private static func onDeviceRecognizer(language: String?) throws -> SFSpeechRecognizer {
         let locale = language.map { Locale(identifier: $0) } ?? .current
-        guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.supportsOnDeviceRecognition else {
+        guard let recognizer = SFSpeechRecognizer(locale: locale),
+              recognizer.supportsOnDeviceRecognition,
+              recognizer.isAvailable else {
             throw SpeechError.onDeviceUnavailable(locale.identifier)
         }
         return recognizer
