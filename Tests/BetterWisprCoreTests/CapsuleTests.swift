@@ -104,6 +104,22 @@ import Testing
     #expect(hover.isHovering && hover.target == nil) // No stale tooltip over an error.
 }
 
+@Test @MainActor func noSpeechCardCanBeTurnedOff() {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+
+    model.phase = .transcribing
+    model.noSpeechHeard()
+    #expect(model.phase == .failed(.noSpeech))
+
+    model.settings.showNoSpeechNotice = false
+    model.phase = .transcribing
+    model.noSpeechHeard()
+    #expect(model.phase == .idle && model.statusMessage.isEmpty)
+}
+
 @Test @MainActor func quickTapBecomesHandsFreeAndCancelledReleaseCannotFinishANewSession() {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)

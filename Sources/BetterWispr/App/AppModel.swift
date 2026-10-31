@@ -661,7 +661,7 @@ final class AppModel {
                 self.recordingDuration = audio.duration
                 guard audio.hasSpeech else {
                     try? FileManager.default.removeItem(at: audio.url)
-                    self.fail(.noSpeech)
+                    self.noSpeechHeard()
                     return
                 }
                 self.playFeedback(.finished)
@@ -742,7 +742,7 @@ final class AppModel {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
-                guard !text.isEmpty else { self.fail(.noSpeech); return }
+                guard !text.isEmpty else { self.noSpeechHeard(); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
@@ -1480,6 +1480,13 @@ final class AppModel {
         guard !isBusy else { return }
         if phase == .sending { holdBackReturn(); return }
         cancelledRecording = nil
+        phase = .idle
+    }
+
+    func noSpeechHeard() {
+        // An earlier dictation waiting for this one to send it must still report that it wasn't sent.
+        guard !settings.showNoSpeechNotice, continuesIn == nil else { fail(.noSpeech); return }
+        statusMessage = ""
         phase = .idle
     }
 

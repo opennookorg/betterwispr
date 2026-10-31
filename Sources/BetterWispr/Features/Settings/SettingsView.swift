@@ -189,6 +189,8 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Hide capsule while dictating", caption: "Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak.", isOn: setting(\.hideCapsuleWhileDictating))
                     RowDivider()
+                    SettingToggle("Tell me when no speech is heard", caption: "Shows “No speech heard.” with a sound when a dictation ends without words. When off, it closes quietly.", isOn: setting(\.showNoSpeechNotice))
+                    RowDivider()
                     SettingToggle("Show words as you speak", caption: "Previews Parakeet’s recognition in the capsule while you record. The pasted text is still the full recognition.", isOn: setting(\.showLiveText))
                         .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
