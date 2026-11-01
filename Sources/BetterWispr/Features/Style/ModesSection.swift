@@ -161,11 +161,7 @@ private struct WritingModeEditor: View {
                 dismiss()
             }
         }
-        .onAppear {
-            let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.compactMap(\.bundleIdentifier)
-            let ids = Set(running + model.history.compactMap(\.appBundleID)).subtracting([Bundle.main.bundleIdentifier].compactMap { $0 })
-            choices = ids.compactMap(AppChoice.init).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        }
+        .onAppear { choices = AppChoice.offered(recent: model.history.compactMap(\.appBundleID)) }
     }
 
     private var writingFooter: String {
@@ -228,20 +224,3 @@ private struct WritingModeEditor: View {
     }
 }
 
-private struct AppChoice: Identifiable {
-    let id: String
-    let name: String
-    let icon: NSImage
-
-    init?(_ bundleID: String) {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
-        id = bundleID
-        name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-        icon = NSWorkspace.shared.icon(forFile: url.path)
-        icon.size = NSSize(width: 16, height: 16)
-    }
-
-    var label: some View {
-        Label { Text(name) } icon: { Image(nsImage: icon) }
-    }
-}

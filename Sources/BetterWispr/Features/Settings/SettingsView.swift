@@ -135,9 +135,9 @@ struct SettingsView: View {
                     SettingToggle("Send to Claude", caption: "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt.", isOn: sendToClaude)
                         .task(id: permissionCheck) { await loadTerminals() }
                         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in permissionCheck += 1 }
-                    if model.settings.sendToClaude {
+                    if model.settings.sendsAfterPaste {
                         RowDivider()
-                        SettingRow("Wait before sending", caption: "The capsule counts down before Return. Dictate again during it to add more, and the next dictation sends both, or click Don’t send.") {
+                        SettingRow("Wait before sending", caption: "The capsule counts down before the send key. Dictate again during it to add more, and the next dictation sends both, or click Don’t send.") {
                             Picker("Wait before sending", selection: setting(\.sendDelayMilliseconds)) {
                                 ForEach(ClaudePrompt.delayChoices, id: \.self) { milliseconds in
                                     let label = milliseconds < 1_000 ? "\(milliseconds) ms" : milliseconds == 1_000 ? "1 second" : "\(milliseconds / 1_000) seconds"
@@ -148,6 +148,8 @@ struct SettingsView: View {
                             .labelsHidden()
                             .fixedSize()
                         }
+                    }
+                    if model.settings.sendToClaude {
                         ForEach(terminals, id: \.bundleID) { terminal in
                             RowDivider()
                             SettingRow(terminal.name, caption: terminal.allowed ? "Allowed to tell BetterWispr which tab is in front." : "BetterWispr asks \(terminal.name) which tab is in front, to send only where Claude Code runs. Open \(terminal.name) to allow it.") {
@@ -163,6 +165,8 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Learn from my corrections", caption: "Words you fix in History, or in the text field within 30 seconds of a paste, are added to Vocabulary. With Medium cleanup, each English fix and a few words around it are first reviewed by the selected notes model.", isOn: setting(\.learnCorrections))
                 }
+
+                SendKeysSection(model: model)
 
                 SettingsSection("App") {
                     SettingToggle("Show in Dock", caption: "When off, use the menu bar to open BetterWispr. Your dictation shortcut still works.", isOn: setting(\.showInDock))

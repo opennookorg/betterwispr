@@ -25,6 +25,7 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 - **Transcribe files and links**: drop in an audio or video file or paste a video link and get a timestamped transcript with the model you choose, to copy or export as text or Markdown. Links use yt-dlp, which BetterWispr installs only when you click Install.
 - **Connected apps**: let Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. Off by default and read-only.
 - **Send to Claude**: optionally press Return after pasting, only into Claude Desktop or Claude Code in the VS Code panel, Terminal or iTerm2. Off by default.
+- **Send keys**: for any other app, add it under Settings > Send keys and record the key that submits there — Return, ⌘Return, Tab, whatever it takes — and BetterWispr presses it after pasting. No rules by default.
 - **History**: raw and corrected transcripts, stored locally (can be turned off).
 - **Bring your own model**: optional Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.
 

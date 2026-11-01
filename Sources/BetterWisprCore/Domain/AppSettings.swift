@@ -45,7 +45,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var autoPaste: Bool = true
     /// Presses Return after pasting into a recognized Claude prompt; see `ClaudePrompt`.
     public var sendToClaude: Bool = false
-    /// Milliseconds before Return, during which another dictation can add more; nil uses `ClaudePrompt.defaultDelay`.
+    /// Apps the user chose a keystroke for, posted after pasting whatever the focused field is; see `SendAfterPaste`.
+    public var sendRules: [AppSendRule] = []
+    /// Milliseconds before the send keystroke, during which another dictation can add more; nil uses `ClaudePrompt.defaultDelay`.
     public var sendDelayMilliseconds: Int?
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
@@ -147,6 +149,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public func tone(for context: StyleContext) -> StyleTone { styles[context] ?? .formal }
 
+    /// Whether any app gets a keystroke after pasting, through Send to Claude or a rule the user wrote.
+    public var sendsAfterPaste: Bool { sendToClaude || sendRules.contains(where: \.isEnabled) }
+
     public var sendDelay: Duration { .milliseconds(min(max(sendDelayMilliseconds ?? ClaudePrompt.defaultDelay, 0), 5_000)) }
     public func soundName(for cue: DictationSound) -> String { sounds[cue] ?? cue.defaultSoundName }
 
@@ -180,6 +185,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         dictationLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .dictationLanguages) ?? []
         autoPaste = try container.decode(Bool.self, forKey: .autoPaste)
         sendToClaude = try container.decodeIfPresent(Bool.self, forKey: .sendToClaude) ?? false
+        sendRules = try container.decodeIfPresent([AppSendRule].self, forKey: .sendRules) ?? []
         sendDelayMilliseconds = try container.decodeIfPresent(Int.self, forKey: .sendDelayMilliseconds)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)

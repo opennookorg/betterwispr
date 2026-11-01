@@ -461,12 +461,12 @@ struct CapsuleView: View {
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel(waveformLabel)
             }
-            if model.pressesReturn {
-                Image(systemName: "return")
+            if let keystroke = model.sendKeystroke {
+                Image(systemName: keystroke == .return ? "return" : "keyboard")
                     .foregroundStyle(.white.opacity(0.75))
                     .frame(width: 14, height: 24)
-                    .help("Sends after pasting. Hold Shift to paste only.")
-                    .accessibilityLabel("Sends after pasting")
+                    .help("Presses \(keystroke.displayName) after pasting. Hold Shift to paste only.")
+                    .accessibilityLabel("Presses \(keystroke.spokenName) after pasting")
                     .transition(.opacity)
             }
             if !model.isHeldSession {
@@ -487,8 +487,8 @@ struct CapsuleView: View {
         .foregroundStyle(.white)
         .buttonStyle(.plain)
         .padding(.horizontal, 4)
-        .frame(width: (model.isHeldSession ? 96 : 108) + (model.pressesReturn ? 18 : 0), height: 28)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: model.pressesReturn)
+        .frame(width: (model.isHeldSession ? 96 : 108) + (model.sendKeystroke == nil ? 0 : 18), height: 28)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: model.sendKeystroke)
         .contentShape(Capsule())
         .contextMenu { Button("Cancel dictation", action: model.cancelRecording) }
         .accessibilityActions { Button("Cancel dictation", action: model.cancelRecording) }
