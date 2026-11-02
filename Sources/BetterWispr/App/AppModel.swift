@@ -107,7 +107,8 @@ final class AppModel {
             }
             if phase.armsCancelShortcut != oldValue.armsCancelShortcut { onBusyChange?(phase.armsCancelShortcut) }
             switch (oldValue.holdsMicrophone, phase.holdsMicrophone) {
-            case (false, true) where settings.pauseMediaWhileDictating: mediaPauser.pause()
+            // Meeting notes keep the call audible, so only Music and Spotify pause.
+            case (false, true) where settings.pauseMediaWhileDictating: mediaPauser.pause(mutingOtherApps: meetings.capturingID == nil)
             case (true, false): mediaPauser.resume()
             default: break
             }

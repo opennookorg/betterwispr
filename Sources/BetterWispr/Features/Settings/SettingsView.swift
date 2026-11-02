@@ -183,7 +183,7 @@ struct SettingsView: View {
                         }
                     }
                     RowDivider()
-                    SettingToggle("Pause music while dictating", caption: "Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on.", isOn: pauseMediaWhileDictating)
+                    SettingToggle("Pause media while dictating", caption: "Pauses Music and Spotify and mutes other apps, such as a video in your browser, while you speak, then brings them back. Muted videos keep playing silently. BetterWispr’s own sounds still play, and calls stay audible during meeting notes. macOS asks for permission to control each of these apps that is open and to use system audio when you turn this on.", isOn: pauseMediaWhileDictating)
                     RowDivider()
                     SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))
                     RowDivider()
@@ -353,7 +353,11 @@ struct SettingsView: View {
         Binding(get: { model.settings.pauseMediaWhileDictating }, set: { isOn in
             model.settings.pauseMediaWhileDictating = isOn
             model.saveSettings()
-            if isOn { Task { await AppleEventMediaPlayers.requestPermission() } }
+            guard isOn else { return }
+            Task {
+                await AppleEventMediaPlayers.requestPermission()
+                if #available(macOS 14.2, *) { await SystemAudioMute.requestPermission() }
+            }
         })
     }
 

@@ -17,12 +17,17 @@ final class SystemAudioTap {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
     private let queue = DispatchQueue(label: "org.betterwispr.meeting-tap", qos: .userInitiated)
+    private let muteBehavior: CATapMuteBehavior
+
+    init(muteBehavior: CATapMuteBehavior = .unmuted) {
+        self.muteBehavior = muteBehavior
+    }
 
     func prepare() async throws -> AVAudioFormat {
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: Self.ownProcess().map { [$0] } ?? [])
         description.name = "BetterWispr Meeting Tap"
         description.isPrivate = true
-        description.muteBehavior = .unmuted
+        description.muteBehavior = muteBehavior
         try check(AudioHardwareCreateProcessTap(description, &tapID), tapID, "create the system audio tap")
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "BetterWispr Meeting Audio",
@@ -77,7 +82,7 @@ final class SystemAudioTap {
         guard status == noErr, object != kAudioObjectUnknown else { throw SystemAudioError(step: step, status: status) }
     }
 
-    private static func ownProcess() -> AudioObjectID? {
+    nonisolated static func ownProcess() -> AudioObjectID? {
         var pid = ProcessInfo.processInfo.processIdentifier
         var objectID = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)

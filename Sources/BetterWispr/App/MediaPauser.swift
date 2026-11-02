@@ -23,20 +23,41 @@ protocol MediaPlayers: Sendable {
     func play(_ app: MediaApp) async
 }
 
+/// Silences apps that can't be paused, such as browsers, without changing whether they play.
+protocol OtherAppsAudio: Sendable {
+    func mute() async
+    func unmute() async
+}
+
+@available(macOS 14.2, *)
+extension SystemAudioMute: OtherAppsAudio {}
+
 @MainActor
 final class MediaPauser {
     private let players: any MediaPlayers
+    private let otherApps: (any OtherAppsAudio)?
     private var paused: [MediaApp] = []
+    private var muted = false
     private(set) var pending: Task<Void, Never>?
 
-    init(players: any MediaPlayers = AppleEventMediaPlayers()) {
+    init(players: any MediaPlayers = AppleEventMediaPlayers(), otherApps: (any OtherAppsAudio)? = MediaPauser.systemMute()) {
         self.players = players
+        self.otherApps = otherApps
     }
 
-    func pause() {
+    static func systemMute() -> (any OtherAppsAudio)? {
+        guard #available(macOS 14.2, *) else { return nil }
+        return SystemAudioMute()
+    }
+
+    func pause(mutingOtherApps: Bool = true) {
         let previous = pending
         pending = Task {
             await previous?.value
+            if mutingOtherApps, let otherApps {
+                await otherApps.mute()
+                muted = true
+            }
             for app in MediaApp.allCases where await players.state(of: app) == .playing {
                 await players.pause(app)
                 paused.append(app)
@@ -48,6 +69,10 @@ final class MediaPauser {
         guard let previous = pending else { return }
         pending = Task {
             await previous.value
+            if muted {
+                muted = false
+                await otherApps?.unmute()
+            }
             let apps = paused
             paused = []
             for app in apps where await players.state(of: app) == .paused {

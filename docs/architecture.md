@@ -136,13 +136,27 @@ the policy immediately and persist through the existing workspace store.
    user clipboard changes. Make failed insertion recoverable through copy either way.
 7. Remove temporary audio on completion/error/cancellation and return to idle.
 
-With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
+With "Pause media while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
 When the phase leaves recording for any other phase it resumes only the apps it
 paused that still report paused. Operations run one at a time, address the
 running process so a closed app is never launched, and never prompt during
 dictation; consent is asked once when the setting turns on. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
+
+Browsers and other players can't be asked whether they play without private
+MediaRemote APIs, which macOS 15.4 closed to other apps, and a play/pause media
+key could start something the user had paused. So on macOS 14.2 and later the
+same pause also starts `SystemAudioMute`, a private Core Audio process tap with
+`muteBehavior = .muted` that excludes BetterWispr's own process. A tap only mutes
+while its device runs, so its private aggregate device runs and discards what it
+hears, like the meeting tap without the writer. Every other app keeps playing silently, the capsule sounds stay audible,
+and the output device's volume and mute are never changed. The resume destroys
+the tap and its device before resuming Music and Spotify, and because both are
+private to BetterWispr, Core Audio also removes them if the app exits without resuming.
+Muting is skipped while meeting notes record, so the call stays audible. Turning
+the setting on also starts a system audio tap once, so macOS asks for System
+Audio Recording then rather than during a dictation.
 
 With "Send to Claude" on (`AppSettings.sendToClaude`, off by default), a pasted
 dictation is followed by a Return key press when `ClaudePrompt` recognizes the

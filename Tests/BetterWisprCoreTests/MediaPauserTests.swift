@@ -3,7 +3,7 @@ import Testing
 @testable import BetterWisprCore
 @testable import BetterWispr
 
-actor FakeMediaPlayers: MediaPlayers {
+actor FakeMediaPlayers: MediaPlayers, OtherAppsAudio {
     private(set) var states: [MediaApp: PlayerState]
     private(set) var log: [String] = []
 
@@ -28,11 +28,19 @@ actor FakeMediaPlayers: MediaPlayers {
         log.append("play \(app)")
         states[app] = .playing
     }
+
+    func mute() {
+        log.append("mute")
+    }
+
+    func unmute() {
+        log.append("unmute")
+    }
 }
 
 @Test @MainActor func resumePlaysOnlyTheAppsThePauseStopped() async {
     let players = FakeMediaPlayers([.music: .playing, .spotify: .paused])
-    let pauser = MediaPauser(players: players)
+    let pauser = MediaPauser(players: players, otherApps: nil)
     pauser.pause()
     await pauser.pending?.value
     #expect(await players.log == ["pause music"])
@@ -45,7 +53,7 @@ actor FakeMediaPlayers: MediaPlayers {
 @Test(arguments: [PlayerState.stopped, .playing])
 @MainActor func resumeLeavesAnAppTheUserChangedDuringDictation(userState: PlayerState) async {
     let players = FakeMediaPlayers([.music: .playing])
-    let pauser = MediaPauser(players: players)
+    let pauser = MediaPauser(players: players, otherApps: nil)
     pauser.pause()
     await pauser.pending?.value
     await players.set(.music, to: userState)
@@ -57,7 +65,7 @@ actor FakeMediaPlayers: MediaPlayers {
 
 @Test @MainActor func quickRestartRunsPauseResumeAndPauseInOrder() async {
     let players = FakeMediaPlayers([.music: .playing])
-    let pauser = MediaPauser(players: players)
+    let pauser = MediaPauser(players: players, otherApps: nil)
     pauser.pause()
     pauser.resume()
     pauser.pause()
@@ -68,7 +76,7 @@ actor FakeMediaPlayers: MediaPlayers {
 
 @Test @MainActor func unusedPauserStaysIdleAndUnreachableAppsAreNeverCommanded() async {
     let players = FakeMediaPlayers([.spotify: .playing])
-    let pauser = MediaPauser(players: players)
+    let pauser = MediaPauser(players: players, otherApps: nil)
     pauser.resume()
     #expect(pauser.pending == nil)
     #expect(await players.log.isEmpty)
@@ -83,15 +91,15 @@ actor FakeMediaPlayers: MediaPlayers {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: folder) }
     let players = FakeMediaPlayers([.music: .playing])
-    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players))
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players, otherApps: players))
     model.settings.pauseMediaWhileDictating = enabled
     model.phase = .preparing
     model.phase = .recording
     await model.mediaPauser.pending?.value
-    #expect(await players.log == (enabled ? ["pause music"] : []))
+    #expect(await players.log == (enabled ? ["mute", "pause music"] : []))
     model.phase = .transcribing
     await model.mediaPauser.pending?.value
-    #expect(await players.log == (enabled ? ["pause music", "play music"] : []))
+    #expect(await players.log == (enabled ? ["mute", "pause music", "unmute", "play music"] : []))
     #expect((model.mediaPauser.pending == nil) == !enabled)
 }
 
@@ -99,7 +107,7 @@ actor FakeMediaPlayers: MediaPlayers {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: folder) }
     let players = FakeMediaPlayers([.music: .playing])
-    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players))
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players, otherApps: players))
     model.settings.pauseMediaWhileDictating = true
     model.settings.soundEffects = false
     model.phase = .preparing
@@ -112,6 +120,28 @@ actor FakeMediaPlayers: MediaPlayers {
     model.discardRecording()
     await model.mediaPauser.pending?.value
     #expect(model.phase == .idle)
-    #expect(await players.log == Array(repeating: ["pause music", "play music"], count: 4).flatMap { $0 })
+    #expect(await players.log == Array(repeating: ["mute", "pause music", "unmute", "play music"], count: 4).flatMap { $0 })
     #expect(await players.states[.music] == .playing)
+}
+
+@Test(arguments: [PlayerState.playing, .paused])
+@MainActor func otherAppsAreMutedForTheWholeDictationWhateverThePlayersDo(musicState: PlayerState) async {
+    let players = FakeMediaPlayers([.music: musicState])
+    let pauser = MediaPauser(players: players, otherApps: players)
+    pauser.pause()
+    pauser.resume()
+    pauser.pause()
+    pauser.resume()
+    await pauser.pending?.value
+    let once = musicState == .playing ? ["mute", "pause music", "unmute", "play music"] : ["mute", "unmute"]
+    #expect(await players.log == once + once)
+}
+
+@Test @MainActor func pausingWithoutMutingLeavesOtherAppsAudible() async {
+    let players = FakeMediaPlayers([.music: .playing])
+    let pauser = MediaPauser(players: players, otherApps: players)
+    pauser.pause(mutingOtherApps: false)
+    pauser.resume()
+    await pauser.pending?.value
+    #expect(await players.log == ["pause music", "play music"])
 }

@@ -1164,12 +1164,13 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
 - [ ] Switch between System, Light, Cream and Dark. Light and Dark look as they
   did before Cream, and the theme survives relaunch.
 
-## Pausing music while dictating
+## Pausing media while dictating
 
-Manual checks. Unit tests cover the pause and resume bookkeeping with a fake
-player; real playback and the Automation prompt need these steps.
+Manual checks. Unit tests cover the pause, mute and resume bookkeeping with a
+fake player; real playback, the muted tap and the permission prompts need these
+steps.
 
-- [ ] Music playing: open Music, turn on Settings → App → Pause music while
+- [ ] Music playing: open Music, turn on Settings → App → Pause media while
   dictating and allow the Automation prompt. Play a track and dictate. Music
   pauses when the capsule appears and resumes as soon as the recording stops.
   Repeat with a dictation cancelled with Escape and with "No speech heard."
@@ -1193,6 +1194,28 @@ player; real playback and the Automation prompt need these steps.
   paused during the new recording and resumes after it; it never plays while
   the microphone is open.
 - [ ] Start meeting notes while Music plays. Music keeps playing.
+- [ ] Browser video: play a YouTube video in Safari, then in Chrome, and dictate.
+  The video goes silent when the capsule appears, keeps playing, and is audible
+  again as soon as the recording stops. Repeat with a cancelled dictation and
+  with "No speech heard."
+- [ ] Own sounds: with Dictation sounds on and a video playing, dictate. The Start,
+  Finish and Cancel sounds are heard while the video is silent.
+- [ ] System Audio Recording: with BetterWispr not yet allowed under Privacy &
+  Security → Screen & System Audio Recording (`tccutil reset AudioCapture
+  org.betterwispr.app`), turn the setting off and on. macOS asks once, and no
+  prompt appears during dictation. Note whether the video is still silenced
+  after denying the prompt.
+- [ ] Volume untouched: the menu bar Sound icon and the output volume don't change
+  during a dictation. Press the volume keys mid-dictation; the video stays
+  silent until the recording stops.
+- [ ] Output switch: start a video on the speakers, connect AirPods mid-dictation.
+  The video stays silent on the AirPods until the recording stops.
+- [ ] Crash: start dictating with a video playing and run `killall -9 BetterWispr`.
+  The video is audible again without relaunching.
+- [ ] Meeting notes recording: dictate during meeting notes with a call or video
+  playing. It stays audible; only Music and Spotify pause.
+- [ ] macOS 14.0 or 14.1, if available: only Music and Spotify pause and no System
+  Audio Recording prompt appears.
 
 ## Clipboard and insertion
 
