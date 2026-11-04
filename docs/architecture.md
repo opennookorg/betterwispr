@@ -134,7 +134,15 @@ the policy immediately and persist through the existing workspace store.
    to paste elsewhere. With "Copy to clipboard" on, leave the transcript on the
    clipboard. With it off, restore clipboard contents without overwriting newer
    user clipboard changes. Make failed insertion recoverable through copy either way.
-7. Remove temporary audio on completion/error/cancellation and return to idle.
+7. Remove temporary audio on completion and cancellation and return to idle.
+   When transcription fails, `FailedDictationStore` copies the recording into
+   `Failed Dictations` (folder 0700, files 0600) and the `DictationRecording` is
+   kept so Try again re-runs `transcribe(_:)` on the same audio with the model
+   selected now. Quitting while recording or transcribing keeps the audio the
+   same way before `discardRecording()` runs. The store keeps at most 20
+   recordings and none older than 7 days, deletes one once its retry succeeds,
+   and only ever deletes files inside its own folder. Cancelled and no-speech
+   dictations are not kept.
 
 With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
