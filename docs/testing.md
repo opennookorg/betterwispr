@@ -1083,10 +1083,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
-- [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
-  connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
-  VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
-  its own and pastes the whole transcript. Hold mode behaves the same while held.
+- [ ] Dictate for 12 minutes in toggle mode with Parakeet, Whisper, Apple and an
+  API connection. No countdown appears and recording continues past 10:00 until
+  you stop it, then the whole transcript pastes. With Show words as you speak on,
+  the Parakeet preview stops following after ten minutes while recording
+  continues. Hold mode behaves the same while held.
 - [ ] Turn on Hide capsule while dictating, with the floating capsule both on
   and off. Dictate in hold and toggle mode. No capsule appears while listening
   or transcribing, the menu bar icon is a microphone while listening, the text
@@ -1094,7 +1095,7 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Show words as you speak is greyed out. Escape, the cancel shortcut and the menu
   bar Cancel still cancel, and the Cancelled card with Undo appears. A failed
   dictation, copy-only and Transcript ready still show their cards. Dictate past
-  9:30: the capsule appears with "Stops in 0:30" and VoiceOver announces it.
+  10:00: the capsule stays hidden and recording continues.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.

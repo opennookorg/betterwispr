@@ -42,8 +42,8 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 5. Click into a text field in any app, hold **⌥ Space**, speak, and release.
 
 If paste can't safely reach the previous app, the text is copied to your
-clipboard instead, so you never lose a dictation. Recordings stop automatically
-after ten minutes, with a countdown in the last 30 seconds.
+clipboard instead, so you never lose a dictation. A dictation records until you
+release or press the shortcut again, however long that is.
 
 ## Bring your own model
 
