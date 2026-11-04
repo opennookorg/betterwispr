@@ -825,8 +825,11 @@ settings decode with an empty list. The built-in catalog stays static and local.
 `APISpeechProvider.prepare` validates configuration and Keychain access without
 network requests. Only transcription through a selected connection uploads audio.
 It reuses WhisperKit's audio conversion to produce 16 kHz mono PCM WAV in memory,
-off the main actor. Sarvam receives sequential 25-second clips; other APIs receive
-the bounded dictation/meeting clip. Fixed cuts can affect words at boundaries.
+off the main actor. Sarvam receives 25-second clips and other APIs 125-second
+clips. A recording with several clips uploads up to four at once
+(`APISpeechProvider.concurrentChunks`, kept low for providers' rate limits) and
+joins the transcripts in clip order, whatever order they answer in. Fixed cuts can
+affect words at boundaries.
 No partial transcript is delivered on failure. Cancellation stops URLSession
 requests; callers retain their generation checks before history and paste.
 
