@@ -48,15 +48,26 @@ public final class APISpeechProvider: SpeechProvider {
             configuration.timeoutIntervalForResource = 120
             let session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
             defer { session.invalidateAndCancel() }
-            var transcripts: [String] = []
-            for chunk in chunks {
-                try Task.checkCancellation()
-                let request = try Self.request(connection, key: apiKey, wav: chunk, language: language)
-                let (data, response) = try await session.data(for: request)
-                try Task.checkCancellation()
-                guard let http = response as? HTTPURLResponse else { throw SpeechAPIError.invalidResponse }
-                let text = try Self.transcript(data, status: http.statusCode, api: connection.api)
-                transcripts.append(text)
+            // Pieces of a long dictation upload together, at most `concurrentChunks` at a time, so the
+            // wait after a five-minute dictation is about one piece's round trip instead of three.
+            let requests = try chunks.map { try Self.request(connection, key: apiKey, wav: $0, language: language) }
+            var transcripts = [String](repeating: "", count: requests.count)
+            try await withThrowingTaskGroup(of: (Int, String).self) { group in
+                var next = 0
+                func send(_ index: Int) {
+                    group.addTask {
+                        try Task.checkCancellation()
+                        let (data, response) = try await session.data(for: requests[index])
+                        try Task.checkCancellation()
+                        guard let http = response as? HTTPURLResponse else { throw SpeechAPIError.invalidResponse }
+                        return (index, try Self.transcript(data, status: http.statusCode, api: connection.api))
+                    }
+                }
+                while next < min(Self.concurrentChunks, requests.count) { send(next); next += 1 }
+                while let (index, text) = try await group.next() {
+                    transcripts[index] = text
+                    if next < requests.count { send(next); next += 1 }
+                }
             }
             return transcripts.filter { !$0.isEmpty }.joined(separator: " ")
         }
@@ -70,6 +81,9 @@ public final class APISpeechProvider: SpeechProvider {
     }
 
     public func cancel() { transcriptionTask?.cancel() }
+
+    /// How many pieces of one dictation are uploaded at once. Kept low for providers' rate limits.
+    nonisolated static let concurrentChunks = 4
 
     nonisolated static func request(_ connection: SpeechConnection, key: String, wav: Data, language: String?) throws -> URLRequest {
         let url = try connection.validatedURL()

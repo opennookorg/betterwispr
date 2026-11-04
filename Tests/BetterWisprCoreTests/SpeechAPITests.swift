@@ -221,3 +221,49 @@ private final class SpeechEndpointStub: URLProtocol, @unchecked Sendable {
         Task { await SpeechEndpointStub.probe.stop(path) }
     }
 }
+
+@MainActor
+@Test func speechAPISendsPiecesOfALongDictationTogetherAndKeepsTheirOrder() async throws {
+    // 300 s cuts into 125 + 125 + 50 s. Each long piece takes 1 s to answer and the short last one
+    // answers first: one at a time takes over 2 s, and joining in arrival order would put "short" first.
+    let audio = FileManager.default.temporaryDirectory.appending(path: "betterwispr-api-test-\(UUID()).wav")
+    defer { try? FileManager.default.removeItem(at: audio) }
+    try SpeechAudio.wav(Array(repeating: 0.1, count: 16_000 * 300)).write(to: audio)
+    var connection = SpeechConnection(api: .openAICompatible)
+    connection.endpoint = "https://speech.example/pieces"
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [SpeechPieceStub.self]
+    let provider = APISpeechProvider(configuration: config, key: { _ in "" })
+    try await provider.prepare(model: connection.speechModel, download: false)
+    let cutting = ContinuousClock.now
+    #expect(try await SpeechAudio.wavChunks(audio, seconds: 125).count == 3)
+    let cut = cutting.duration(to: .now)
+    let started = ContinuousClock.now
+    #expect(try await provider.transcribe(audioURL: audio, language: "en", vocabulary: []) == "long long short")
+    #expect(started.duration(to: .now) - cut < .milliseconds(1_700))
+}
+
+// See SpeechEndpointStub. Answers after a delay set by the upload's size, with no mutable state.
+private final class SpeechPieceStub: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    private static func bodySize(_ request: URLRequest) -> Int {
+        guard let stream = request.httpBodyStream else { return request.httpBody?.count ?? 0 }
+        var size = 0
+        var buffer = [UInt8](repeating: 0, count: 65_536)
+        stream.open()
+        defer { stream.close() }
+        while case let read = stream.read(&buffer, maxLength: buffer.count), read > 0 { size += read }
+        return size
+    }
+    override func startLoading() {
+        let long = Self.bodySize(request) > 16_000 * 2 * 100
+        DispatchQueue.global().asyncAfter(deadline: .now() + (long ? 1.0 : 0.05)) { [self] in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(#"{"text":"\#(long ? "long" : "short")"}"#.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+    override func stopLoading() {}
+}

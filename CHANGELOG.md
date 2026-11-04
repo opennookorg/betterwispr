@@ -9,6 +9,9 @@ All notable changes to BetterWispr are listed here. The format follows
 ### Added
 - Send to Claude, in Settings > After you speak and off by default. After pasting, BetterWispr presses Return when the cursor is in Claude Desktop's message box, the Claude Code panel in VS Code, or a Terminal or iTerm2 tab where Claude Code is running, so a dictated prompt is submitted hands-free. Anywhere else, such as a shell or a file, the text is only pasted. A tab counts only while a Claude Code process is in front in it: Terminal and iTerm2 are asked which tab is focused once you allow it. VS Code terminals and Ghostty paste without sending because a stale title cannot prove which process receives Return. Return also answers a question Claude Code is asking, such as a permission prompt. The capsule shows ↵ when a dictation will be sent. Hold Shift as you finish, or start with Shift and your shortcut, to paste only. After pasting, the capsule counts down for a second: dictate again to add more, and the next dictation is pasted after the first and sends both, or press Escape or click Don't send. Wait before sending changes the countdown, from 120 ms to two seconds. Return is skipped, with "Pasted, not sent", when you switched apps or fields. In VS Code this turns on its accessibility support, which may ask once whether to optimize the editor for a screen reader; No is fine.
 
+### Changed
+- A long dictation sent to an API connection is uploaded in pieces at the same time, up to four at once, instead of one piece after another. The transcript keeps the pieces in order. On a Spark-hosted Nemotron 3.5 endpoint, a 283-second dictation went from 10.3 to 6.9 seconds after release.
+
 ## [0.1.6] - 2026-10-15
 
 ### Added
