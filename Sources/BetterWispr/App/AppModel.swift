@@ -831,6 +831,21 @@ final class AppModel {
         playFeedback(.cancelled)
     }
 
+    /// Quitting must never lose speech: a dictation still recording or transcribing is saved to
+    /// Failed Dictations, where History lists it to transcribe after the next launch.
+    func keepDictationForQuit() {
+        var audio: URL?
+        if phase == .recording, let recorded = try? recorder.stop(), recorded.hasSpeech {
+            audio = recorded.url
+        } else if let recording = activeRecording ?? cancelledRecording, recording.keptURL == nil {
+            audio = recording.audio.url
+        }
+        guard let audio else { return }
+        do { try failedDictationStore.keep(audio) } catch {
+            Logger(subsystem: "org.betterwispr.app", category: "FailedDictations").error("Couldn’t keep a dictation at quit: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     /// Transcribes the failed dictation again with the speech model selected now, or starts a new dictation when none is kept.
     func retryFailure() {
         guard !isBusy, let recording = failedRecording else { toggleRecording(); return }
