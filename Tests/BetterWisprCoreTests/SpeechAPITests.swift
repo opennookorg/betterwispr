@@ -221,3 +221,13 @@ private final class SpeechEndpointStub: URLProtocol, @unchecked Sendable {
         Task { await SpeechEndpointStub.probe.stop(path) }
     }
 }
+
+@Test func speechAPIAcceptsDictationsLongerThanTenMinutes() async throws {
+    // Dictation has no time limit; a 25-minute recording is cut into pieces like any other.
+    let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-api-test-\(UUID()).wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try SpeechAudio.wav(Array(repeating: 0.1, count: 16_000 * 1_500)).write(to: url)
+    let chunks = try await SpeechAudio.wavChunks(url, seconds: 125)
+    #expect(chunks.count == 12)
+    #expect(chunks.reduce(0) { $0 + ($1.count - 44) / 2 } == 1_500 * 16_000)
+}

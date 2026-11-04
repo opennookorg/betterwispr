@@ -28,7 +28,7 @@ import Testing
     #expect(DictationSound.finished.sound(named: "Ping", in: directory) == nil)
 }
 
-@Test @MainActor func hiddenCapsuleStaysAwayWhileDictatingButReturnsForTheLimitWarningAndCards() {
+@Test @MainActor func hiddenCapsuleStaysAwayWhileDictatingButReturnsForCards() {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
     defer {
@@ -39,18 +39,15 @@ import Testing
     model.phase = .recording
     var presentations = 0
     model.onPresentationChange = { presentations += 1 }
-    model.advanceRecording(to: AudioRecorder.maximumDuration - 30)
+    model.advanceRecording(to: 30)
     #expect(model.showsCapsule && presentations == 0)
     model.advanceRecording(to: 0)
     model.settings.hideCapsuleWhileDictating = true
     #expect(!model.showsCapsule)
 
-    model.advanceRecording(to: AudioRecorder.maximumDuration - 31)
-    #expect(model.recordingSecondsLeft == nil && !model.showsCapsule && presentations == 0)
-    model.advanceRecording(to: AudioRecorder.maximumDuration - 30)
-    #expect(model.recordingSecondsLeft == 30 && model.showsCapsule && presentations == 1)
-    model.advanceRecording(to: AudioRecorder.maximumDuration - 12)
-    #expect(model.recordingSecondsLeft == 12 && presentations == 1)
+    // Dictation has no time limit, so a hidden capsule stays hidden however long it runs.
+    model.advanceRecording(to: 3 * 3600)
+    #expect(model.phase == .recording && !model.showsCapsule && presentations == 0)
 
     model.phase = .transcribing
     #expect(!model.showsCapsule)

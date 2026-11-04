@@ -127,12 +127,6 @@ final class AppModel {
     /// The dictation in progress will press Return after pasting: Send to Claude is on, the field is a Claude prompt and Shift isn't held.
     private(set) var pressesReturn = false
     var recordingDuration: TimeInterval = 0
-    /// Counts down the last 30 seconds before a dictation reaches `AudioRecorder.maximumDuration`.
-    var recordingSecondsLeft: Int? {
-        guard phase == .recording else { return nil }
-        let left = Int((AudioRecorder.maximumDuration - recordingDuration).rounded(.up))
-        return left <= 30 ? max(0, left) : nil
-    }
     var history: [Transcript] = []
     var vocabulary: [VocabularyEntry] = []
     var settings = AppSettings()
@@ -591,8 +585,6 @@ final class AppModel {
                         self.advanceRecording(to: Date().timeIntervalSince(started))
                         self.refreshTargetAcceptance()
                         self.updatePressesReturn()
-                        // Keep dictation bounded; a new recording can start immediately afterwards.
-                        if self.recordingDuration >= AudioRecorder.maximumDuration { self.finishRecording(); return }
                     }
                 }
             } catch {
@@ -606,9 +598,7 @@ final class AppModel {
     }
 
     func advanceRecording(to duration: TimeInterval) {
-        let warned = recordingSecondsLeft != nil
         recordingDuration = duration
-        if !warned, recordingSecondsLeft != nil, settings.hideCapsuleWhileDictating { onPresentationChange?() }
     }
 
     /// Runs preview passes once the warm-up load has finished; it never starts a load itself.

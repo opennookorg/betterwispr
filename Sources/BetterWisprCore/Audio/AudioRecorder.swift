@@ -25,8 +25,6 @@ public enum AudioRecordingError: LocalizedError {
 
 @MainActor
 public final class AudioRecorder {
-    /// Longest dictation before the app finishes it on its own.
-    nonisolated public static let maximumDuration: TimeInterval = 600
     public var onLevel: (@MainActor @Sendable (VoiceLevels) -> Void)?
     public var onError: (@MainActor (any Error) -> Void)?
     /// RMS amplitude gate, not a semantic speech detector. Lower this for quiet microphones.

@@ -37,7 +37,6 @@ struct CapsuleView: View {
             if !showsCard, let target = hover.target {
                 tooltip(for: target)
             }
-            RecordingLimitLabel(model: model)
             if model.isBusy, !model.liveTranscript.isEmpty {
                 livePreview
             }
@@ -573,30 +572,6 @@ private struct CapsuleCardButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.white.opacity(configuration.isPressed ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-/// Counts down the last 30 seconds before dictation finishes at the recording limit.
-private struct RecordingLimitLabel: View {
-    let model: AppModel
-
-    var body: some View {
-        Group {
-            if let secondsLeft = model.recordingSecondsLeft {
-                Text("Stops in \(Duration.seconds(secondsLeft).formatted(.time(pattern: .minuteSecond)))")
-                    .font(.system(size: 11, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background { CapsuleGlass(cornerRadius: 14) }
-                    .allowsHitTesting(false)
-            }
-        }
-        .onChange(of: model.recordingSecondsLeft != nil) { _, warning in
-            guard warning else { return }
-            AccessibilityNotification.Announcement("Dictation stops in 30 seconds.").post()
-        }
     }
 }
 

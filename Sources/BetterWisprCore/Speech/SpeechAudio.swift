@@ -10,8 +10,6 @@ enum SpeechAudio {
         let file = try AVAudioFile(forReading: url)
         let duration = Double(file.length) / file.processingFormat.sampleRate
         guard duration.isFinite, duration > 0 else { throw SpeechError.emptyAudio }
-        // Dictation is bounded by AudioRecorder.maximumDuration; allow a small scheduling margin at stop.
-        guard duration <= AudioRecorder.maximumDuration + 5 else { throw SpeechAPIError.audioTooLong }
         var chunks: [Data] = []
         // ponytail: fixed 125 s chunks (25 s for Sarvam) can split a word at each cut; cut at quiet points with MediaAudio.cut if boundary errors matter.
         for start in stride(from: 0.0, to: duration, by: seconds) {
