@@ -12,6 +12,29 @@ struct HistoryView: View {
 
     var body: some View {
         Form {
+            if query.isEmpty, !model.failedDictations.isEmpty {
+                Section {
+                    ForEach(model.failedDictations) { item in
+                        HStack(spacing: 6) {
+                            Text(item.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                            Spacer()
+                            Button("Transcribe") { model.transcribeFailedDictation(item) }
+                                .help("Transcribe this recording on the Transcribe page")
+                            Button { model.revealFailedDictation(item) } label: { Image(systemName: "folder") }
+                                .help("Show in Finder")
+                                .accessibilityLabel("Show in Finder")
+                            Button { model.deleteFailedDictation(item) } label: { Image(systemName: "trash") }
+                                .help("Delete recording")
+                                .accessibilityLabel("Delete recording")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                } header: {
+                    Text("Not transcribed")
+                } footer: {
+                    Text("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for 7 days, up to the newest 20.")
+                }
+            }
             if !filteredHistory.isEmpty {
                 Section {
                     ForEach(filteredHistory) { transcript in
@@ -36,7 +59,9 @@ struct HistoryView: View {
         .formStyle(.grouped)
         .overlay {
             if filteredHistory.isEmpty {
-                if query.isEmpty {
+                if query.isEmpty, !model.failedDictations.isEmpty {
+                    EmptyView()
+                } else if query.isEmpty {
                     ContentUnavailableView(
                         "No Dictations",
                         systemImage: "clock",

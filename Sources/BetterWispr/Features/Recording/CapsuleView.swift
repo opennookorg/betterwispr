@@ -207,7 +207,8 @@ struct CapsuleView: View {
                 }
                 .buttonStyle(.bordered)
             } else if model.failure != nil {
-                Button("Try again", action: model.toggleRecording)
+                Button("Try again", action: model.retryFailure)
+                    .help(model.canRetryFailure ? "Transcribe this recording again" : "Start a new dictation")
                     .buttonStyle(.bordered)
             }
             if isMeetingCapturing {

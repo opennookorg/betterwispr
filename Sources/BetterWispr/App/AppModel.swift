@@ -43,7 +43,10 @@ struct DictationFailure: Equatable {
 @MainActor
 final class DictationRecording {
     let audio: RecordedAudio
-    let model: SpeechModel
+    /// The speech model to use; Try again after a failure switches it to the one selected now.
+    var model: SpeechModel
+    /// The copy kept in Failed Dictations after this recording failed to transcribe.
+    var keptURL: URL?
     let settings: AppSettings
     let vocabulary: [VocabularyEntry]
     let target: NSRunningApplication?
@@ -118,6 +121,11 @@ final class AppModel {
     private(set) var cardDuration = 0.0
     private var cancelledRecording: DictationRecording?
     var canUndoCancellation: Bool { phase == .cancelled && cancelledRecording != nil }
+    /// The dictation that just failed to transcribe; Try again transcribes it instead of recording a new one.
+    private var failedRecording: DictationRecording?
+    var canRetryFailure: Bool { failure != nil && failedRecording != nil }
+    /// Recordings kept on disk after they failed to transcribe, newest first.
+    private(set) var failedDictations: [FailedDictation] = []
     var statusMessage = ""
     var partialTranscript = ""
     /// Preview only; the pasted text always comes from the batch recognition.
@@ -162,6 +170,7 @@ final class AppModel {
 
     @ObservationIgnored let mediaPauser: MediaPauser
     @ObservationIgnored private let store: LocalStore
+    @ObservationIgnored private let failedDictationStore: FailedDictationStore
     @ObservationIgnored private let recorder = AudioRecorder()
     @ObservationIgnored private let startsServices: Bool
     @ObservationIgnored private let correctionWatcher = CorrectionWatcher()
@@ -219,6 +228,7 @@ final class AppModel {
 
     init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser()) {
         self.store = store
+        failedDictationStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
         self.mediaPauser = mediaPauser
         self.startsServices = startsServices
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
@@ -233,6 +243,8 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
+        failedDictationStore.prune()
+        failedDictations = failedDictationStore.list()
         guard startsServices else { return }
         applyAppearance()
         migrateLegacyOnboarding()
@@ -505,6 +517,7 @@ final class AppModel {
     private func startRecording(held: Bool) {
         guard !isBusy else { return }
         cancelledRecording = nil
+        failedRecording = nil
         feedbackSound?.stop()
         correctionWatcher.stop()
         guard isModelInstalled(selectedModel) else {
@@ -702,6 +715,7 @@ final class AppModel {
                 if self?.generation == token { self?.activeRecording = nil }
             }
             guard let self else { return }
+            var transcribed = false
             do {
                 try Task.checkCancellation()
                 let screenTerms = spellsScreenNames ? await context?.value(within: .milliseconds(300), cancellingOnTimeout: false)?.spellingTerms() ?? [] : []
@@ -743,6 +757,8 @@ final class AppModel {
                 }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
                 guard !text.isEmpty else { self.fail(.noSpeech); return }
+                transcribed = true
+                self.forgetFailedDictation(recording)
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
@@ -788,7 +804,12 @@ final class AppModel {
                 if let persistenceWarning { self.statusMessage = "History could not be saved: \(persistenceWarning)" }
             } catch {
                 guard self.generation == token else { return }
-                self.fail(DictationFailure(title: "Couldn’t transcribe.", message: error.localizedDescription))
+                var failure = DictationFailure(title: "Couldn’t transcribe.", message: error.localizedDescription)
+                if !transcribed {
+                    self.keepFailedDictation(recording)
+                    failure.message += " Try again transcribes the same recording."
+                }
+                self.fail(failure)
             }
         }
     }
@@ -808,6 +829,52 @@ final class AppModel {
         cancelledRecording = recoverable
         present(.cancelled, for: Self.cancellationSeconds)
         playFeedback(.cancelled)
+    }
+
+    /// Transcribes the failed dictation again with the speech model selected now, or starts a new dictation when none is kept.
+    func retryFailure() {
+        guard !isBusy, let recording = failedRecording else { toggleRecording(); return }
+        failedRecording = nil
+        cancelledRecording = nil
+        generation = UUID()
+        isHeldSession = false
+        recording.model = selectedModel
+        transcribe(recording)
+    }
+
+    /// Keeps a recording that failed to transcribe, in memory for Try again and on disk for History.
+    private func keepFailedDictation(_ recording: DictationRecording) {
+        failedRecording = recording
+        guard recording.keptURL == nil else { return }
+        do {
+            recording.keptURL = try failedDictationStore.keep(recording.audio.url)
+        } catch {
+            Logger(subsystem: "org.betterwispr.app", category: "FailedDictations").error("Couldn’t keep a failed dictation: \(error.localizedDescription, privacy: .public)")
+        }
+        failedDictations = failedDictationStore.list()
+    }
+
+    private func forgetFailedDictation(_ recording: DictationRecording) {
+        guard let kept = recording.keptURL else { return }
+        recording.keptURL = nil
+        failedDictationStore.remove(kept)
+        failedDictations = failedDictationStore.list()
+    }
+
+    /// Opens a kept recording on the Transcribe page, which leaves the file in place.
+    func transcribeFailedDictation(_ item: FailedDictation) {
+        selectedPage = .transcribe
+        transcribe(file: item.url)
+    }
+
+    func revealFailedDictation(_ item: FailedDictation) {
+        NSWorkspace.shared.activateFileViewerSelecting([item.url])
+    }
+
+    func deleteFailedDictation(_ item: FailedDictation) {
+        if failedRecording?.keptURL == item.url { failedRecording?.keptURL = nil }
+        failedDictationStore.remove(item.url)
+        failedDictations = failedDictationStore.list()
     }
 
     func undoCancellation() {
@@ -840,6 +907,7 @@ final class AppModel {
         endLivePreview()
         activeRecording = nil
         cancelledRecording = nil
+        failedRecording = nil
         feedbackSound?.stop()
         // A cancelled preparation may leave a partially loaded provider; load cleanly next time.
         if loading == nil, phase == .transcribing || preparedModelID == nil {
@@ -1480,6 +1548,7 @@ final class AppModel {
         guard !isBusy else { return }
         if phase == .sending { holdBackReturn(); return }
         cancelledRecording = nil
+        failedRecording = nil
         phase = .idle
     }
 
