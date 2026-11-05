@@ -130,7 +130,8 @@ import Testing
     let context = DictationContext(selectedText: String(repeating: "pick ", count: 400), clipboard: String(repeating: "copy ", count: 400),
                                    window: String(repeating: "pane ", count: 800))
     let plain = TranscriptPolisher.exchange(text, for: .apple, vocabulary: [], context: context, instructions: "").instructions
-    #expect(plain.contains("copy copy") && !plain.contains("pane pane"))
+    #expect(plain.contains("pick pick") && plain.contains("copy copy"))
+    #expect(plain.count + TranscriptPolisher.message(for: text).count + text.count <= TranscriptPolisher.appleBudget)
 
     let vocabulary = (0..<200).map { "Term\($0)Name" }
     let mode = String(repeating: "Use British spelling. ", count: 100)
@@ -148,9 +149,9 @@ import Testing
 }
 
 @Test func retriesTimeoutsAtOnceAndTransientFailuresWithBackoff() {
-    #expect(TranscriptPolisher.schedule(for: .cli(.claudeCode), words: 50) == (1, .seconds(15)))
-    #expect(TranscriptPolisher.schedule(for: .apple, words: 9) == (3, .seconds(7)))
-    #expect(TranscriptPolisher.schedule(for: .ollama("llama3.1:8b"), words: 300) == (3, .seconds(37)))
+    #expect(TranscriptPolisher.schedule(for: .cli(.claudeCode), words: 50) == (1, .seconds(30)))
+    #expect(TranscriptPolisher.schedule(for: .apple, words: 9) == (3, .seconds(15)))
+    #expect(TranscriptPolisher.schedule(for: .ollama("llama3.1:8b"), words: 300) == (3, .seconds(74)))
 
     #expect(TranscriptPolisher.retryDelay(after: .timedOut, attempt: 1, of: 3) == .zero)
     #expect(TranscriptPolisher.retryDelay(after: .transientFailure, attempt: 1, of: 3) == .seconds(1))
