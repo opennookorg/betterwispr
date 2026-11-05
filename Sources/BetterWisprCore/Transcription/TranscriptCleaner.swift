@@ -24,7 +24,7 @@ public enum TranscriptCleaner {
     private static let terminators = sentenceEnders.union(["…"])
     private static let clauseBreaks = terminators.union([","])
 
-    /// Removes English filled pauses, set-off "you know" and unpunctuated stutters; other languages are only trimmed.
+    /// Removes English filled pauses and stutters, and formats explicit spoken lists; other languages are only trimmed.
     public static func clean(_ text: String, language: String?) -> String {
         let ranges = text.ranges(of: /[\p{L}\p{M}\p{N}_'’-]+/)
         let ends = ranges.dropFirst().map(\.lowerBound) + [text.endIndex]
@@ -35,7 +35,24 @@ public enum TranscriptCleaner {
         let rebuilt = String(leading) + destutter(dropRepairs(dropFillers(tokens))).map { $0.word + $0.trailing }.joined()
         var result = rebuilt.replacing(/\ {2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         if result.hasSuffix(",") { result.removeLast() }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        return formattingLists(result.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// shortcut: only consecutive explicit English enumeration cues, use Medium cleanup for inferred lists.
+    private static func formattingLists(_ text: String) -> String {
+        let cues = text.matches(of: /(?i)(?:\band\s+)?\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\s+of\s+all|ly)\b(?=[\s,;:.!?]|$)[ \t]*[,;:.]?[ \t]*/)
+        let ordinals = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+        guard cues.count >= 2,
+              cues.map({ $0.1.lowercased() }) == Array(ordinals.prefix(cues.count)) else { return text }
+        let ends = cues.dropFirst().map(\.range.lowerBound) + [text.endIndex]
+        var items: [String] = []
+        for (cue, end) in zip(cues, ends) {
+            let item = text[cue.range.upperBound..<end].trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+            guard item.contains(where: { $0.isLetter || $0.isNumber }) else { return text }
+            items.append("- " + item)
+        }
+        let introduction = text[..<cues[0].range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        return (introduction.isEmpty ? "" : introduction + "\n\n") + items.joined(separator: "\n")
     }
 
     /// Uses the chosen language, or detects it when the language is automatic; undetectable text counts as English.

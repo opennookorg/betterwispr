@@ -6,6 +6,19 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Spoken bullet lists
+
+- [ ] With English and Light cleanup, dictate “First of all, send the invoice.
+  Second of all, book the room. Third of all, call Alex.” into TextEdit. Expect
+  three lines beginning with `- `, with the spoken cues removed. Repeat with
+  “firstly”, “secondly” and “thirdly”, and with an introductory sentence.
+- [ ] Repeat with each writing tone. Each item stays on its own line.
+- [ ] Dictate “First of all, thank you for coming.” and “The first invoice and
+  the second invoice are ready.” Both stay in prose. With cleanup None or a
+  non-English language selected, enumeration cues stay as spoken.
+- [ ] With Medium cleanup and its provider unavailable, repeat the list.
+  Light cleanup still supplies bullets without contacting another provider.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,
