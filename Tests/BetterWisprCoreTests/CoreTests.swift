@@ -53,6 +53,7 @@ import Testing
     toggled.onboardingStep = 2
     toggled.copyToClipboard = true
     toggled.soundEffects = false
+    toggled.soundVolume = 0.3
     toggled.hideCapsuleWhileDictating = true
     toggled.sounds = [.started: "Pop", .attention: "Funk"]
     toggled.pauseMediaWhileDictating = true
@@ -470,4 +471,12 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
 @Test func workspaceSavedBeforeSoundVolumeKeepsTheOldLevel() throws {
     let settings = try jsonDroppingKey(AppSettings(), "soundVolume")
     #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == 0.6)
+}
+
+@Test(arguments: [(-1, 0.05), (0, 0.05), (0.01, 0.05), (0.4, 0.4), (2, 1)] as [(Double, Float)])
+func savedSoundVolumeDecodesInsideTheSliderRange(saved: Double, decoded: Float) throws {
+    var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettings())) as! [String: Any]
+    object["soundVolume"] = saved
+    let settings = try JSONSerialization.data(withJSONObject: object)
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == decoded)
 }

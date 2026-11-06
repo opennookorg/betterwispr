@@ -171,7 +171,9 @@ struct SettingsView: View {
                     if model.settings.soundEffects {
                         RowDivider()
                         SettingRow("Sound volume") {
-                            Slider(value: setting(\.soundVolume), in: 0.05...1) { editing in
+                            Slider(value: setting(\.soundVolume), in: AppSettings.soundVolumeRange) {
+                                Text("Sound volume")
+                            } onEditingChanged: { editing in
                                 if !editing { model.playFeedback(.started) }
                             }
                             .labelsHidden()
