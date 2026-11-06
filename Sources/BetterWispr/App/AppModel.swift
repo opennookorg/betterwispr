@@ -1237,6 +1237,7 @@ final class AppModel {
         vocabulary += added
         do {
             try persist()
+            guard settings.notifyLearnedCorrections else { return }
             let ids = Set(added.map(\.id))
             ToastWindow.shared.show(Toast(title: "Learned \(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))",
                                           message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
@@ -1510,7 +1511,7 @@ final class AppModel {
     func playFeedback(_ cue: DictationSound) {
         feedbackSound?.stop()
         guard settings.soundEffects, meetings.capturingID == nil, let sound = cue.sound(named: settings.soundName(for: cue)) else { return }
-        sound.volume = 0.6
+        sound.volume = settings.soundVolume
         sound.play()
         feedbackSound = sound
     }
