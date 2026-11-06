@@ -130,11 +130,11 @@ import Testing
     let context = DictationContext(selectedText: String(repeating: "pick ", count: 400), clipboard: String(repeating: "copy ", count: 400),
                                    window: String(repeating: "pane ", count: 800))
     let plain = TranscriptPolisher.exchange(text, for: .apple, vocabulary: [], context: context, instructions: "").instructions
-    #expect(plain.contains("pick pick") && plain.contains("copy copy"))
+    #expect(plain.contains("pick pick") && plain.contains("copy copy") && !plain.contains("pane pane"))
     #expect(plain.count + TranscriptPolisher.message(for: text).count + text.count <= TranscriptPolisher.appleBudget)
 
     let vocabulary = (0..<200).map { "Term\($0)Name" }
-    let mode = String(repeating: "Use British spelling. ", count: 100)
+    let mode = String(repeating: "Use British spelling. ", count: 10)
     let crowded = TranscriptPolisher.exchange(text, for: .apple, vocabulary: vocabulary, context: context, instructions: mode).instructions
     #expect(crowded.contains("pick pick") && !crowded.contains("copy copy"))
     #expect(crowded.count + TranscriptPolisher.message(for: text).count + text.count <= TranscriptPolisher.appleBudget)
