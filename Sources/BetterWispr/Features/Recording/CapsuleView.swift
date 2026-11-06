@@ -20,7 +20,7 @@ struct CapsuleView: View {
     }
     private var showsCard: Bool {
         switch model.phase {
-        case .cancelled, .completed, .unpasted, .failed, .sending: true
+        case .cancelled, .completed, .unpasted, .failed, .sending, .asking: true
         default: failure != nil || meetingPrompt != nil
         }
     }
@@ -37,7 +37,6 @@ struct CapsuleView: View {
             if !showsCard, let target = hover.target {
                 tooltip(for: target)
             }
-            RecordingLimitLabel(model: model)
             if model.isBusy, !model.liveTranscript.isEmpty {
                 livePreview
             }
@@ -74,6 +73,7 @@ struct CapsuleView: View {
                 AccessibilityNotification.Announcement(model.canUndoCancellation ? "Transcript cancelled. Undo is available for five seconds." : "Transcript cancelled.").post()
             case .completed(let message): AccessibilityNotification.Announcement(message).post()
             case .sending: AccessibilityNotification.Announcement("Sending. Dictate again to add more first.").post()
+            case .asking(let question): AccessibilityNotification.Announcement("\(question.title) \(question.message)").post()
             default: break
             }
         }
@@ -92,6 +92,9 @@ struct CapsuleView: View {
                     .transition(swap)
             } else if model.phase == .sending {
                 sendingCard
+                    .transition(swap)
+            } else if case .asking(let question) = model.phase {
+                questionCard(question)
                     .transition(swap)
             } else if case .completed(let message) = model.phase {
                 completionCard(message)
@@ -207,7 +210,11 @@ struct CapsuleView: View {
                 }
                 .buttonStyle(.bordered)
             } else if model.failure != nil {
-                Button("Try again", action: model.toggleRecording)
+                let retry = model.canRetryFailure
+                    ? model.selectedModel.recordingAction(onDevice: (title: "Try again", help: "Transcribe this recording again"))
+                    : (title: "Try again", help: "Start a new dictation")
+                Button(retry.title, action: model.retryFailure)
+                    .help(retry.help)
                     .buttonStyle(.bordered)
             }
             if isMeetingCapturing {
@@ -295,6 +302,27 @@ struct CapsuleView: View {
         .buttonStyle(CapsuleCardButtonStyle())
         .padding(.horizontal, 18)
         .frame(width: 320, height: 56)
+    }
+
+    private func questionCard(_ question: DictationQuestion) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(question.title)
+                .font(.system(size: 14, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(question.message)
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Button(question.refusal) { model.answerQuestion(false) }
+                Button(question.approval) { model.answerQuestion(true) }
+            }
+        }
+        .foregroundStyle(.white)
+        .buttonStyle(CapsuleCardButtonStyle())
+        .padding(18)
+        .frame(width: 360, alignment: .leading)
     }
 
     private func completionCard(_ message: String) -> some View {
@@ -576,30 +604,6 @@ private struct CapsuleCardButtonStyle: ButtonStyle {
     }
 }
 
-/// Counts down the last 30 seconds before dictation finishes at the recording limit.
-private struct RecordingLimitLabel: View {
-    let model: AppModel
-
-    var body: some View {
-        Group {
-            if let secondsLeft = model.recordingSecondsLeft {
-                Text("Stops in \(Duration.seconds(secondsLeft).formatted(.time(pattern: .minuteSecond)))")
-                    .font(.system(size: 11, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background { CapsuleGlass(cornerRadius: 14) }
-                    .allowsHitTesting(false)
-            }
-        }
-        .onChange(of: model.recordingSecondsLeft != nil) { _, warning in
-            guard warning else { return }
-            AccessibilityNotification.Announcement("Dictation stops in 30 seconds.").post()
-        }
-    }
-}
-
 /// Reads the live audio level in its own body so each level update redraws only the bars, not the whole capsule.
 private struct CapsuleWaveform: View {
     let model: AppModel
@@ -648,8 +652,6 @@ private struct CapsuleGlass: View {
         Group {
             if reduceTransparency {
                 shape.fill(Color(white: 0.09))
-            } else if #available(macOS 26.0, *) {
-                Color.clear.glassEffect(.regular.tint(.black.opacity(0.45)), in: shape)
             } else {
                 shape.fill(.ultraThinMaterial)
                     .overlay { shape.fill(.black.opacity(0.45)) }

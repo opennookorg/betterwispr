@@ -49,7 +49,8 @@ public final class LiveTranscriber {
     public typealias Pass = @MainActor @Sendable ([Float]) async throws -> LivePass
 
     public static let sampleRate = 16_000
-    static let maximumSamples = (Int(AudioRecorder.maximumDuration) + 5) * sampleRate
+    /// The preview stops following after ten minutes to bound memory; the dictation itself keeps recording.
+    static let maximumSamples = 605 * sampleRate
     static let minimumSamples = ASRConstants.minimumRequiredSamples(forSampleRate: sampleRate)
     private static let padding = [Float](repeating: 0, count: sampleRate)
 
