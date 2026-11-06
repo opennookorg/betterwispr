@@ -12,7 +12,7 @@ needed; it is not a promise of Linux/iOS portability. Feature folders are source
 organization, not separate packages or a plugin loader.
 
 Codex subscription transcription is a static model outside the local catalog.
-`CodexSpeechProvider` shares `SpeechAudio`'s bounded mono PCM16 WAV conversion
+`CodexSpeechProvider` shares `SpeechAudio`'s mono PCM16 WAV conversion
 and uploads ordered 125-second chunks directly to the fixed unofficial ChatGPT
 transcription endpoint. Each transcription owns an ephemeral URLSession and its
 cancellable task. Redirects, cookies, cached responses, and stored URL credentials
@@ -826,7 +826,7 @@ settings decode with an empty list. The built-in catalog stays static and local.
 network requests. Only transcription through a selected connection uploads audio.
 It reuses WhisperKit's audio conversion to produce 16 kHz mono PCM WAV in memory,
 off the main actor. Sarvam receives sequential 25-second clips; other APIs receive
-the bounded dictation/meeting clip. Fixed cuts can affect words at boundaries.
+sequential 125-second clips. Fixed cuts can affect words at boundaries.
 No partial transcript is delivered on failure. Cancellation stops URLSession
 requests; callers retain their generation checks before history and paste.
 
