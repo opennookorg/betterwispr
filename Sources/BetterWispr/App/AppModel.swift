@@ -750,8 +750,7 @@ final class AppModel {
                                             appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
-                    self.history.insert(transcript, at: 0)
-                    do { try self.persist() } catch { persistenceWarning = error.localizedDescription }
+                    do { try self.addToHistory(transcript) } catch { persistenceWarning = error.localizedDescription }
                 }
                 let returnDelay = recording.settings.sendToClaude && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
                 let paste = FocusedAppIntegration(keepsCopy: writingSettings.copyToClipboard, expectedFocus: recording.targetElement)
@@ -1190,6 +1189,65 @@ final class AppModel {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
             catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
         }
+    }
+
+    /// Adds a dictation and deletes what retention no longer keeps; a failed save deletes nothing and keeps the dictation for the next save.
+    func addToHistory(_ transcript: Transcript) throws {
+        do { try saveKeeping([transcript] + history) } catch {
+            history.insert(transcript, at: 0)
+            throw error
+        }
+    }
+
+    /// Dictations the chosen retention would delete now.
+    func historyRemoved(by retention: HistoryRetention) -> Int {
+        var clock = settings.historyClock
+        let trusted = clock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        return history.count - retention.kept(history, clockIsTrusted: trusted).count
+    }
+
+    /// Saves the retention and deletes the dictations it doesn't keep.
+    func setHistoryRetention(_ retention: HistoryRetention) {
+        guard retention != settings.historyRetention else { return }
+        let previous = settings.historyRetention
+        settings.historyRetention = retention
+        do {
+            let trusted = try saveKeeping(history)
+            if !trusted, retention.kept(history).count < history.count {
+                ToastWindow.shared.show(Toast(title: "Keep history saved", message: "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day.",
+                                              systemImage: "clock"))
+            }
+        } catch {
+            settings.historyRetention = previous
+            ToastWindow.shared.show(Toast(failure: "Couldn’t change history retention", error))
+        }
+    }
+
+    /// Applies a saved limit at launch and says what it removed; paused while Save history is off and never run on an unreadable workspace.
+    func pruneHistoryAtLaunch() {
+        guard storageIsReadable, settings.saveHistory, settings.historyRetention != .forever else { return }
+        let before = history.count
+        do {
+            try saveKeeping(history)
+            if history.count < before { ToastWindow.shared.show(Toast(pruned: before - history.count, by: settings.historyRetention)) }
+        } catch {
+            if settings.historyRetention.kept(history).count < before {
+                ToastWindow.shared.show(Toast(failure: "Couldn’t delete older dictations", error))
+            }
+        }
+    }
+
+    /// Saves `dictations` minus what retention deletes and returns whether the clock was trusted; a failed save changes nothing.
+    @discardableResult
+    private func saveKeeping(_ dictations: [Transcript]) throws -> Bool {
+        let previous = (settings.historyClock, history)
+        let trusted = settings.historyClock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        history = settings.historyRetention.kept(dictations, clockIsTrusted: trusted)
+        do { try persist() } catch {
+            (settings.historyClock, history) = previous
+            throw error
+        }
+        return trusted
     }
 
     func deleteTranscript(_ transcript: Transcript) {

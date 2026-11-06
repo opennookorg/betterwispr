@@ -470,6 +470,26 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(rushed.observe("") == nil)
 }
 
+@Test func workspaceSavedBeforeHistoryRetentionKeepsEverything() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "historyRetention")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).historyRetention == .forever)
+}
+
+@Test func historyRetentionKeepsTheNewestDictationsWithinItsLimit() {
+    let now = Date(timeIntervalSince1970: 1_000_000_000)
+    let history = (0..<120).map { day in
+        Transcript(createdAt: now.addingTimeInterval(-Double(day) * 86_400), text: "\(day)", rawText: "\(day)",
+                   duration: 1, modelName: "test", language: "en")
+    }
+    var utc = Calendar(identifier: .gregorian)
+    utc.timeZone = .gmt
+    #expect(HistoryRetention.forever.kept(history, now: now, calendar: utc).count == 120)
+    #expect(HistoryRetention.latest100.kept(history, now: now, calendar: utc).map(\.text) == (0..<100).map { "\($0)" })
+    #expect(HistoryRetention.threeDays.kept(history, now: now, calendar: utc).count == 4)
+    #expect(HistoryRetention.twoWeeks.kept(history, now: now, calendar: utc).count == 15)
+    #expect(HistoryRetention.threeMonths.kept(history, now: now, calendar: utc).count == 93)
+}
+
 @Test func workspaceSavedBeforeTrailingSpacesPastesWithoutOne() throws {
     let settings = try jsonDroppingKey(AppSettings(), "appendTrailingSpace")
     #expect(try !JSONDecoder().decode(AppSettings.self, from: settings).appendTrailingSpace)

@@ -157,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func start() {
         guard !started else { return }
         started = true
+        model.pruneHistoryAtLaunch()
         capsule = CapsuleController(model: model)
         model.onPresentationChange = { [weak self] in self?.capsule?.update() }
         notetaker = NotetakerController(model: model)
