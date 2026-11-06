@@ -133,6 +133,9 @@ struct SettingsView: View {
                 SettingsSection("After you speak") {
                     SettingToggle("Paste into the active app", caption: "Needs Accessibility. Otherwise, text is copied.", isOn: setting(\.autoPaste))
                     RowDivider()
+                    SettingToggle("Add a space after pasting", caption: "So the next dictation doesn’t run into this one. Skipped after Chinese or Japanese.", isOn: setting(\.appendTrailingSpace))
+                        .disabled(!model.settings.autoPaste)
+                    RowDivider()
                     SettingToggle("Send to Claude", caption: "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt.", isOn: sendToClaude)
                         .task(id: permissionCheck) { await loadTerminals() }
                         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in permissionCheck += 1 }
@@ -163,12 +166,28 @@ struct SettingsView: View {
                     SettingToggle("Copy to clipboard", caption: "Keep each dictation ready to paste again. When off, your clipboard is left as it was.", isOn: setting(\.copyToClipboard))
                     RowDivider()
                     SettingToggle("Learn from my corrections", caption: "Words you fix in History, or in the text field within 30 seconds of a paste, are added to Vocabulary. With Medium cleanup, each English fix and a few words around it are first reviewed by the selected notes model.", isOn: setting(\.learnCorrections))
+                    if model.settings.learnCorrections {
+                        RowDivider()
+                        SettingToggle("Notify when a word is learned", caption: "Show what was added to Vocabulary, with Undo. When off, words are still learned quietly; review them in Vocabulary.", isOn: setting(\.notifyLearnedCorrections))
+                    }
                 }
 
                 SettingsSection("App") {
                     SettingToggle("Show in Dock", caption: "When off, use the menu bar to open BetterWispr. Your dictation shortcut still works.", isOn: setting(\.showInDock))
                     RowDivider()
                     SettingToggle("Dictation sounds", caption: "Soft cues when dictation starts listening, finishes, cancels or needs attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
+                    if model.settings.soundEffects {
+                        RowDivider()
+                        SettingRow("Sound volume") {
+                            Slider(value: setting(\.soundVolume), in: AppSettings.soundVolumeRange) {
+                                Text("Sound volume")
+                            } onEditingChanged: { editing in
+                                if !editing { model.playFeedback(.started) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 160)
+                        }
+                    }
                     if model.settings.soundEffects {
                         ForEach(DictationSound.allCases, id: \.self) { cue in
                             let overridden = cue.url(in: DictationSound.overrideDirectory) != nil
@@ -189,6 +208,8 @@ struct SettingsView: View {
                     SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))
                     RowDivider()
                     SettingToggle("Hide capsule while dictating", caption: "Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak.", isOn: setting(\.hideCapsuleWhileDictating))
+                    RowDivider()
+                    SettingToggle("Tell me when no speech is heard", caption: "Shows “No speech heard.” with a sound when a dictation ends without words. When off, it closes quietly.", isOn: setting(\.showNoSpeechNotice))
                     RowDivider()
                     SettingToggle("Show words as you speak", caption: "Previews Parakeet’s recognition in the capsule while you record. The pasted text is still the full recognition.", isOn: setting(\.showLiveText))
                         .disabled(model.settings.hideCapsuleWhileDictating)

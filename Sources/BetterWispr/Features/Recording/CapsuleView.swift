@@ -648,8 +648,6 @@ private struct CapsuleGlass: View {
         Group {
             if reduceTransparency {
                 shape.fill(Color(white: 0.09))
-            } else if #available(macOS 26.0, *) {
-                Color.clear.glassEffect(.regular.tint(.black.opacity(0.45)), in: shape)
             } else {
                 shape.fill(.ultraThinMaterial)
                     .overlay { shape.fill(.black.opacity(0.45)) }

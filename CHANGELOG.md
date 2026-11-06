@@ -6,9 +6,19 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Setup recommends Parakeet Ultra and lists Apple on-device speech only when it supports your language on this Mac. If Apple is your selected model and it isn't available, setup says so, keeps your setting and holds Continue until you pick another model. Models marks Apple as unavailable and turns off its Use button.
+
 ### Added
 - Keep history, in Settings > App under Save dictation history. Choose Forever, the latest 100 dictations, 3 days, 2 weeks or 3 months. Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. A choice that would delete dictations asks first and says how many. It is Forever by default, so nothing is deleted until you choose.
+- Add a space after pasting, in Settings > After you speak and off by default. Each pasted dictation ends with a space, so the next one doesn't run into it. It is skipped when the text ends in Chinese or Japanese, or already ends in a space or line break, and History keeps the text without it. A dictation that joins one waiting to be sent to Claude uses that space instead of adding its own.
+- Sound volume, in Settings > App under Dictation sounds. A slider sets how loud the start, finish, cancel and needs-attention sounds play, and plays the start sound when you let go. It starts at the level the sounds always used.
+- Notify when a word is learned, in Settings under Learn from my corrections and on by default. Turn it off to stop the "Learned …" toast after you fix a dictation. Corrections are still added to Vocabulary, where entries marked Learned can be reviewed and removed. Without the toast there is no Undo button.
 - Send to Claude, in Settings > After you speak and off by default. After pasting, BetterWispr presses Return when the cursor is in Claude Desktop's message box, the Claude Code panel in VS Code, or a Terminal or iTerm2 tab where Claude Code is running, so a dictated prompt is submitted hands-free. Anywhere else, such as a shell or a file, the text is only pasted. A tab counts only while a Claude Code process is in front in it: Terminal and iTerm2 are asked which tab is focused once you allow it. VS Code terminals and Ghostty paste without sending because a stale title cannot prove which process receives Return. Return also answers a question Claude Code is asking, such as a permission prompt. The capsule shows ↵ when a dictation will be sent. Hold Shift as you finish, or start with Shift and your shortcut, to paste only. After pasting, the capsule counts down for a second: dictate again to add more, and the next dictation is pasted after the first and sends both, or press Escape or click Don't send. Wait before sending changes the countdown, from 120 ms to two seconds. Return is skipped, with "Pasted, not sent", when you switched apps or fields. In VS Code this turns on its accessibility support, which may ask once whether to optimize the editor for a screen reader; No is fine.
+- Tell me when no speech is heard, in Settings > App and on by default. Turn it off, and a dictation that ends without words closes quietly instead of showing "No speech heard." with a sound. The card still appears when an earlier dictation was waiting for this one to send it, since that dictation stays pasted but not sent.
+
+### Fixed
+- The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
 
 ## [0.1.6] - 2026-10-15
 
