@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import WhisperKit
 
 enum SpeechAudio {
-    /// The stretches of a recording, in seconds, that are uploaded one at a time.
+    /// The stretches of a recording, in seconds, that are uploaded as separate requests.
     @concurrent
     nonisolated static func chunkRanges(_ url: URL, seconds: Double) async throws -> [Range<Double>] {
         guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else { throw SpeechError.audioUnavailable }

@@ -25,7 +25,8 @@ All notable changes to BetterWispr are listed here. The format follows
 ### Changed
 - Dictation no longer stops at ten minutes. It used to finish by itself at ten minutes, after a "Stops in 0:30" countdown. Now it records until you release or press your shortcut, with a brief reminder every hour, up to a limit of 4,278,190,080 audio frames: about 24 hours 45 minutes at 48 kHz, half that at 96 kHz. At the limit it finishes by itself and transcribes what it captured. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
 - A recording of ten minutes or longer now asks before it is sent to an API connection and before it is pasted automatically. If you don't send it, the audio stays on your Mac and you can try it again. If you don't paste it, the text is left on your clipboard. Local models never ask before transcribing.
-- API connections now load one piece of a long recording at a time for upload, instead of holding the whole recording in memory first.
+- API connections now load only the pieces of a long recording that are being uploaded, instead of holding the whole recording in memory first.
+- A long dictation sent to an API connection is uploaded in pieces at the same time, up to four at once, instead of one piece after another. The transcript keeps the pieces in order. If the provider answers that it is rate limiting (HTTP 429) or a piece times out, BetterWispr keeps the answers it has and sends the remaining pieces one at a time. A piece that fails then fails the dictation: nothing is pasted, and the recording is kept so you can try again.
 - A dictation interrupted by a microphone or recording failure now keeps what was captured, so you can try it again and find it in History when history is on. Before, the audio was deleted.
 - Recordings left in the temporary folder by a crash are deleted at the next launch, once they are more than a day old.
 

@@ -1092,6 +1092,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
+- [ ] With an API connection selected, dictate for about five minutes. The
+  transcript pastes in the order spoken. Cancel while it transcribes: no text
+  pastes. Against a test endpoint that answers one clip with HTTP 429 and then
+  recovers, the dictation still completes in order. When it keeps answering 429,
+  the failure card offers Try again, nothing pastes, and with history on History
+  lists the recording under Not transcribed.
 - [ ] In Settings > App, Sound volume starts at the old fixed level on a workspace
   saved before the setting existed. Letting go of the slider plays the start
   sound once at the new level, and start, finish, cancel, needs-attention and
