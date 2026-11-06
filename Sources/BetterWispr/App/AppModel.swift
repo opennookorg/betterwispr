@@ -1092,6 +1092,11 @@ final class AppModel {
         return !model.requiresModelDownload || installedModelIDs.contains(model.id)
     }
 
+    /// Whether Apple on-device recognition supports the current language on this Mac.
+    var appleSpeechAvailable: Bool {
+        (try? AppleSpeechProvider.checkAvailability(language: settings.language == "auto" ? nil : settings.language)) != nil
+    }
+
     var canEditConnections: Bool { !isBusy && meetings.runs.isEmpty && transcriptions.job == nil }
 
     func saveConnection(_ connection: SpeechConnection, key: String?, forNotes: Bool = false) throws {

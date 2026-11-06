@@ -7,7 +7,7 @@ All notable changes to BetterWispr are listed here. The format follows
 ## [Unreleased]
 
 ### Changed
-- Setup recommends Parakeet Ultra and lists Apple on-device speech only when it supports your language on this Mac. If Apple is your selected model and it isn't available, setup says so and keeps your setting. Speaker detection is no longer offered during setup; download it from Models.
+- Setup recommends Parakeet Ultra and lists Apple on-device speech only when it supports your language on this Mac. If Apple is your selected model and it isn't available, setup says so, keeps your setting and holds Continue until you pick another model. Models marks Apple as unavailable and turns off its Use button.
 
 ### Added
 - Add a space after pasting, in Settings > After you speak and off by default. Each pasted dictation ends with a space, so the next one doesn't run into it. It is skipped when the text ends in Chinese or Japanese, or already ends in a space or line break, and History keeps the text without it. A dictation that joins one waiting to be sent to Claude uses that space instead of adding its own.

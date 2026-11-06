@@ -381,10 +381,16 @@ call audio, and an in-room corpus with far-field microphones would have to be
 added.
 
 - [ ] Run setup on a fresh user. The model step lists Parakeet Ultra, and Apple
-  on-device only when it supports the language on this Mac. Nothing downloads
-  until Download is clicked. Speaker detection is offered in Models, not in setup.
+  on-device only when it supports the language on this Mac. Speaker detection
+  shows below the speech models and nothing downloads until Download is clicked.
+  Clicking it during the speech model download shows "Downloads when the speech
+  model is ready" and it starts after that download. Its Cancel takes it off the
+  queue, and cancelling the speech model download drops it too.
 - [ ] With Apple selected and a language it does not support, the model step says
-  so without changing `selectedModelID`. Download or Use moves to the new model.
+  so without changing `selectedModelID`, and Continue stays off. Back then Skip
+  still leaves setup. Download or Use moves to the new model and turns Continue on.
+- [ ] With the same setup, Models shows Apple as "Selected · Unavailable" with no
+  active checkmark and its Use button off, and picking another model works.
 - [ ] With Use Calendar on, record during an event with invitees. The button
   beside a speaker's name field lists the invitees, and picking one fills the
   name and removes it from the other speakers' lists.

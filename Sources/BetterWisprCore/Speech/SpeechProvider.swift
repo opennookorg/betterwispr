@@ -55,6 +55,9 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
 
     public var requiresPreparationBeforeRecording: Bool { engine == .apple || !processingLocation.isOnDevice }
 
+    /// Whether this is Apple speech while on-device recognition can't serve the current language.
+    public func isUnavailable(appleSpeechAvailable: Bool) -> Bool { engine == .apple && !appleSpeechAvailable }
+
     public static let codex = SpeechModel(
         id: "codex", name: "Codex · Subscription",
         detail: "Transcribes with your Codex subscription through an unofficial ChatGPT endpoint. Requires internet access.",

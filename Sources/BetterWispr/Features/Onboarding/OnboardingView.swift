@@ -55,8 +55,7 @@ struct OnboardingView: View {
     }
 
     private var speechChoices: [SpeechModel] {
-        (["parakeet-ultra"] + (appleSpeechAvailable ? ["apple"] : []))
-            .compactMap { id in model.models.first { $0.id == id } }
+        Self.speechChoices(from: model.models, appleSpeechAvailable: appleSpeechAvailable)
     }
     private var shortcut: String { model.settings.shortcut.displayName }
 
@@ -151,19 +150,24 @@ struct OnboardingView: View {
             ForEach(speechChoices) { speechModel in
                 speechModelRow(speechModel)
             }
+            speakerDetectionRow
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .frame(height: 210)
-        .onAppear(perform: refreshAppleSpeechAvailability)
+        .frame(height: 236)
+        .onAppear { appleSpeechAvailable = model.appleSpeechAvailable }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshAppleSpeechAvailability()
+            appleSpeechAvailable = model.appleSpeechAvailable
         }
     }
 
-    private func refreshAppleSpeechAvailability() {
-        let language = model.settings.language == "auto" ? nil : model.settings.language
-        appleSpeechAvailable = (try? AppleSpeechProvider.checkAvailability(language: language)) != nil
+    static func speechChoices(from models: [SpeechModel], appleSpeechAvailable: Bool) -> [SpeechModel] {
+        (["parakeet-ultra"] + (appleSpeechAvailable ? ["apple"] : []))
+            .compactMap { id in models.first { $0.id == id } }
+    }
+
+    static func canContinue(from step: OnboardingStep, selected: SpeechModel, appleSpeechAvailable: Bool) -> Bool {
+        step != .model || !selected.isUnavailable(appleSpeechAvailable: appleSpeechAvailable)
     }
 
     @ViewBuilder private func speechModelRow(_ speechModel: SpeechModel) -> some View {
@@ -196,6 +200,35 @@ struct OnboardingView: View {
         }
     }
 
+    @ViewBuilder private var speakerDetectionRow: some View {
+        let installation = model.installation?.id == AppModel.speakerDetectionID ? model.installation : nil
+        LabeledContent {
+            if model.speakerDetectionInstalled {
+                ready
+            } else if let installation, installation.failure == nil {
+                HStack {
+                    ProgressView(value: installation.progress).frame(width: 120)
+                    Button("Cancel", action: model.cancelInstallation)
+                }
+            } else if model.speakerDetectionQueued {
+                Button("Cancel") { model.speakerDetectionQueued = false }
+            } else {
+                Button(installation == nil ? "Download" : "Retry", action: model.installSpeakerDetection)
+            }
+        } label: {
+            Text("Speaker detection")
+            Text(speakerDetectionDetail(installation))
+        }
+    }
+
+    private func speakerDetectionDetail(_ installation: ModelInstallation?) -> String {
+        if let installation, !model.speakerDetectionInstalled {
+            return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
+        }
+        if model.speakerDetectionQueued { return "Downloads when the speech model is ready." }
+        return "Optional. Tells the voices in your meetings apart, on this Mac."
+    }
+
     private var ready: some View {
         Label {
             Text("Ready")
@@ -216,7 +249,7 @@ struct OnboardingView: View {
 
     static func selectedModelNote(selected: SpeechModel, isInstalled: Bool, choices: [SpeechModel]) -> String? {
         guard !choices.contains(where: { $0.id == selected.id }) else { return nil }
-        if selected.engine == .apple { return "Apple on-device speech isn’t available for your language on this Mac. Pick a model here, or in Models after setup." }
+        if selected.engine == .apple { return "Apple on-device speech isn’t available for your language on this Mac. Pick a model here to continue." }
         return isInstalled ? "You’re using \(selected.name). Parakeet Ultra is recommended." : nil
     }
 
@@ -268,6 +301,7 @@ struct OnboardingView: View {
                 Button("Continue") { go(to: OnboardingStep(rawValue: step.rawValue + 1)) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!Self.canContinue(from: step, selected: model.selectedModel, appleSpeechAvailable: appleSpeechAvailable))
             }
         }
         .overlay { progressDots }
