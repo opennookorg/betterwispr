@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var permissionCheck = 0
     @State private var terminals: [ScriptableTerminal] = []
+    @State private var pendingRetention: HistoryRetention?
 
     private static let voiceCommands = [
         ("“comma”, “question mark”, “full stop”", ", ? ."),
@@ -197,6 +198,25 @@ struct SettingsView: View {
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()
                     SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it.", isOn: setting(\.saveHistory))
+                    if model.settings.saveHistory {
+                        RowDivider()
+                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation.") {
+                            Picker("Keep history", selection: Binding(
+                                get: { model.settings.historyRetention },
+                                set: { retention in
+                                    if model.historyRemoved(by: retention) > 0 { pendingRetention = retention } else { model.setHistoryRetention(retention) }
+                                }
+                            )) {
+                                Text("Forever").tag(HistoryRetention.forever)
+                                Text("Latest 100").tag(HistoryRetention.latest100)
+                                Text("3 days").tag(HistoryRetention.threeDays)
+                                Text("2 weeks").tag(HistoryRetention.twoWeeks)
+                                Text("3 months").tag(HistoryRetention.threeMonths)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
                 }
 
                 SettingsSection("Calendar") {
@@ -265,6 +285,14 @@ struct SettingsView: View {
         .animation(.ui, value: model.calendarGranted)
         .animation(.ui, value: model.settings.useCalendar)
         .animation(.ui, value: model.calendarAccounts)
+        .alert("Delete older dictations?", isPresented: Binding(get: { pendingRetention != nil }, set: { if !$0 { pendingRetention = nil } }),
+               presenting: pendingRetention) { retention in
+            Button("Delete", role: .destructive) { model.setHistoryRetention(retention) }
+            Button("Cancel", role: .cancel) {}
+        } message: { retention in
+            let count = model.historyRemoved(by: retention)
+            Text("\(count) \(count == 1 ? "dictation" : "dictations") will be deleted from this Mac. This can’t be undone.")
+        }
     }
 
     static let spokenLanguages = [

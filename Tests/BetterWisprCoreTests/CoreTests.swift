@@ -466,3 +466,21 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(rushed.observe("Claude Cod") == nil)
     #expect(rushed.observe("") == nil)
 }
+
+@Test func workspaceSavedBeforeHistoryRetentionKeepsEverything() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "historyRetention")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).historyRetention == .forever)
+}
+
+@Test func historyRetentionKeepsTheNewestDictationsWithinItsLimit() {
+    let now = Date(timeIntervalSince1970: 1_000_000_000)
+    let history = (0..<120).map { day in
+        Transcript(createdAt: now.addingTimeInterval(-Double(day) * 86_400), text: "\(day)", rawText: "\(day)",
+                   duration: 1, modelName: "test", language: "en")
+    }
+    #expect(HistoryRetention.forever.kept(history, now: now).count == 120)
+    #expect(HistoryRetention.latest100.kept(history, now: now).map(\.text) == (0..<100).map { "\($0)" })
+    #expect(HistoryRetention.threeDays.kept(history, now: now).count == 4)
+    #expect(HistoryRetention.twoWeeks.kept(history, now: now).count == 15)
+    #expect(HistoryRetention.threeMonths.kept(history, now: now).count == 91)
+}

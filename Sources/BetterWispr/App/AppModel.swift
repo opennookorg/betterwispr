@@ -234,6 +234,7 @@ final class AppModel {
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
         guard startsServices else { return }
+        if storageIsReadable { setHistoryRetention(settings.historyRetention) }
         applyAppearance()
         migrateLegacyOnboarding()
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
@@ -749,8 +750,12 @@ final class AppModel {
                                             appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
-                    self.history.insert(transcript, at: 0)
-                    do { try self.persist() } catch { persistenceWarning = error.localizedDescription }
+                    let previous = self.history
+                    self.history = self.settings.historyRetention.kept([transcript] + self.history)
+                    do { try self.persist() } catch {
+                        self.history = previous
+                        persistenceWarning = error.localizedDescription
+                    }
                 }
                 let returnDelay = recording.settings.sendToClaude && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
                 let paste = FocusedAppIntegration(keepsCopy: writingSettings.copyToClipboard, expectedFocus: recording.targetElement)
@@ -1180,6 +1185,24 @@ final class AppModel {
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
             catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
+        }
+    }
+
+    /// Dictations the chosen retention would delete now.
+    func historyRemoved(by retention: HistoryRetention) -> Int {
+        history.count - retention.kept(history).count
+    }
+
+    /// Saves the retention and deletes the dictations it doesn't keep; also run at launch.
+    func setHistoryRetention(_ retention: HistoryRetention) {
+        let kept = retention.kept(history)
+        guard retention != settings.historyRetention || kept.count < history.count else { return }
+        let previous = (settings.historyRetention, history)
+        settings.historyRetention = retention
+        history = kept
+        do { try persist() } catch {
+            (settings.historyRetention, history) = previous
+            ToastWindow.shared.show(Toast(failure: "Couldn’t change history retention", error))
         }
     }
 

@@ -29,6 +29,25 @@ public enum ModelIdleUnload: Int, Codable, CaseIterable, Sendable {
     public var delay: Duration? { self == .never ? nil : .seconds(rawValue * 60) }
 }
 
+/// How long saved dictations are kept before BetterWispr deletes them.
+public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
+    case forever, latest100, threeDays, twoWeeks, threeMonths
+
+    /// The dictations to keep from `history`, which is ordered newest first.
+    public func kept(_ history: [Transcript], now: Date = .now) -> [Transcript] {
+        let days: Int
+        switch self {
+        case .forever: return history
+        case .latest100: return Array(history.prefix(100))
+        case .threeDays: days = 3
+        case .twoWeeks: days = 14
+        case .threeMonths: days = 90
+        }
+        let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
+        return history.filter { $0.createdAt >= cutoff }
+    }
+}
+
 public struct AppSettings: Codable, Equatable, Sendable {
     public var selectedModelID: String = "apple"
     public var speechConnections: [SpeechConnection] = []
@@ -49,6 +68,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var sendDelayMilliseconds: Int?
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
+    public var historyRetention: HistoryRetention = .forever
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
@@ -183,6 +203,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         sendDelayMilliseconds = try container.decodeIfPresent(Int.self, forKey: .sendDelayMilliseconds)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
+        historyRetention = try container.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention) ?? .forever
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
