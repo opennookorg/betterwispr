@@ -14,7 +14,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Tell me when no speech is heard, in Settings > App and on by default. Turn it off, and a dictation that ends without words closes quietly instead of showing "No speech heard." with a sound. The card still appears when an earlier dictation was waiting for this one to send it, since that dictation stays pasted but not sent.
 
 ### Fixed
-- The capsule stays dark over bright windows on macOS 26 and later. Liquid Glass could turn it gray there, which made its white text and icons hard to read. It now uses the same background as earlier macOS versions.
+- The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
 
 ## [0.1.6] - 2026-10-15
 

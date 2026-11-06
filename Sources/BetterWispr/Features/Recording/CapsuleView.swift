@@ -649,7 +649,6 @@ private struct CapsuleGlass: View {
             if reduceTransparency {
                 shape.fill(Color(white: 0.09))
             } else {
-                // Liquid Glass turns light over light backgrounds; keep ultraThinMaterial so hardcoded white text stays readable.
                 shape.fill(.ultraThinMaterial)
                     .overlay { shape.fill(.black.opacity(0.45)) }
             }
