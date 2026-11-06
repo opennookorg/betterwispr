@@ -1098,6 +1098,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.
+- [ ] Turn off Tell me when no speech is heard and stay silent through a dictation.
+  The capsule closes with no card and no sound. Start a dictation with the
+  microphone disconnected or denied: the error card and its sound still appear.
+  With Send to Claude on, dictate again during the countdown and stay silent: the
+  card still appears and says the earlier dictation was pasted but not sent.
 - [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
   bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
