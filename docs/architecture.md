@@ -12,7 +12,7 @@ needed; it is not a promise of Linux/iOS portability. Feature folders are source
 organization, not separate packages or a plugin loader.
 
 Codex subscription transcription is a static model outside the local catalog.
-`CodexSpeechProvider` shares `SpeechAudio`'s bounded mono PCM16 WAV conversion
+`CodexSpeechProvider` shares `SpeechAudio`'s mono PCM16 WAV conversion
 and uploads ordered 125-second chunks directly to the fixed unofficial ChatGPT
 transcription endpoint. Each transcription owns an ephemeral URLSession and its
 cancellable task. Redirects, cookies, cached responses, and stored URL credentials
@@ -54,12 +54,16 @@ the policy immediately and persist through the existing workspace store.
    Settings) starts a session. Capture the previously focused external app before
    showing the nonactivating capsule. With "Hide capsule while dictating" on,
    `AppModel.showsCapsule` keeps it hidden until the session leaves the busy
-   phases or the 30-second limit warning starts. While the session is preparing,
-   recording or transcribing, a second Carbon hot key makes Escape (also with the
-   dictation shortcut's held modifiers unless they include Command, so
-   Command-Option-Escape stays Force Quit) cancel it from any app through the
-   same Undo path; it is unregistered as soon as the session leaves those phases,
-   so other apps keep Escape.
+   phases. While the session is preparing, recording or transcribing, a second
+   Carbon hot key makes Escape (also with the dictation shortcut's held modifiers
+   unless they include Command, so Command-Option-Escape stays Force Quit) cancel
+   it from any app through the same Undo path. While a long-dictation question is
+   open, Escape answers no. The hot key is unregistered as soon as the session
+   leaves those phases, so other apps keep Escape. `DictationLimits` holds the
+   long-dictation rules: an hourly reminder from the main-actor ticker, a hard stop
+   counted in frames at the file's sample rate, which keeps the file readable by
+   WhisperKit's 32-bit `AVAudioFrameCount` conversions and finishes like a normal
+   stop, and the ten-minute threshold for asking before an API upload or auto-paste.
 2. Validate the selected provider and check microphone permission. Apple speech
    authorization and API-key checks still precede capture. Installed neural-model
    warm-up runs independently, so it need not delay capture; readiness is checked
@@ -842,7 +846,7 @@ settings decode with an empty list. The built-in catalog stays static and local.
 network requests. Only transcription through a selected connection uploads audio.
 It reuses WhisperKit's audio conversion to produce 16 kHz mono PCM WAV in memory,
 off the main actor. Sarvam receives sequential 25-second clips; other APIs receive
-the bounded dictation/meeting clip. Fixed cuts can affect words at boundaries.
+sequential 125-second clips. Fixed cuts can affect words at boundaries.
 No partial transcript is delivered on failure. Cancellation stops URLSession
 requests; callers retain their generation checks before history and paste.
 

@@ -1120,10 +1120,22 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   model never sends audio to a connection.
 - [ ] `tmutil isexcluded` on `Failed Dictations` reports it as excluded. With Keep
   history at 3 days, a kept recording older than 3 days is gone at the next launch.
-- [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
-  connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
-  VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
-  its own and pastes the whole transcript. Hold mode behaves the same while held.
+- [ ] Dictate for 12 minutes in toggle mode with Parakeet, Whisper, Apple and an
+  API connection. No countdown appears and recording continues past 10:00 until
+  you stop it, then the whole transcript pastes. With Show words as you speak on,
+  the Parakeet preview stops following after ten minutes while recording
+  continues. Hold mode behaves the same while held. With an API connection the
+  capsule asks before sending, and with automatic paste it asks before pasting,
+  with no countdown on either card. Don't send leaves the recording on the failure
+  card and, with history on, in History. Copy instead leaves the text on the
+  clipboard. Escape answers no to both. Both questions stay away under 10:00.
+- [ ] Toggle-record past one hour. A short toast reminds you it is still recording
+  and names the limit, without taking focus or changing the capsule, and comes
+  back each hour. The hard stop (4,278,190,080 frames, about 24 hours 45 minutes at
+  48 kHz) is covered by `theWriterStopsAtItsFrameLimitAndKeepsWhatItCaptured` and
+  `theHardStopFinishesTheRecordingInsteadOfDroppingIt`, not by a real recording.
+- [ ] Unplug the only microphone during a long dictation. The failure card offers
+  Try again on what was captured, and with history on History lists it.
 - [ ] Turn on Hide capsule while dictating, with the floating capsule both on
   and off. Dictate in hold and toggle mode. No capsule appears while listening
   or transcribing, the menu bar icon is a microphone while listening, the text
@@ -1131,7 +1143,7 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Show words as you speak is greyed out. Escape, the cancel shortcut and the menu
   bar Cancel still cancel, and the Cancelled card with Undo appears. A failed
   dictation, copy-only and Transcript ready still show their cards. Dictate past
-  9:30: the capsule appears with "Stops in 0:30" and VoiceOver announces it.
+  10:00: the capsule stays hidden and recording continues.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.

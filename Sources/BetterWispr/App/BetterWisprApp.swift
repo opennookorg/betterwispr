@@ -128,6 +128,7 @@ private struct MenuContents: View {
         case .recording: "Listening…"
         case .transcribing: "Transcribing…"
         case .preparing: "Preparing…"
+        case .asking: "Waiting for your answer…"
         case .idle, .failed, .unpasted, .cancelled, .completed, .sending: "BetterWispr: Ready"
         }
     }
