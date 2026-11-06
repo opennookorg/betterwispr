@@ -1083,6 +1083,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
+- [ ] In Settings > App, Sound volume starts at the old fixed level on a workspace
+  saved before the setting existed. Letting go of the slider plays the start
+  sound once at the new level, and start, finish, cancel, needs-attention and
+  `SoundOverrides` cues all follow it, also after relaunch. With a meeting
+  recording, letting go stays quiet. VoiceOver reads the slider as Sound volume.
+  Turning Dictation sounds off hides the slider and keeps its value.
 - [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
   connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
   VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on

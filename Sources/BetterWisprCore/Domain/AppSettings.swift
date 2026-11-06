@@ -54,6 +54,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var showLiveText: Bool = true
     public var hideCapsuleWhileDictating: Bool = false
     public var soundEffects: Bool = true
+    public static let soundVolumeRange: ClosedRange<Float> = 0.05...1
+    public var soundVolume: Float = 0.6
     /// macOS system sound names picked per cue; missing cues use `DictationSound.defaultSoundName`.
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
@@ -189,6 +191,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
+        soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
