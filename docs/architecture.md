@@ -12,7 +12,7 @@ needed; it is not a promise of Linux/iOS portability. Feature folders are source
 organization, not separate packages or a plugin loader.
 
 Codex subscription transcription is a static model outside the local catalog.
-`CodexSpeechProvider` shares `SpeechAudio`'s bounded mono PCM16 WAV conversion
+`CodexSpeechProvider` shares `SpeechAudio`'s mono PCM16 WAV conversion
 and uploads ordered 125-second chunks directly to the fixed unofficial ChatGPT
 transcription endpoint. Each transcription owns an ephemeral URLSession and its
 cancellable task. Redirects, cookies, cached responses, and stored URL credentials
@@ -54,12 +54,16 @@ the policy immediately and persist through the existing workspace store.
    Settings) starts a session. Capture the previously focused external app before
    showing the nonactivating capsule. With "Hide capsule while dictating" on,
    `AppModel.showsCapsule` keeps it hidden until the session leaves the busy
-   phases or the 30-second limit warning starts. While the session is preparing,
-   recording or transcribing, a second Carbon hot key makes Escape (also with the
-   dictation shortcut's held modifiers unless they include Command, so
-   Command-Option-Escape stays Force Quit) cancel it from any app through the
-   same Undo path; it is unregistered as soon as the session leaves those phases,
-   so other apps keep Escape.
+   phases. While the session is preparing, recording or transcribing, a second
+   Carbon hot key makes Escape (also with the dictation shortcut's held modifiers
+   unless they include Command, so Command-Option-Escape stays Force Quit) cancel
+   it from any app through the same Undo path. While a long-dictation question is
+   open, Escape answers no. The hot key is unregistered as soon as the session
+   leaves those phases, so other apps keep Escape. `DictationLimits` holds the
+   long-dictation rules: an hourly reminder from the main-actor ticker, a hard stop
+   counted in frames at the file's sample rate, which keeps the file readable by
+   WhisperKit's 32-bit `AVAudioFrameCount` conversions and finishes like a normal
+   stop, and the ten-minute threshold for asking before an API upload or auto-paste.
 2. Validate the selected provider and check microphone permission. Apple speech
    authorization and API-key checks still precede capture. Installed neural-model
    warm-up runs independently, so it need not delay capture; readiness is checked
@@ -114,7 +118,12 @@ the policy immediately and persist through the existing workspace store.
    has an available cleanup model. Only the Medium case reads the clipboard. The edit is bounded by a timeout and
    rejected when it answers the dictation, adds new words or changes length too
    much; any failure keeps the Light text, and Medium never picks a different
-   model than the one selected.
+   model than the one selected. When `TranscriptListFormatter.isLikelyList` finds
+   explicit order, a sentence with three or more parts or phrasing repeated three
+   times, one more model call identifies list items, and
+   `TranscriptListLayout.render` quotes them from the edit. Mode instructions and
+   dictated line breaks skip that call, and an edit that loses or adds a dictated
+   line keeps the Light text.
    Next apply the writing tone chosen for the destination app's style context
    (`AppCategory` maps bundle IDs; browsers count as Other). A `WritingMode`
    can override cleanup, tone, screen context and Medium instructions. A spoken
@@ -134,7 +143,23 @@ the policy immediately and persist through the existing workspace store.
    to paste elsewhere. With "Copy to clipboard" on, leave the transcript on the
    clipboard. With it off, restore clipboard contents without overwriting newer
    user clipboard changes. Make failed insertion recoverable through copy either way.
-7. Remove temporary audio on completion/error/cancellation and return to idle.
+7. Remove temporary audio on completion and cancellation and return to idle.
+   When transcription fails, `FailedDictationStore` copies the recording into
+   `Failed Dictations` (folder 0700, files 0600) and the `DictationRecording` is
+   kept so Try again re-runs `transcribe(_:)` on the same audio with the model
+   selected now. Quitting while recording or transcribing keeps the audio the
+   same way before `discardRecording()` runs. The store keeps at most 20
+   recordings, 1 GB in total and none older than 7 days, or the Keep history age
+   limit when that is shorter and the clock is trusted, checked at launch, on
+   each keep and hourly. The oldest go first; the recording that just failed is
+   never evicted, even when it alone is larger than the cap. The folder is
+   excluded from backups. A recording is deleted once its retry succeeds or its
+   Transcribe page transcript is saved, and the store only ever deletes files
+   inside its own folder. Cancelled and no-speech dictations are not kept. Nothing
+   is copied to disk while Save dictation history is off, and turning it off
+   deletes what is kept. Try again and the kept recording's Transcribe action use
+   the model selected at that moment and never fall back to another one; when
+   that model is off this Mac the button names where the audio goes.
 
 With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
@@ -210,7 +235,9 @@ frontmost app's selection through Accessibility with
 under secure input or from a password field. Empty, short (under
 `TranscriptPolisher.minimumWords`) and non-English selections are refused. The
 trimmed text goes to `TranscriptPolisher` with `AppSettings.cleanupSettings` and
-vocabulary hints, without screen context or mode instructions. Before pasting,
+vocabulary hints, without screen context or mode instructions. It keeps the
+selection's layout: no layout call runs, and an edit that adds or removes list
+markers keeps the original. Before pasting,
 the selection is read again. Matching text in the same Accessibility element
 and selected range is replaced through `FocusedAppIntegration`, which also
 checks the original focused element and frontmost app and restores the clipboard.
@@ -848,10 +875,21 @@ settings decode with an empty list. The built-in catalog stays static and local.
 `APISpeechProvider.prepare` validates configuration and Keychain access without
 network requests. Only transcription through a selected connection uploads audio.
 It reuses WhisperKit's audio conversion to produce 16 kHz mono PCM WAV in memory,
-off the main actor. Sarvam receives sequential 25-second clips; other APIs receive
-the bounded dictation/meeting clip. Fixed cuts can affect words at boundaries.
-No partial transcript is delivered on failure. Cancellation stops URLSession
-requests; callers retain their generation checks before history and paste.
+off the main actor. Sarvam receives 25-second clips and other APIs 125-second
+clips. A recording with several clips uploads up to four at once
+(`APISpeechProvider.concurrentChunks`, kept low for providers' rate limits), reads
+each clip from disk only when its upload starts, and joins the transcripts in clip
+order, whatever order they answer in. Fixed cuts can affect words at boundaries.
+A request's timeout starts with that request, so a clip waiting for a free slot
+does not use it up. An HTTP 429 or a timeout stops new clips from starting. Clips
+in flight finish, and every answer received is kept. After a pause (the provider's
+`Retry-After` up to 30 seconds, otherwise 1 second after a 429, none after a
+timeout) the clips still without an answer go one at a time, in order. A clip that
+fails there fails the dictation, even if that was its first attempt, so one
+dictation sends a clip at most twice. Any other failure stops the dictation at once.
+No partial transcript is delivered on failure, and the app keeps the recording for
+another try. Cancellation stops URLSession requests and the pause between retries;
+callers retain their generation checks before history and paste.
 
 Sarvam uses multipart uploads and `api-subscription-key`; Smallest uses binary WAV
 with Bearer authentication; custom endpoints use OpenAI-compatible multipart and

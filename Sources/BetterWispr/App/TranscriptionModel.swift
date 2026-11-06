@@ -40,8 +40,8 @@ final class TranscriptionModel {
 
     func transcript(_ id: UUID) -> Meeting? { transcripts.first { $0.id == id } }
 
-    func transcribe(file: URL, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry]) {
-        start(file.deletingPathExtension().lastPathComponent, model: model, provider: provider, language: language) { [weak self] id in
+    func transcribe(file: URL, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry], onSaved: @escaping () -> Void = {}) {
+        start(file.deletingPathExtension().lastPathComponent, model: model, provider: provider, language: language, onSaved: onSaved) { [weak self] id in
             try await MediaTranscriber.transcribe(file, with: provider, language: language, vocabulary: vocabulary) { self?.update(id, stage: $0) }
         }
     }
@@ -110,7 +110,7 @@ final class TranscriptionModel {
         Self.removeLeftovers()
     }
 
-    private func start(_ title: String, model: SpeechModel, provider: any SpeechProvider, language: String?,
+    private func start(_ title: String, model: SpeechModel, provider: any SpeechProvider, language: String?, onSaved: @escaping () -> Void = {},
                        transcribe: @escaping (UUID) async throws -> MediaTranscript) {
         guard job == nil else { return }
         let started = TranscriptionJob(title: title, modelName: model.name)
@@ -126,7 +126,7 @@ final class TranscriptionModel {
                 guard self?.job?.id == started.id else { return }
                 let transcript = try await transcribe(started.id)
                 guard let self, let job = self.job, job.id == started.id else { return }
-                self.finish(job.title, transcript: transcript, model: model, language: language)
+                self.finish(job.title, transcript: transcript, model: model, language: language, onSaved: onSaved)
             } catch {
                 guard let self, self.job?.id == started.id else { return }
                 self.cancel()
@@ -141,7 +141,7 @@ final class TranscriptionModel {
         if let title { job?.title = title }
     }
 
-    private func finish(_ title: String, transcript: MediaTranscript, model: SpeechModel, language: String?) {
+    private func finish(_ title: String, transcript: MediaTranscript, model: SpeechModel, language: String?, onSaved: () -> Void) {
         job = nil
         work = nil
         provider = nil
@@ -158,6 +158,7 @@ final class TranscriptionModel {
             self.error = "The transcript is open but couldn’t be saved, so copy or export it before quitting. \(error.localizedDescription)"
             return
         }
+        onSaved()
         if let speakerError = transcript.speakerError {
             error = "Couldn’t tell the speakers apart. \(speakerError.localizedDescription)"
         }
@@ -200,9 +201,9 @@ extension AppModel {
         models.first { $0.id == transcriptions.modelID } ?? selectedModel
     }
 
-    func transcribe(file: URL) {
+    func transcribe(file: URL, onSaved: @escaping () -> Void = {}) {
         guard let (speechModel, language) = transcriptionSettings() else { return }
-        transcriptions.transcribe(file: file, with: speechModel, provider: speechModel.makeProvider(), language: language, vocabulary: vocabulary)
+        transcriptions.transcribe(file: file, with: speechModel, provider: speechModel.makeProvider(), language: language, vocabulary: vocabulary, onSaved: onSaved)
     }
 
     func transcribe(link: String) {

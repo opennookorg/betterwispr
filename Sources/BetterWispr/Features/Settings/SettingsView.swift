@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var permissionCheck = 0
     @State private var terminals: [ScriptableTerminal] = []
+    @State private var pendingRetention: HistoryRetention?
 
     private static let voiceCommands = [
         ("“comma”, “question mark”, “full stop”", ", ? ."),
@@ -132,6 +133,9 @@ struct SettingsView: View {
                 SettingsSection("After you speak") {
                     SettingToggle("Paste into the active app", caption: "Needs Accessibility. Otherwise, text is copied.", isOn: setting(\.autoPaste))
                     RowDivider()
+                    SettingToggle("Add a space after pasting", caption: "So the next dictation doesn’t run into this one. Skipped after Chinese or Japanese.", isOn: setting(\.appendTrailingSpace))
+                        .disabled(!model.settings.autoPaste)
+                    RowDivider()
                     SettingToggle("Send to Claude", caption: "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt.", isOn: sendToClaude)
                         .task(id: permissionCheck) { await loadTerminals() }
                         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in permissionCheck += 1 }
@@ -164,6 +168,10 @@ struct SettingsView: View {
                     SettingToggle("Copy to clipboard", caption: "Keep each dictation ready to paste again. When off, your clipboard is left as it was.", isOn: setting(\.copyToClipboard))
                     RowDivider()
                     SettingToggle("Learn from my corrections", caption: "Words you fix in History, or in the text field within 30 seconds of a paste, are added to Vocabulary. With Medium cleanup, each English fix and a few words around it are first reviewed by the selected notes model.", isOn: setting(\.learnCorrections))
+                    if model.settings.learnCorrections {
+                        RowDivider()
+                        SettingToggle("Notify when a word is learned", caption: "Show what was added to Vocabulary, with Undo. When off, words are still learned quietly; review them in Vocabulary.", isOn: setting(\.notifyLearnedCorrections))
+                    }
                 }
 
                 SendKeysSection(model: model)
@@ -172,6 +180,18 @@ struct SettingsView: View {
                     SettingToggle("Show in Dock", caption: "When off, use the menu bar to open BetterWispr. Your dictation shortcut still works.", isOn: setting(\.showInDock))
                     RowDivider()
                     SettingToggle("Dictation sounds", caption: "Soft cues when dictation starts listening, finishes, cancels or needs attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
+                    if model.settings.soundEffects {
+                        RowDivider()
+                        SettingRow("Sound volume") {
+                            Slider(value: setting(\.soundVolume), in: AppSettings.soundVolumeRange) {
+                                Text("Sound volume")
+                            } onEditingChanged: { editing in
+                                if !editing { model.playFeedback(.started) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 160)
+                        }
+                    }
                     if model.settings.soundEffects {
                         ForEach(DictationSound.allCases, id: \.self) { cue in
                             let overridden = cue.url(in: DictationSound.overrideDirectory) != nil
@@ -193,6 +213,8 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Hide capsule while dictating", caption: "Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak.", isOn: setting(\.hideCapsuleWhileDictating))
                     RowDivider()
+                    SettingToggle("Tell me when no speech is heard", caption: "Shows “No speech heard.” with a sound when a dictation ends without words. When off, it closes quietly.", isOn: setting(\.showNoSpeechNotice))
+                    RowDivider()
                     SettingToggle("Show words as you speak", caption: "Previews Parakeet’s recognition in the capsule while you record. The pasted text is still the full recognition.", isOn: setting(\.showLiveText))
                         .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
@@ -200,7 +222,26 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()
-                    SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it.", isOn: setting(\.saveHistory))
+                    SettingToggle("Save dictation history", caption: model.settings.saveHistory ? "Keep text on this Mac so you can find and reuse it, and the audio of dictations that couldn’t be transcribed. Turning this off deletes that audio." : "New dictations aren’t saved and no audio is kept. Dictations already saved stay, and Keep history deletes nothing while this is off.", isOn: setting(\.saveHistory))
+                    if model.settings.saveHistory {
+                        RowDivider()
+                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. Usage totals and Insights count only the dictations kept. Audio kept from failed dictations follows the same age limit.") {
+                            Picker("Keep history", selection: Binding(
+                                get: { model.settings.historyRetention },
+                                set: { retention in
+                                    if model.historyRemoved(by: retention) > 0 { pendingRetention = retention } else { model.setHistoryRetention(retention) }
+                                }
+                            )) {
+                                Text("Forever").tag(HistoryRetention.forever)
+                                Text("Latest 100").tag(HistoryRetention.latest100)
+                                Text("3 days").tag(HistoryRetention.threeDays)
+                                Text("2 weeks").tag(HistoryRetention.twoWeeks)
+                                Text("3 months").tag(HistoryRetention.threeMonths)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
                 }
 
                 SettingsSection("Calendar") {
@@ -269,6 +310,14 @@ struct SettingsView: View {
         .animation(.ui, value: model.calendarGranted)
         .animation(.ui, value: model.settings.useCalendar)
         .animation(.ui, value: model.calendarAccounts)
+        .alert("Delete older dictations?", isPresented: Binding(get: { pendingRetention != nil }, set: { if !$0 { pendingRetention = nil } }),
+               presenting: pendingRetention) { retention in
+            Button("Delete", role: .destructive) { model.setHistoryRetention(retention) }
+            Button("Cancel", role: .cancel) {}
+        } message: { retention in
+            let count = model.historyRemoved(by: retention)
+            Text("\(count) \(count == 1 ? "dictation" : "dictations") will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.")
+        }
     }
 
     static let spokenLanguages = [

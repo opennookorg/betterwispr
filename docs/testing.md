@@ -6,6 +6,80 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Semantic spoken lists: local trial
+
+Use English (or Auto with English speech), Style → Auto cleanup → Medium,
+and Apple's on-device cleanup model. Keep Use screen context off for this
+trial. Text goes through `TranscriptPolisher.polish`, which uses the model to
+infer list structure from meaning. The selected model decides whether the text is a list and identifies item boundaries. A shared renderer matches the quoted fragments to the original text and refuses invented items, reordered spans or omitted non-framing words. Explicit numbering cues select numbering only after the model has identified a list. The renderer needs three items, or two when the speaker numbered them, so "Pick up milk, bread and eggs" with a two-item answer stays a sentence. Each item starts with a capital and ends with a period or its spoken question or exclamation mark, and numbered items lose the spoken ordinal.
+The first edit can form a list by itself. The layout pass runs only when `TranscriptListFormatter.isLikelyList` finds explicit order, a sentence with three or more parts, or phrasing repeated three times. "New line" and "new paragraph" are converted by `VoiceCommands` before the model. A dictation with such breaks skips the layout pass, and an edit that loses or adds lines keeps the Light text, so the breaks survive. Selected-text cleanup uses `TranscriptPolisher.selectionInstructions`, skips the layout pass, and keeps the Light text if the edit adds or removes list markers.
+Light cleanup only removes fillers, stutters and clear repairs. Parakeet remains the independent speech-recognition engine. The layout pass uses the same selected cleanup provider as editing; Apple Intelligence is used for this local trial. No subscription is required, and no cloud provider is used as a fallback. The existing built-in model and other cleanup providers use the same layout interface; their quality has not been live-verified in this trial.
+
+| Say naturally | Expected structure |
+| --- | --- |
+| Okay, let's do my shopping list. I need to buy milk, I need to buy bread, another thing, buy eggs, then buy flour, then buy donuts. | Introduction and five bullets |
+| I need to buy milk I need to buy bread and I need to buy eggs. | Three bullets, without an introduction |
+| I need milk, bread, eggs, flour and donuts. | Five bullets |
+| We need to update the website, send the invoices and book the room. | Three bullets |
+| The release needs a keyboard shortcut that works, a history that survives restarts, and a way to copy the result. | Three bullets |
+| For tomorrow please call Sam, renew the insurance, pick up the parcel and water the plants. | Four bullets |
+| Open the app, sign in, choose the report and press export. | Four numbered steps |
+| I bought milk after work, then went home because it was raining. | Prose |
+| I put the milk next to the bread and realised I had forgotten the eggs. | Prose |
+| The first room is upstairs and the second room is downstairs. | Prose |
+| I met Alex, Sam and Jo at the station. | Prose |
+| I visited Paris and Tokyo last year. | Prose |
+| Call Sam next Tuesday about the renewal. | Prose, keeping "next" |
+| Send the report to Sam today new line call the vendor about the delivery date | Two lines, no list |
+| Thanks for the update new paragraph I will review the draft this afternoon | Two paragraphs, no list |
+| We launched a new line of products last spring. | Prose, keeping "new line" |
+
+The first seven examples are lists because they enumerate requested items,
+requirements, independent tasks or ordered actions. The rest describe a
+connected narrative or comparison, or dictate a line break. Words like “then”,
+“first” and object names alone do not decide the format. Keep every action, item,
+quantity, qualifier and negation; formatting is not permission to invent or
+summarize content.
+
+Local model trials invoke the production text method directly with synthetic
+text, so they test semantic formatting independently of speech-recognition
+mistakes. Run the same phrases through the live app to test the full path.
+
+On 2026-11-06 (macOS 27.2, Apple's on-device model, the commit that adds this
+record), the internal `TranscriptPolisher.polish` method ran on synthetic text
+after `VoiceCommands.apply`, with no microphone, recognition or paste:
+
+| Samples | Runs | Result | Layout calls |
+| --- | --- | --- | --- |
+| Short "new line" and "new paragraph" dictations | 18 | 18 kept the break, none became a list | 0 |
+| Long dictations with a cue | 4 | 2 edited with the break kept; 2 flattened by the model, so `polish` returned nil, which keeps the Light text and its break | 0 |
+| Ordinary "new line" and "new paragraph" wording | 4 | 4 unchanged, no break | 0 |
+| Ordinals in prose | 24 | 24 stayed prose | 0 |
+| Explicitly numbered points | 6 | 6 numbered lists | 4 |
+| Lists without numbering | 16 | 16 lists | 12 |
+| Prose | 18 | 18 stayed prose | 4 |
+| Selected text (two sentences, one existing list) | 6 | 6 formed no list; the existing list kept its markers | 0 |
+
+Four self-correction samples ran 12 times each on this prompt and on the prompt
+it replaced: 44 of 48 and 43 of 48 removed the rejected wording. The misses
+differed: this prompt left "Sorry I mean eight." in 4 of 12 table bookings; the
+earlier prompt left "Sorry I meant Priya." or similar in 5 of 12 name swaps. Both
+prompts also dropped "please" from the room sample every time. "Email the draft to
+Jordan no wait Casey before lunch." was not corrected in 5 of 5 runs on either
+prompt. These small runs validate those cases, not arbitrary model accuracy, and
+other cleanup providers were not run.
+
+- [ ] Dictate these examples into TextEdit with Medium and Apple selected.
+  Compare History's original transcription and formatted text.
+- [ ] Repeat with each writing tone; numbers/bullets and line breaks survive.
+- [ ] With Light/None or a non-English language selected, no model-based list
+  inference runs. If the selected cleanup model is unavailable, times out or
+  returns an unsafe edit, the app retains Light cleanup without a cloud fallback.
+  If only the layout pass fails, the edit is kept without list formatting.
+
+The structured layout is currently bounded to 20 items. Model output can vary; a likely list may take several seconds longer because it needs a separate layout call. A passing text trial does not establish general
+recognition accuracy or verify microphone, shortcut and paste permissions.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,
@@ -406,11 +480,17 @@ been measured. Measuring either needs recorded meetings with known speakers:
 call audio, and an in-room corpus with far-field microphones would have to be
 added.
 
-- [ ] Run setup on a fresh user. Speaker detection shows below the speech model
-  and downloads nothing until Download is clicked. Clicking it during the
-  speech model download shows "Downloads when the speech model is ready" and it
-  starts after that download. Its Cancel takes it off the queue, and
-  cancelling the speech model download drops it too.
+- [ ] Run setup on a fresh user. The model step lists Parakeet Ultra, and Apple
+  on-device only when it supports the language on this Mac. Speaker detection
+  shows below the speech models and nothing downloads until Download is clicked.
+  Clicking it during the speech model download shows "Downloads when the speech
+  model is ready" and it starts after that download. Its Cancel takes it off the
+  queue, and cancelling the speech model download drops it too.
+- [ ] With Apple selected and a language it does not support, the model step says
+  so without changing `selectedModelID`, and Continue stays off. Back then Skip
+  still leaves setup. Download or Use moves to the new model and turns Continue on.
+- [ ] With the same setup, Models shows Apple as "Selected · Unavailable" with no
+  active checkmark and its Use button off, and picking another model works.
 - [ ] With Use Calendar on, record during an event with invitees. The button
   beside a speaker's name field lists the invitees, and picking one fills the
   name and removes it from the other speakers' lists.
@@ -1072,8 +1152,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Escape reaches TextEdit again. Escape never stops a running notetaker. With a
   ⌘ ⌥ dictation shortcut, ⌘ ⌥ Escape still opens Force Quit while dictating.
   With an Fn shortcut, pressing Esc while holding Fn cancels.
+- [ ] On macOS 26 or later with Reduce Transparency off, dictate over a plain white
+  window. The capsule stays dark and its white text and icons stay readable. Repeat
+  with Reduce Transparency on, where the capsule is an opaque dark fill.
 - [ ] Hold mode: Settings > Shortcut names it "Hold or tap" and its caption
-  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
+  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point capsule
   shows only the wider waveform, with no cancel or finish buttons. Text is
   inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
   expands to the 108 × 28 point pill with separate × and ✓ controls.
@@ -1109,10 +1192,56 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
-- [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
-  connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
-  VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
-  its own and pastes the whole transcript. Hold mode behaves the same while held.
+- [ ] With an API connection selected, dictate for about five minutes. The
+  transcript pastes in the order spoken. Cancel while it transcribes: no text
+  pastes. Against a test endpoint that answers one clip with HTTP 429 and then
+  recovers, the dictation still completes in order. When it keeps answering 429,
+  the failure card offers Try again, nothing pastes, and with history on History
+  lists the recording under Not transcribed.
+- [ ] In Settings > App, Sound volume starts at the old fixed level on a workspace
+  saved before the setting existed. Letting go of the slider plays the start
+  sound once at the new level, and start, finish, cancel, needs-attention and
+  `SoundOverrides` cues all follow it, also after relaunch. With a meeting
+  recording, letting go stays quiet. VoiceOver reads the slider as Sound volume.
+  Turning Dictation sounds off hides the slider and keeps its value.
+- [ ] Select an API connection to an endpoint that is down and dictate. The
+  failure card's Try again transcribes the same recording once the endpoint is
+  back, without starting a new dictation. Before retrying, History lists the
+  recording under Not transcribed with Transcribe, Show in Finder and Delete, and
+  the file in `Failed Dictations` is 0600. A successful retry removes it.
+- [ ] Quit BetterWispr from the menu bar while dictating, and again while a long
+  dictation is transcribing. After relaunch, History lists each one under Not
+  transcribed, and Transcribe produces the text and removes the row.
+- [ ] Turn off Save dictation history and repeat both checks. Try again still works
+  on the failure card, but nothing appears in `Failed Dictations`. Delete a kept
+  recording while its failure card is showing. Try again then starts a new
+  dictation. Quit during the cancelled card. No recording is kept, and no
+  `betterwispr-*.caf` is left in the temporary folder.
+- [ ] Keep recordings in `Failed Dictations`, then turn off Save dictation history.
+  The folder empties, Not transcribed disappears, and the caption says no audio
+  is kept. A failure card that was showing still offers Try again from memory.
+- [ ] With an API connection selected, the button on a kept recording and on the
+  failure card reads Send to and the connection's name, and its help names the
+  endpoint. With a local model they read Transcribe and Try again. A failing local
+  model never sends audio to a connection.
+- [ ] `tmutil isexcluded` on `Failed Dictations` reports it as excluded. With Keep
+  history at 3 days, a kept recording older than 3 days is gone at the next launch.
+- [ ] Dictate for 12 minutes in toggle mode with Parakeet, Whisper, Apple and an
+  API connection. No countdown appears and recording continues past 10:00 until
+  you stop it, then the whole transcript pastes. With Show words as you speak on,
+  the Parakeet preview stops following after ten minutes while recording
+  continues. Hold mode behaves the same while held. With an API connection the
+  capsule asks before sending, and with automatic paste it asks before pasting,
+  with no countdown on either card. Don't send leaves the recording on the failure
+  card and, with history on, in History. Copy instead leaves the text on the
+  clipboard. Escape answers no to both. Both questions stay away under 10:00.
+- [ ] Toggle-record past one hour. A short toast reminds you it is still recording
+  and names the limit, without taking focus or changing the capsule, and comes
+  back each hour. The hard stop (4,278,190,080 frames, about 24 hours 45 minutes at
+  48 kHz) is covered by `theWriterStopsAtItsFrameLimitAndKeepsWhatItCaptured` and
+  `theHardStopFinishesTheRecordingInsteadOfDroppingIt`, not by a real recording.
+- [ ] Unplug the only microphone during a long dictation. The failure card offers
+  Try again on what was captured, and with history on History lists it.
 - [ ] Turn on Hide capsule while dictating, with the floating capsule both on
   and off. Dictate in hold and toggle mode. No capsule appears while listening
   or transcribing, the menu bar icon is a microphone while listening, the text
@@ -1120,10 +1249,15 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Show words as you speak is greyed out. Escape, the cancel shortcut and the menu
   bar Cancel still cancel, and the Cancelled card with Undo appears. A failed
   dictation, copy-only and Transcript ready still show their cards. Dictate past
-  9:30: the capsule appears with "Stops in 0:30" and VoiceOver announces it.
+  10:00: the capsule stays hidden and recording continues.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.
+- [ ] Turn off Tell me when no speech is heard and stay silent through a dictation.
+  The capsule closes with no card and no sound. Start a dictation with the
+  microphone disconnected or denied: the error card and its sound still appear.
+  With Send to Claude on, dictate again during the countdown and stay silent: the
+  card still appears and says the earlier dictation was pasted but not sent.
 - [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
   bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
@@ -1301,6 +1435,10 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Fix a word with the pencil in History. The raw transcription stays
   unchanged and the word appears in Vocabulary as Learned.
 - [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.
+- [ ] Turn off "Notify when a word is learned" and fix a word. No toast appears
+  and the word appears in Vocabulary as Learned. The switch stays off after a
+  relaunch and hides while "Learn from my corrections" is off. Other toasts, such
+  as removing a word from Vocabulary, still appear.
 - [ ] Type in a password field after dictating. Nothing is read or learned.
 
 ### Writing modes
@@ -1439,6 +1577,19 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Disable history, dictate again and relaunch. That new transcript must not
   have been persisted. Delete existing history entries explicitly and verify
   they stay deleted after relaunch.
+- [ ] Set Keep history to a limit that would delete dictations. The alert states
+  the count. Cancel changes nothing. Delete removes only those dictations, and
+  the limit survives relaunch. Meetings and file transcriptions stay.
+- [ ] The alert says usage totals and Insights will shrink. With a limit set,
+  relaunching with an expired dictation shows a toast naming how many went and the
+  limit. With Save history off, the picker hides and a saved limit deletes nothing
+  on relaunch.
+- [ ] With an age limit set, move the Mac's date ahead by more than a day and
+  relaunch. Nothing is deleted. Set the date back: the dictations made meanwhile
+  stay. A date left ahead for a day counts as correct and age limits apply.
+- [ ] With a limit set, confirm older dictations go at launch and after a dictation.
+  In a read-only temporary profile, a failed save deletes nothing and the new
+  dictation stays listed until a later save writes it.
 - [ ] Verify temporary audio removal after success, error and cancellation. Force
   termination is a separate check: record whether recovery removes orphaned files.
 - [ ] In a temporary profile, supply malformed JSON or an unsupported schema
