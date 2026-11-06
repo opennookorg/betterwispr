@@ -466,3 +466,8 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(rushed.observe("Claude Cod") == nil)
     #expect(rushed.observe("") == nil)
 }
+
+@Test func workspaceSavedBeforeLearnedNotificationsShowsThem() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "notifyLearnedCorrections")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).notifyLearnedCorrections)
+}
