@@ -169,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        model.keepDictationForQuit()
         model.discardRecording()
         guard let pending = model.mediaPauser.pending else { return .terminateNow }
         Task {

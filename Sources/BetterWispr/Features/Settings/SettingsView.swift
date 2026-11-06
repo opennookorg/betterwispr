@@ -218,10 +218,10 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()
-                    SettingToggle("Save dictation history", caption: model.settings.saveHistory ? "Keep text on this Mac so you can find and reuse it." : "New dictations aren’t saved. Dictations already saved stay, and Keep history deletes nothing while this is off.", isOn: setting(\.saveHistory))
+                    SettingToggle("Save dictation history", caption: model.settings.saveHistory ? "Keep text on this Mac so you can find and reuse it, and the audio of dictations that couldn’t be transcribed. Turning this off deletes that audio." : "New dictations aren’t saved and no audio is kept. Dictations already saved stay, and Keep history deletes nothing while this is off.", isOn: setting(\.saveHistory))
                     if model.settings.saveHistory {
                         RowDivider()
-                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. Usage totals and Insights count only the dictations kept.") {
+                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. Usage totals and Insights count only the dictations kept. Audio kept from failed dictations follows the same age limit.") {
                             Picker("Keep history", selection: Binding(
                                 get: { model.settings.historyRetention },
                                 set: { retention in

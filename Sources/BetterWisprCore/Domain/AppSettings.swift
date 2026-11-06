@@ -33,17 +33,20 @@ public enum ModelIdleUnload: Int, Codable, CaseIterable, Sendable {
 public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
     case forever, latest100, threeDays, twoWeeks, threeMonths
 
+    /// The oldest date this retention keeps, or nil when it has no age limit.
+    public func cutoff(now: Date = .now, calendar: Calendar = .current) -> Date? {
+        switch self {
+        case .forever, .latest100: nil
+        case .threeDays: calendar.date(byAdding: DateComponents(day: -3), to: now)
+        case .twoWeeks: calendar.date(byAdding: DateComponents(day: -14), to: now)
+        case .threeMonths: calendar.date(byAdding: DateComponents(month: -3), to: now)
+        }
+    }
+
     /// The dictations to keep from `history` (newest first); age limits delete nothing while `clockIsTrusted` is false.
     public func kept(_ history: [Transcript], now: Date = .now, calendar: Calendar = .current, clockIsTrusted: Bool = true) -> [Transcript] {
-        let age: DateComponents
-        switch self {
-        case .forever: return history
-        case .latest100: return Array(history.prefix(100))
-        case .threeDays: age = DateComponents(day: -3)
-        case .twoWeeks: age = DateComponents(day: -14)
-        case .threeMonths: age = DateComponents(month: -3)
-        }
-        guard clockIsTrusted, let cutoff = calendar.date(byAdding: age, to: now) else { return history }
+        if self == .latest100 { return Array(history.prefix(100)) }
+        guard clockIsTrusted, let cutoff = cutoff(now: now, calendar: calendar) else { return history }
         return history.filter { $0.createdAt >= cutoff }
     }
 }

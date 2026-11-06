@@ -68,7 +68,7 @@ For optional subscription transcription, see [Codex subscription setup](docs/cod
 - Settings, vocabulary and history live in `~/Library/Application Support/BetterWispr/workspace.json` (not encrypted).
 - Models live in the `Models` folder next to it.
 - With Remember named voices on, voice profiles of the speakers you name live in `Voices.json` next to it (not encrypted). Forget Voices in Models deletes them, and deleting a meeting deletes the profiles named in it.
-- Audio is written to temporary files and deleted after each recording.
+- Audio is written to temporary files and deleted after each recording. A dictation that fails to transcribe, or is still in progress when BetterWispr quits, is kept in the `Failed Dictations` folder next to it, readable only by your macOS user, unless Save dictation history is off. It is deleted once it is transcribed, after 7 days or a shorter Keep history age limit, when more than 20 are kept or they pass 1 GB (oldest first), or when you turn Save dictation history off. The folder is left out of backups, and History lists each one under Not transcribed. When the selected speech model is an API connection, its button names where the audio will be sent.
 - Built-in models only touch the network when you explicitly download one.
 - Send to Claude is off by default. When it is on, BetterWispr reads the list of running processes on this Mac to find Claude Code, and asks Terminal and iTerm2 which tab is in front once you allow it. Nothing is stored or sent.
 - Connected apps is off by default. When you turn it on, apps you connect read your meetings through `BetterWispr --mcp` on this Mac and send what they read to their own AI provider.

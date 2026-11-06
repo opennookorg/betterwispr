@@ -207,7 +207,11 @@ struct CapsuleView: View {
                 }
                 .buttonStyle(.bordered)
             } else if model.failure != nil {
-                Button("Try again", action: model.toggleRecording)
+                let retry = model.canRetryFailure
+                    ? model.selectedModel.recordingAction(onDevice: (title: "Try again", help: "Transcribe this recording again"))
+                    : (title: "Try again", help: "Start a new dictation")
+                Button(retry.title, action: model.retryFailure)
+                    .help(retry.help)
                     .buttonStyle(.bordered)
             }
             if isMeetingCapturing {

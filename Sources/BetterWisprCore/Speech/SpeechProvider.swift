@@ -39,6 +39,21 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
         }
     }
 
+    /// Where transcribing with this model sends audio, or nil when audio stays on this Mac.
+    public var audioDestination: String? {
+        switch processingLocation {
+        case .onDevice: nil
+        case .configuredEndpoint: name
+        case .chatGPT: "ChatGPT"
+        }
+    }
+
+    /// The wording for an action that transcribes a recording, naming where the audio goes when it leaves this Mac.
+    public func recordingAction(onDevice: (title: String, help: String)) -> (title: String, help: String) {
+        guard let audioDestination else { return onDevice }
+        return ("Send to \(audioDestination)", "Sends this recording to \(connection?.endpoint ?? audioDestination)")
+    }
+
     public var requiresModelDownload: Bool {
         switch engine {
         case .whisperKit, .parakeet: true

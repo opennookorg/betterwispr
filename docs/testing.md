@@ -1098,6 +1098,28 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   `SoundOverrides` cues all follow it, also after relaunch. With a meeting
   recording, letting go stays quiet. VoiceOver reads the slider as Sound volume.
   Turning Dictation sounds off hides the slider and keeps its value.
+- [ ] Select an API connection to an endpoint that is down and dictate. The
+  failure card's Try again transcribes the same recording once the endpoint is
+  back, without starting a new dictation. Before retrying, History lists the
+  recording under Not transcribed with Transcribe, Show in Finder and Delete, and
+  the file in `Failed Dictations` is 0600. A successful retry removes it.
+- [ ] Quit BetterWispr from the menu bar while dictating, and again while a long
+  dictation is transcribing. After relaunch, History lists each one under Not
+  transcribed, and Transcribe produces the text and removes the row.
+- [ ] Turn off Save dictation history and repeat both checks. Try again still works
+  on the failure card, but nothing appears in `Failed Dictations`. Delete a kept
+  recording while its failure card is showing. Try again then starts a new
+  dictation. Quit during the cancelled card. No recording is kept, and no
+  `betterwispr-*.caf` is left in the temporary folder.
+- [ ] Keep recordings in `Failed Dictations`, then turn off Save dictation history.
+  The folder empties, Not transcribed disappears, and the caption says no audio
+  is kept. A failure card that was showing still offers Try again from memory.
+- [ ] With an API connection selected, the button on a kept recording and on the
+  failure card reads Send to and the connection's name, and its help names the
+  endpoint. With a local model they read Transcribe and Try again. A failing local
+  model never sends audio to a connection.
+- [ ] `tmutil isexcluded` on `Failed Dictations` reports it as excluded. With Keep
+  history at 3 days, a kept recording older than 3 days is gone at the next launch.
 - [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
   connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
   VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
