@@ -36,6 +36,7 @@ import Testing
     #expect(!settings.copyToClipboard)
     #expect(settings.soundEffects)
     #expect(!settings.hideCapsuleWhileDictating)
+    #expect(settings.showNoSpeechNotice)
     #expect(DictationSound.allCases.map(settings.soundName) == ["Tink", "Purr", "Bottle", "Basso"])
     #expect(!settings.pauseMediaWhileDictating)
     #expect(!settings.showInDock)
@@ -55,6 +56,7 @@ import Testing
     toggled.soundEffects = false
     toggled.soundVolume = 0.3
     toggled.hideCapsuleWhileDictating = true
+    toggled.showNoSpeechNotice = false
     toggled.sounds = [.started: "Pop", .attention: "Funk"]
     toggled.pauseMediaWhileDictating = true
     toggled.showInDock = true

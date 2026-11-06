@@ -53,6 +53,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
     public var hideCapsuleWhileDictating: Bool = false
+    /// When off, a dictation with no words ends without the "No speech heard." card and its sound.
+    public var showNoSpeechNotice: Bool = true
     public var soundEffects: Bool = true
     public static let soundVolumeRange: ClosedRange<Float> = 0.05...1
     public var soundVolume: Float = 0.6
@@ -190,6 +192,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
+        showNoSpeechNotice = try container.decodeIfPresent(Bool.self, forKey: .showNoSpeechNotice) ?? true
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
