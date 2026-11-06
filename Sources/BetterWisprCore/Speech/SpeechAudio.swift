@@ -3,25 +3,24 @@ import Foundation
 @preconcurrency import WhisperKit
 
 enum SpeechAudio {
+    /// The stretches of a recording, in seconds, that are uploaded as separate requests.
     @concurrent
-    nonisolated static func wavChunks(_ url: URL, seconds: Double) async throws -> [Data] {
+    nonisolated static func chunkRanges(_ url: URL, seconds: Double) async throws -> [Range<Double>] {
         guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else { throw SpeechError.audioUnavailable }
         try Task.checkCancellation()
         let file = try AVAudioFile(forReading: url)
         let duration = Double(file.length) / file.processingFormat.sampleRate
         guard duration.isFinite, duration > 0 else { throw SpeechError.emptyAudio }
-        // Dictation is bounded by AudioRecorder.maximumDuration; allow a small scheduling margin at stop.
-        guard duration <= AudioRecorder.maximumDuration + 5 else { throw SpeechAPIError.audioTooLong }
-        var chunks: [Data] = []
         // ponytail: fixed 125 s chunks (25 s for Sarvam) can split a word at each cut; cut at quiet points with MediaAudio.cut if boundary errors matter.
-        for start in stride(from: 0.0, to: duration, by: seconds) {
-            try Task.checkCancellation()
-            let buffer = try AudioProcessor.loadAudio(fromPath: url.path, startTime: start, endTime: min(duration, start + seconds))
-            let samples = AudioProcessor.convertBufferToArray(buffer: buffer)
-            chunks.append(wav(samples))
-        }
+        return stride(from: 0.0, to: duration, by: seconds).map { $0..<min(duration, $0 + seconds) }
+    }
+
+    /// Reads one stretch from disk, so a long recording is never held in memory whole.
+    @concurrent
+    nonisolated static func wavChunk(_ url: URL, _ range: Range<Double>) async throws -> Data {
         try Task.checkCancellation()
-        return chunks
+        let buffer = try AudioProcessor.loadAudio(fromPath: url.path, startTime: range.lowerBound, endTime: range.upperBound)
+        return wav(AudioProcessor.convertBufferToArray(buffer: buffer))
     }
 
     nonisolated static func wav(_ samples: [Float]) -> Data {

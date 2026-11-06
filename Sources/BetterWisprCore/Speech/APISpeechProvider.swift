@@ -8,14 +8,17 @@ public final class APISpeechProvider: SpeechProvider {
     private var transcriptionTask: Task<String, any Error>?
     private let key: (SpeechConnection) throws -> String?
     private let configuration: URLSessionConfiguration
+    private let requestTimeout: TimeInterval
 
     public init() {
         key = { try SpeechAPIKeyStore().read(for: $0) }
         configuration = .ephemeral
+        requestTimeout = 60
     }
 
-    init(configuration: URLSessionConfiguration, key: @escaping (SpeechConnection) throws -> String?) {
+    init(configuration: URLSessionConfiguration, requestTimeout: TimeInterval = 60, key: @escaping (SpeechConnection) throws -> String?) {
         self.configuration = configuration
+        self.requestTimeout = requestTimeout
         self.key = key
     }
 
@@ -37,39 +40,59 @@ public final class APISpeechProvider: SpeechProvider {
         let apiKey = try key(connection) ?? ""
         // Validate before doing audio work, and read the key anew after rotation/removal.
         _ = try Self.request(connection, key: apiKey, wav: Data(), language: language)
+        let timeout = requestTimeout
         let task = Task {
-            let chunks = try await SpeechAudio.wavChunks(audioURL, seconds: connection.api == .sarvam ? 25 : 125)
+            let ranges = try await SpeechAudio.chunkRanges(audioURL, seconds: connection.api == .sarvam ? 25 : 125)
             try Task.checkCancellation()
             configuration.urlCache = nil
             configuration.httpCookieStorage = nil
             configuration.httpShouldSetCookies = false
             configuration.urlCredentialStorage = nil
-            configuration.timeoutIntervalForRequest = 60
-            configuration.timeoutIntervalForResource = 120
+            configuration.timeoutIntervalForRequest = timeout
+            configuration.timeoutIntervalForResource = timeout * 2
+            configuration.httpMaximumConnectionsPerHost = Self.concurrentChunks
             let session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
             defer { session.invalidateAndCancel() }
-            // Pieces of a long dictation upload together, at most `concurrentChunks` at a time.
-            let requests = try chunks.map { try Self.request(connection, key: apiKey, wav: $0, language: language) }
-            var transcripts = [String](repeating: "", count: requests.count)
-            try await withThrowingTaskGroup(of: (Int, String).self) { group in
-                var next = 0
-                func send(_ index: Int) {
-                    group.addTask {
-                        try Task.checkCancellation()
-                        let (data, response) = try await session.data(for: requests[index])
-                        try Task.checkCancellation()
-                        guard let http = response as? HTTPURLResponse else { throw SpeechAPIError.invalidResponse }
-                        return (index, try Self.transcript(data, status: http.statusCode, api: connection.api))
-                    }
+            let send: @Sendable (Range<Double>) async throws -> ClipAnswer = { range in
+                let chunk = try await SpeechAudio.wavChunk(audioURL, range)
+                try Task.checkCancellation()
+                let request = try Self.request(connection, key: apiKey, wav: chunk, language: language, timeout: timeout)
+                do {
+                    let (data, response) = try await session.data(for: request)
+                    try Task.checkCancellation()
+                    guard let http = response as? HTTPURLResponse else { throw SpeechAPIError.invalidResponse }
+                    if http.statusCode == 429 { return .tryAgain(SpeechAPIError.http(429), after: Self.retryPause(http)) }
+                    return .text(try Self.transcript(data, status: http.statusCode, api: connection.api))
+                } catch let error as URLError where error.code == .timedOut {
+                    return .tryAgain(error, after: .zero)
                 }
-                while next < min(Self.concurrentChunks, requests.count) { send(next); next += 1 }
-                while let (index, text) = try await group.next() {
-                    transcripts[index] = text
-                    if next < requests.count { send(next); next += 1 }
+            }
+            var transcripts = [String?](repeating: nil, count: ranges.count)
+            let pause = try await withThrowingTaskGroup(of: (Int, ClipAnswer).self) { group in
+                var next = 0
+                var pause: Duration?
+                func start(_ index: Int) {
+                    group.addTask { (index, try await send(ranges[index])) }
+                }
+                while next < min(Self.concurrentChunks, ranges.count) { start(next); next += 1 }
+                while let (index, answer) = try await group.next() {
+                    switch answer {
+                    case .text(let text): transcripts[index] = text
+                    case .tryAgain(_, let after): pause = max(pause ?? .zero, after)
+                    }
+                    if pause == nil, next < ranges.count { start(next); next += 1 }
+                }
+                return pause
+            }
+            if let pause { try await Task.sleep(for: pause) }
+            for index in ranges.indices where transcripts[index] == nil {
+                switch try await send(ranges[index]) {
+                case .text(let text): transcripts[index] = text
+                case .tryAgain(let error, _): throw error
                 }
             }
             try Task.checkCancellation()
-            return transcripts.filter { !$0.isEmpty }.joined(separator: " ")
+            return transcripts.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
         }
         transcriptionTask = task
         defer { transcriptionTask = nil }
@@ -85,12 +108,17 @@ public final class APISpeechProvider: SpeechProvider {
     /// How many pieces of one dictation are uploaded at once. Kept low for providers' rate limits.
     nonisolated static let concurrentChunks = 4
 
-    nonisolated static func request(_ connection: SpeechConnection, key: String, wav: Data, language: String?) throws -> URLRequest {
+    /// How long to wait before retrying after a 429: the provider's Retry-After seconds up to 30, otherwise 1.
+    nonisolated static func retryPause(_ response: HTTPURLResponse) -> Duration {
+        .seconds(min(max(response.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0) } ?? 1, 0), 30))
+    }
+
+    nonisolated static func request(_ connection: SpeechConnection, key: String, wav: Data, language: String?, timeout: TimeInterval = 60) throws -> URLRequest {
         let url = try connection.validatedURL()
         try connection.validateAPIKey(key)
         try connection.validateLanguage(language)
         let language = SpeechModel.engineLanguage(language)
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if !key.isEmpty {
@@ -137,6 +165,11 @@ public final class APISpeechProvider: SpeechProvider {
               let text = object[field] as? String else { throw SpeechAPIError.invalidResponse }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+private enum ClipAnswer: Sendable {
+    case text(String)
+    case tryAgain(any Error, after: Duration)
 }
 
 /// Reject every redirect, including same-host redirects that could change which service receives audio.

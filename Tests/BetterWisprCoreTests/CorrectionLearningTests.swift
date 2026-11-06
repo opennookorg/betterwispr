@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import BetterWisprCore
+@testable import BetterWispr
 
 private let original = "Ask Prakash Joshi Pages to grab the post hog numbers today"
 private let edited = "Ask Prakash Joshi Pax to grab the PostHog numbers today"
@@ -188,4 +189,23 @@ private func replacing(_ heard: String, with corrected: String, action: String =
     #expect(shape(.vocabularyOnly("PostHog")) == ["PostHog", ""])
     #expect(shape(.reject) == nil)
     #expect(CorrectionDecision.vocabularyOnly("PostHog").entry()?.learned == true)
+}
+
+@Test @MainActor func correctionIsStillLearnedAndSavedWithItsNotificationOff() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let store = LocalStore(directory: folder)
+    let model = AppModel(store: store, startsServices: false)
+    model.settings.notifyLearnedCorrections = false
+    let transcript = Transcript(text: "ping post hog today", rawText: "ping post hog today", duration: 1, modelName: "test", language: "en")
+    model.history = [transcript]
+
+    model.updateTranscript(transcript, text: "ping PostHog today")
+    let deadline = ContinuousClock.now + .seconds(5)
+    while model.vocabulary.isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+
+    #expect(model.vocabulary.map(\.replacement) == ["PostHog"])
+    #expect(model.vocabulary.first?.learned == true)
+    #expect(try store.load().vocabulary == model.vocabulary)
 }

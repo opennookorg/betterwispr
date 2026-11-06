@@ -27,6 +27,18 @@ extension Toast {
     init(failure title: String, _ error: Error) {
         self.init(title: title, message: error.localizedDescription, systemImage: "exclamationmark.triangle.fill", isError: true)
     }
+
+    init(pruned count: Int, by retention: HistoryRetention) {
+        let limit = switch retention {
+        case .forever: "from history"
+        case .latest100: "beyond the latest 100"
+        case .threeDays: "older than 3 days"
+        case .twoWeeks: "older than 2 weeks"
+        case .threeMonths: "older than 3 months"
+        }
+        self.init(title: "Deleted \(count) \(count == 1 ? "dictation" : "dictations") \(limit)",
+                  message: "Your Keep history setting removes them from this Mac. Meetings and transcribed files stay.", systemImage: "trash")
+    }
 }
 
 @MainActor
