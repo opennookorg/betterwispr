@@ -14,12 +14,13 @@ struct HistoryView: View {
         Form {
             if query.isEmpty, !model.failedDictations.isEmpty {
                 Section {
+                    let action = model.transcriptionModel.recordingAction(onDevice: ("Transcribe", "Transcribe this recording on the Transcribe page"))
                     ForEach(model.failedDictations) { item in
                         HStack(spacing: 6) {
                             Text(item.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                             Spacer()
-                            Button("Transcribe") { model.transcribeFailedDictation(item) }
-                                .help("Transcribe this recording on the Transcribe page")
+                            Button(action.title) { model.transcribeFailedDictation(item) }
+                                .help(action.help)
                             Button { model.revealFailedDictation(item) } label: { Image(systemName: "folder") }
                                 .help("Show in Finder")
                                 .accessibilityLabel("Show in Finder")
@@ -32,7 +33,7 @@ struct HistoryView: View {
                 } header: {
                     Text("Not transcribed")
                 } footer: {
-                    Text("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for 7 days, up to the newest 20.")
+                    Text("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups.")
                 }
             }
             if !filteredHistory.isEmpty {

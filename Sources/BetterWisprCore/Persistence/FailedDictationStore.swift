@@ -4,14 +4,17 @@ import Foundation
 public struct FailedDictation: Identifiable, Equatable, Sendable {
     public let url: URL
     public let createdAt: Date
+    public let bytes: Int64
     public var id: URL { url }
 }
 
 /// Keeps the audio of dictations that failed to transcribe, readable only by this macOS user.
-/// It holds at most `limit` recordings and none older than `maximumAge`; the oldest go first.
+/// It holds at most `limit` recordings, `maximumBytes` in total and none older than `maximumAge`; the oldest go first.
+/// The folder is left out of backups.
 public struct FailedDictationStore: Sendable {
     public static let limit = 20
     public static let maximumAge: TimeInterval = 7 * 24 * 3600
+    public static let maximumBytes: Int64 = 1_000_000_000
 
     public let directory: URL
 
@@ -38,20 +41,20 @@ public struct FailedDictationStore: Sendable {
         }
         try manager.copyItem(at: audio, to: url)
         try manager.setAttributes([.posixPermissions: 0o600, .creationDate: now, .modificationDate: now], ofItemAtPath: url.path)
-        prune(now: now)
+        prune(now: now, sparing: url)
         return url
     }
 
     /// The kept recordings, newest first.
     public func list() -> [FailedDictation] {
-        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey]
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey, .fileSizeKey]
         let items = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys),
                                                                   options: [.skipsHiddenFiles])) ?? []
         return items.compactMap { url in
             guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { return nil }
-            // Named under `directory` as given, so it matches what `keep` returned even through /var → /private/var.
             return FailedDictation(url: directory.appendingPathComponent(url.lastPathComponent),
-                                   createdAt: values.contentModificationDate ?? .distantPast)
+                                   createdAt: values.contentModificationDate ?? .distantPast,
+                                   bytes: Int64(values.fileSize ?? 0))
         }
         .sorted { $0.createdAt > $1.createdAt }
     }
@@ -61,10 +64,26 @@ public struct FailedDictationStore: Sendable {
         try? FileManager.default.removeItem(at: url)
     }
 
-    public func prune(now: Date = Date()) {
-        for (index, item) in list().enumerated()
-        where index >= Self.limit || now.timeIntervalSince(item.createdAt) > Self.maximumAge {
-            try? FileManager.default.removeItem(at: item.url)
+    /// Deletes every kept recording, and nothing else in or outside the folder.
+    public func removeAll() {
+        for item in list() { remove(item.url) }
+    }
+
+    /// Enforces the limits oldest first and marks the folder as excluded from backups; `sparing` and the newest clip survive the byte cap, and `sparing` survives everything.
+    public func prune(now: Date = Date(), notBefore: Date? = nil, sparing justFailed: URL? = nil) {
+        var folder = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? folder.setResourceValues(values)
+        let items = list()
+        var total: Int64 = 0
+        for (index, item) in (items.filter { $0.url == justFailed } + items.filter { $0.url != justFailed }).enumerated() {
+            total += item.bytes
+            guard item.url != justFailed else { continue }
+            let expired = now.timeIntervalSince(item.createdAt) > Self.maximumAge || notBefore.map { item.createdAt < $0 } == true
+            if index >= Self.limit || expired || (index > 0 && total > Self.maximumBytes) {
+                try? FileManager.default.removeItem(at: item.url)
+            }
         }
     }
 }

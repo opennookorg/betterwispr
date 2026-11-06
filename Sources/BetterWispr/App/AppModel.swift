@@ -204,6 +204,7 @@ final class AppModel {
     @ObservationIgnored private var acceptanceCheck: (started: ContinuousClock.Instant, task: Task<Void, Never>?)?
     @ObservationIgnored private var pendingNotSent: (() -> Void)?
     @ObservationIgnored private var continuesIn: pid_t?
+    @ObservationIgnored private var earlierPasteEndsInSpace = false
     @ObservationIgnored private var dictationContext: Task<DictationContext, Never>?
     @ObservationIgnored private var activeRecording: DictationRecording?
     @ObservationIgnored private var feedbackSound: NSSound?
@@ -243,15 +244,13 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
-        failedDictationStore.prune()
-        failedDictations = failedDictationStore.list()
+        if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
         Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3600))
                 guard let self else { return }
-                self.failedDictationStore.prune()
-                self.failedDictations = self.failedDictationStore.list()
+                self.pruneFailedDictations()
             }
         }
         applyAppearance()
@@ -682,7 +681,7 @@ final class AppModel {
                 self.recordingDuration = audio.duration
                 guard audio.hasSpeech else {
                     try? FileManager.default.removeItem(at: audio.url)
-                    self.fail(.noSpeech)
+                    self.noSpeechHeard()
                     return
                 }
                 self.playFeedback(.finished)
@@ -764,7 +763,7 @@ final class AppModel {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
-                guard !text.isEmpty else { self.fail(.noSpeech); return }
+                guard !text.isEmpty else { self.noSpeechHeard(); return }
                 transcribed = true
                 self.forgetFailedDictation(recording)
                 self.partialTranscript = text
@@ -773,8 +772,7 @@ final class AppModel {
                                             appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
-                    self.history.insert(transcript, at: 0)
-                    do { try self.persist() } catch { persistenceWarning = error.localizedDescription }
+                    do { try self.addToHistory(transcript) } catch { persistenceWarning = error.localizedDescription }
                 }
                 let returnDelay = recording.settings.sendToClaude && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
                 let paste = FocusedAppIntegration(keepsCopy: writingSettings.copyToClipboard, expectedFocus: recording.targetElement)
@@ -783,7 +781,10 @@ final class AppModel {
                 self.activeRecording = nil
                 let continues = recording.continuesIn != nil && recording.continuesIn == recording.target?.processIdentifier
                 self.continuesIn = nil
-                let result = try await integration?.deliver(continues ? TextJoin.continuing(text) : text, to: recording.target)
+                let addsTrailingSpace = writingSettings.autoPaste && writingSettings.appendTrailingSpace
+                let delivered = TextJoin.pasted(text, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
+                self.earlierPasteEndsInSpace = addsTrailingSpace && delivered.last?.isWhitespace == true
+                let result = try await integration?.deliver(delivered, to: recording.target)
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
@@ -815,7 +816,7 @@ final class AppModel {
                 var failure = DictationFailure(title: "Couldn’t transcribe.", message: error.localizedDescription)
                 if !transcribed {
                     self.keepFailedDictation(recording)
-                    failure.message += " Try again transcribes the same recording."
+                    failure.message += " You can try this same recording again."
                 }
                 self.fail(failure)
             }
@@ -884,6 +885,21 @@ final class AppModel {
         recording.keptURL = nil
         failedDictationStore.remove(kept)
         failedDictations = failedDictationStore.list()
+    }
+
+    /// Applies the store's limits and Keep history's age limit, which waits while the clock is untrusted as it does for dictations.
+    private func pruneFailedDictations() {
+        var clock = settings.historyClock
+        let trusted = clock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        failedDictationStore.prune(notBefore: trusted ? settings.historyRetention.cutoff() : nil)
+        failedDictations = failedDictationStore.list()
+    }
+
+    /// Deletes all kept audio while Save history is off; a failure card's Try again still has its temporary recording.
+    private func deleteKeptAudio() {
+        failedDictationStore.removeAll()
+        failedDictations = failedDictationStore.list()
+        for recording in [activeRecording, cancelledRecording, failedRecording] { recording?.keptURL = nil }
     }
 
     /// Opens a kept recording on the Transcribe page and deletes it once its transcript is saved.
@@ -1181,6 +1197,11 @@ final class AppModel {
         return !model.requiresModelDownload || installedModelIDs.contains(model.id)
     }
 
+    /// Whether Apple on-device recognition supports the current language on this Mac.
+    var appleSpeechAvailable: Bool {
+        (try? AppleSpeechProvider.checkAvailability(language: settings.language == "auto" ? nil : settings.language)) != nil
+    }
+
     var canEditConnections: Bool { !isBusy && meetings.runs.isEmpty && transcriptions.job == nil }
 
     func saveConnection(_ connection: SpeechConnection, key: String?, forNotes: Bool = false) throws {
@@ -1276,6 +1297,67 @@ final class AppModel {
         }
     }
 
+    /// Adds a dictation and deletes what retention no longer keeps; a failed save deletes nothing and keeps the dictation for the next save.
+    func addToHistory(_ transcript: Transcript) throws {
+        do { try saveKeeping([transcript] + history) } catch {
+            history.insert(transcript, at: 0)
+            throw error
+        }
+    }
+
+    /// Dictations the chosen retention would delete now.
+    func historyRemoved(by retention: HistoryRetention) -> Int {
+        var clock = settings.historyClock
+        let trusted = clock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        return history.count - retention.kept(history, clockIsTrusted: trusted).count
+    }
+
+    /// Saves the retention and deletes the dictations it doesn't keep.
+    func setHistoryRetention(_ retention: HistoryRetention) {
+        guard retention != settings.historyRetention else { return }
+        let previous = settings.historyRetention
+        settings.historyRetention = retention
+        do {
+            let trusted = try saveKeeping(history)
+            if !trusted, retention.kept(history).count < history.count {
+                ToastWindow.shared.show(Toast(title: "Keep history saved", message: "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day.",
+                                              systemImage: "clock"))
+            }
+            pruneFailedDictations()
+        } catch {
+            settings.historyRetention = previous
+            ToastWindow.shared.show(Toast(failure: "Couldn’t change history retention", error))
+        }
+    }
+
+    /// Applies a saved limit at launch and says what it removed; paused while Save history is off and never run on an unreadable workspace.
+    func pruneHistoryAtLaunch() {
+        guard storageIsReadable, settings.saveHistory, settings.historyRetention != .forever else { return }
+        let before = history.count
+        do {
+            try saveKeeping(history)
+            if history.count < before { ToastWindow.shared.show(Toast(pruned: before - history.count, by: settings.historyRetention)) }
+        } catch {
+            if settings.historyRetention.kept(history).count < before {
+                ToastWindow.shared.show(Toast(failure: "Couldn’t delete older dictations", error))
+            }
+        }
+        pruneFailedDictations()
+    }
+
+    /// Saves `dictations` minus what retention deletes and returns whether the clock was trusted; a failed save changes nothing.
+    @discardableResult
+    private func saveKeeping(_ dictations: [Transcript]) throws -> Bool {
+        let previous = (settings.historyClock, history)
+        let trusted = settings.historyClock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        history = settings.historyRetention.kept(dictations, clockIsTrusted: trusted)
+        do { try persist() } catch {
+            (settings.historyClock, history) = previous
+            throw error
+        }
+        return trusted
+    }
+
     func deleteTranscript(_ transcript: Transcript) {
         let previous = history
         history.removeAll { $0.id == transcript.id }
@@ -1330,6 +1412,7 @@ final class AppModel {
         vocabulary += added
         do {
             try persist()
+            guard settings.notifyLearnedCorrections else { return }
             let ids = Set(added.map(\.id))
             ToastWindow.shared.show(Toast(title: "Learned \(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))",
                                           message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
@@ -1423,6 +1506,7 @@ final class AppModel {
                 else { try SMAppService.mainApp.unregister() }
             }
             try persist()
+            if !settings.saveHistory { deleteKeptAudio() }
         } catch {
             settings.launchAtLogin = SMAppService.mainApp.status == .enabled
             statusMessage = "Could not save settings: \(error.localizedDescription)"
@@ -1577,6 +1661,13 @@ final class AppModel {
         phase = .idle
     }
 
+    func noSpeechHeard() {
+        // An earlier dictation waiting for this one to send it must still report that it wasn't sent.
+        guard !settings.showNoSpeechNotice, continuesIn == nil else { fail(.noSpeech); return }
+        statusMessage = ""
+        phase = .idle
+    }
+
     private func abandon(_ failure: DictationFailure) {
         discardRecording()
         fail(failure)
@@ -1597,7 +1688,7 @@ final class AppModel {
     func playFeedback(_ cue: DictationSound) {
         feedbackSound?.stop()
         guard settings.soundEffects, meetings.capturingID == nil, let sound = cue.sound(named: settings.soundName(for: cue)) else { return }
-        sound.volume = 0.6
+        sound.volume = settings.soundVolume
         sound.play()
         feedbackSound = sound
     }

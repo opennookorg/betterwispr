@@ -11,6 +11,7 @@ struct ModelsView: View {
     @State private var forgetFailure: String?
     @State private var preparingSubscription = false
     @State private var subscriptionSignedIn = false
+    @State private var appleSpeechAvailable = true
 
     var body: some View {
         Form {
@@ -156,8 +157,10 @@ struct ModelsView: View {
         }
         .formStyle(.grouped)
         .task { subscriptionSignedIn = CodexSpeechProvider.isSignedIn }
+        .task(id: model.settings.language) { appleSpeechAvailable = model.appleSpeechAvailable }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             subscriptionSignedIn = CodexSpeechProvider.isSignedIn
+            appleSpeechAvailable = model.appleSpeechAvailable
         }
         .sheet(item: $editing) { connection in
             SpeechConnectionEditor(model: model, connection: connection, forNotes: editingNotes)
@@ -203,6 +206,7 @@ struct ModelsView: View {
         let installing = installation != nil && installation?.failure == nil
         let installed = model.isModelInstalled(speechModel)
         let signInMissing = speechModel.engine == .codex && !subscriptionSignedIn
+        let unavailable = speechModel.isUnavailable(appleSpeechAvailable: appleSpeechAvailable)
 
         return HStack(alignment: .top, spacing: 12) {
             SymbolTile(
@@ -214,7 +218,8 @@ struct ModelsView: View {
                 HStack(spacing: 6) {
                     Text(speechModel.name).fontWeight(.medium)
                     if selected {
-                        badge(signInMissing ? "Selected · Setup required" : "Active", color: signInMissing ? .orange : .green)
+                        badge(signInMissing ? "Selected · Setup required" : unavailable ? "Selected · Unavailable" : "Active",
+                              color: signInMissing || unavailable ? .orange : .green)
                     } else if speechModel.id == "parakeet-ultra" {
                         badge("Recommended", color: .accentColor)
                     }
@@ -228,6 +233,11 @@ struct ModelsView: View {
                     .foregroundStyle(.tertiary)
                 if signInMissing {
                     Text("Sign in with codex login in Terminal.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if unavailable {
+                    Text("Isn’t available for your language on this Mac. Choose another model to dictate.")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -256,7 +266,7 @@ struct ModelsView: View {
             Spacer(minLength: 8)
             if installing {
                 Button("Cancel", action: model.cancelInstallation)
-            } else if selected && installed && !signInMissing {
+            } else if selected && installed && !signInMissing && !unavailable {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
                     .foregroundStyle(.green)
@@ -283,7 +293,7 @@ struct ModelsView: View {
                         model.selectModel(speechModel)
                     }
                 }
-                    .disabled(model.isBusy || preparingSubscription)
+                    .disabled(model.isBusy || preparingSubscription || unavailable)
             } else {
                 Button(installation == nil ? "Download" : "Retry") { model.installModel(speechModel) }
                     .disabled(model.isInstalling)

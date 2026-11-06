@@ -207,8 +207,11 @@ struct CapsuleView: View {
                 }
                 .buttonStyle(.bordered)
             } else if model.failure != nil {
-                Button("Try again", action: model.retryFailure)
-                    .help(model.canRetryFailure ? "Transcribe this recording again" : "Start a new dictation")
+                let retry = model.canRetryFailure
+                    ? model.selectedModel.recordingAction(onDevice: (title: "Try again", help: "Transcribe this recording again"))
+                    : (title: "Try again", help: "Start a new dictation")
+                Button(retry.title, action: model.retryFailure)
+                    .help(retry.help)
                     .buttonStyle(.bordered)
             }
             if isMeetingCapturing {
@@ -649,8 +652,6 @@ private struct CapsuleGlass: View {
         Group {
             if reduceTransparency {
                 shape.fill(Color(white: 0.09))
-            } else if #available(macOS 26.0, *) {
-                Color.clear.glassEffect(.regular.tint(.black.opacity(0.45)), in: shape)
             } else {
                 shape.fill(.ultraThinMaterial)
                     .overlay { shape.fill(.black.opacity(0.45)) }
