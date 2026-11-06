@@ -426,3 +426,21 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
     // Keep the cleanup task from reading the user's actual selection in this test.
     model.phase = .preparing
 }
+
+@Test @MainActor func discardingADictationCancelsItsPendingSendBeforeItResolves() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+    model.settings.sendToClaude = true
+    var resolved = false
+    var notSent = 0
+    model.pressSendKey(in: .current, after: .milliseconds(50), using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: { notSent += 1 }, resolving: { _, _ in
+        resolved = true
+        return .return
+    })
+    model.discardRecording()
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(!resolved && notSent == 0)
+}
