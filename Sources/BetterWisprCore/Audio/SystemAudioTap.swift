@@ -45,9 +45,19 @@ final class SystemAudioTap {
     }
 
     func start(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>, UnsafePointer<AudioTimeStamp>) -> Void) throws {
-        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { @Sendable _, input, inputTime, _, _ in receive(input, inputTime) }
-        guard status == noErr, procID != nil else { throw SystemAudioError(step: "listen to system audio", status: status) }
+        try listen(receive)
         try check(AudioDeviceStart(aggregateID, procID), aggregateID, "start system audio")
+    }
+
+    /// Starts off the main actor, because `kAudioAggregateDeviceTapAutoStartKey` makes `AudioDeviceStart` wait for the first audio from a tapped app; `stop()` must wait for this to return.
+    func startInBackground() async throws {
+        try listen { _, _ in }
+        let device = aggregateID
+        let proc = procID
+        let status = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: AudioDeviceStart(device, proc)) }
+        }
+        try check(status, device, "start system audio")
     }
 
     func stop() {
@@ -62,6 +72,11 @@ final class SystemAudioTap {
         procID = nil
         aggregateID = AudioObjectID(kAudioObjectUnknown)
         tapID = AudioObjectID(kAudioObjectUnknown)
+    }
+
+    private func listen(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>, UnsafePointer<AudioTimeStamp>) -> Void) throws {
+        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { @Sendable _, input, inputTime, _, _ in receive(input, inputTime) }
+        guard status == noErr, procID != nil else { throw SystemAudioError(step: "listen to system audio", status: status) }
     }
 
     private func streamDescription() async throws -> AudioStreamBasicDescription {

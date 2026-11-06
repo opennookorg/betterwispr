@@ -26,7 +26,7 @@ protocol MediaPlayers: Sendable {
 
 /// Silences apps that can't be paused, such as browsers, without changing whether they play.
 protocol OtherAppsAudio: Sendable {
-    func mute() async throws
+    func mute(onFailure: @escaping @MainActor @Sendable (any Error) -> Void) async
     func unmute() async
 }
 
@@ -84,12 +84,11 @@ final class MediaPauser {
         let previous = pending
         pending = Task {
             await previous?.value
-            do {
-                try await otherApps?.mute()
-                muted = true
-            } catch {
+            muted = true
+            await otherApps?.mute { error in
                 Logger(subsystem: "org.betterwispr.app", category: "MediaPauser").error("Couldn’t mute other apps: \(error.localizedDescription, privacy: .public)")
-                onMuteFailure?(error)
+                self.muted = false
+                self.onMuteFailure?(error)
             }
         }
     }

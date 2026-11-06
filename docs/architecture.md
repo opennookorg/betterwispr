@@ -182,6 +182,18 @@ after recording, so nothing is muted while it waits. A dictation that fails whil
 preparing, such as a denied permission or a model that won't load, never mutes. A
 mute runs on the `MediaPauser` queue, not in the recording path, so a failure can't
 stop the dictation: it is logged and shown as a toast, and other apps stay audible.
+
+The aggregate device sets `kAudioAggregateDeviceTapAutoStartKey`, and Apple's header
+says `AudioDeviceStart` then waits until a tapped app receives its first audio. With
+nothing playing that can last the whole dictation and beyond, so the mute path runs
+it off the main actor (`SystemAudioTap.startInBackground`) and `SystemAudioMute.mute`
+returns without waiting. The `MediaPauser` queue, resuming Music and quitting never
+wait for a start. An unmute that arrives mid-start only clears `wanted`, and the tap
+is stopped as soon as the start returns, so no Core Audio teardown runs against a
+device that is still starting. Until then nothing is playing and nothing is muted.
+The first sound after that wakes the tap, so it may be withheld for a moment before
+the tap stops. The next dictation reuses a start still in progress, so at most one is
+ever waiting. Meeting notes still use the synchronous `start`.
 macOS may report no error when System Audio Recording is denied, in which case
 nothing is muted and nothing is shown. That case is not exercised.
 

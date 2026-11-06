@@ -31,8 +31,8 @@ actor FakeMediaPlayers: MediaPlayers, OtherAppsAudio {
         states[app] = .playing
     }
 
-    func mute() throws {
-        if let muteError { throw muteError }
+    func mute(onFailure: @escaping @MainActor @Sendable (any Error) -> Void) async {
+        if let muteError { return await onFailure(muteError) }
         log.append("mute")
     }
 
@@ -309,10 +309,32 @@ func aCallIsAssumedWhenAKnownCallAppOrABrowserUsesTheMicrophone(recording: [Stri
 private final class FakeTap: MutingTap {
     var failure: (any Error)?
     private(set) var events: [String] = []
+    private let release: AsyncStream<Void>?
+    private let releaseContinuation: AsyncStream<Void>.Continuation?
 
-    func begin() throws {
+    init(holdsStart: Bool = false) {
+        if holdsStart {
+            let (stream, continuation) = AsyncStream<Void>.makeStream()
+            release = stream
+            releaseContinuation = continuation
+        } else {
+            release = nil
+            releaseContinuation = nil
+        }
+    }
+
+    func begin() async throws {
         events.append("begin")
+        if let release { for await _ in release {} }
         if let failure { throw failure }
+    }
+
+    func finishStart() {
+        releaseContinuation?.finish()
+    }
+
+    func untilStarting() async {
+        while events.isEmpty { await Task.yield() }
     }
 
     func stop() {
@@ -321,32 +343,103 @@ private final class FakeTap: MutingTap {
 }
 
 @available(macOS 14.2, *)
-@Test @MainActor func aFailedTapIsStoppedRethrownAndRetriedNextTime() async throws {
+@Test @MainActor func aFailedTapIsStoppedReportedAndRetriedNextTime() async {
     let failing = FakeTap()
     failing.failure = MuteFailure()
     let working = FakeTap()
     var taps = [failing, working]
     let mute = SystemAudioMute(makeTap: { taps.removeFirst() })
-    await #expect(throws: MuteFailure.self) { try await mute.mute() }
+    var failures: [any Error] = []
+    mute.mute { failures.append($0) }
+    await mute.starting?.value
+    #expect(failures.first is MuteFailure)
     #expect(failing.events == ["begin", "stop"])
-    try await mute.mute()
+    mute.mute { failures.append($0) }
+    await mute.starting?.value
     #expect(working.events == ["begin"])
+    #expect(failures.count == 1)
     mute.unmute()
     #expect(working.events == ["begin", "stop"])
 }
 
 @available(macOS 14.2, *)
-@Test @MainActor func mutingTwiceUsesOneTapAndUnmutingWithoutOneDoesNothing() async throws {
+@Test @MainActor func mutingTwiceUsesOneTapAndUnmutingWithoutOneDoesNothing() async {
     let tap = FakeTap()
     var made = 0
     let mute = SystemAudioMute(makeTap: { made += 1; return tap })
     mute.unmute()
     #expect(made == 0)
-    try await mute.mute()
-    try await mute.mute()
+    mute.mute { _ in }
+    await mute.starting?.value
+    mute.mute { _ in }
     #expect(made == 1)
     mute.unmute()
     mute.unmute()
+    #expect(tap.events == ["begin", "stop"])
+}
+
+@available(macOS 14.2, *)
+@Test @MainActor func aStopDuringTheStartIsHeldUntilItReturnsThenReleasesTheTap() async {
+    let tap = FakeTap(holdsStart: true)
+    let mute = SystemAudioMute(makeTap: { tap })
+    mute.mute { _ in }
+    await tap.untilStarting()
+    mute.unmute()
+    #expect(tap.events == ["begin"])
+    tap.finishStart()
+    await mute.starting?.value
+    #expect(tap.events == ["begin", "stop"])
+}
+
+@available(macOS 14.2, *)
+@Test @MainActor func aStartThatFailsAfterTheDictationEndedIsCleanedUpWithoutAMessage() async {
+    let tap = FakeTap(holdsStart: true)
+    tap.failure = MuteFailure()
+    let mute = SystemAudioMute(makeTap: { tap })
+    var failures: [any Error] = []
+    mute.mute { failures.append($0) }
+    await tap.untilStarting()
+    mute.unmute()
+    tap.finishStart()
+    await mute.starting?.value
+    #expect(tap.events == ["begin", "stop"])
+    #expect(failures.isEmpty)
+}
+
+@available(macOS 14.2, *)
+@Test @MainActor func aNewDictationReusesAStartStillWaitingAndKeepsTheMute() async {
+    let tap = FakeTap(holdsStart: true)
+    var made = 0
+    let mute = SystemAudioMute(makeTap: { made += 1; return tap })
+    mute.mute { _ in }
+    await tap.untilStarting()
+    mute.unmute()
+    mute.mute { _ in }
+    tap.finishStart()
+    await mute.starting?.value
+    #expect(made == 1)
+    #expect(tap.events == ["begin"])
+    mute.unmute()
+    #expect(tap.events == ["begin", "stop"])
+}
+
+@available(macOS 14.2, *)
+@Test @MainActor func aStartStillWaitingForAudioHoldsUpNeitherMusicNorQuit() async {
+    let players = FakeMediaPlayers([.music: .playing])
+    let tap = FakeTap(holdsStart: true)
+    let mute = SystemAudioMute(makeTap: { tap })
+    let pauser = MediaPauser(players: players, otherApps: mute, callInProgress: { false })
+    pauser.pause()
+    pauser.muteOtherApps()
+    await pauser.pending?.value
+    await tap.untilStarting()
+    pauser.unmuteOtherApps()
+    pauser.resume()
+    await pauser.pending?.value
+    #expect(await players.log == ["pause music", "play music"])
+    #expect(tap.events == ["begin"])
+    tap.finishStart()
+    await mute.starting?.value
     #expect(tap.events == ["begin", "stop"])
 }
 

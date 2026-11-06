@@ -1268,7 +1268,11 @@ steps.
   recording starts, keeps playing, and is audible again as soon as the recording
   stops. Repeat with a cancelled dictation and with "No speech heard."
 - [ ] Nothing playing: dictate with no app playing audio. The capsule and the
-  shortcut respond normally, and the dictation stops when asked.
+  shortcut respond normally, and the dictation stops when asked. With Pause music
+  while dictating on and Music playing, Music resumes when the recording stops.
+- [ ] After a silent dictation: dictate with nothing playing, stop, then start a
+  video. It is audible, apart from at most a moment at the very start. Note how long
+  that moment is. Quit during a silent dictation: the app quits without waiting.
 - [ ] Model load: with a model that takes a while to load and a video playing, start
   a dictation. The video stays audible until recording starts.
 - [ ] Question card: record a dictation long enough to reach the question card. The

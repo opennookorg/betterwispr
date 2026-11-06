@@ -12,7 +12,7 @@ protocol MutingTap: AnyObject {
 extension SystemAudioTap: MutingTap {
     func begin() async throws {
         _ = try await prepare()
-        try start { _, _ in }
+        try await startInBackground()
     }
 }
 
@@ -22,6 +22,8 @@ extension SystemAudioTap: MutingTap {
 public final class SystemAudioMute: Sendable {
     private let makeTap: @MainActor () -> any MutingTap
     private var tap: (any MutingTap)?
+    private var wanted = false
+    private(set) var starting: Task<Void, Never>?
 
     public convenience init() {
         self.init(makeTap: { SystemAudioTap(muteBehavior: .mutedWhenTapped) })
@@ -31,20 +33,32 @@ public final class SystemAudioMute: Sendable {
         self.makeTap = makeTap
     }
 
-    public func mute() async throws {
+    /// Returns without waiting for the tap, whose start can last until some app plays audio; a start still running is reused rather than doubled.
+    public func mute(onFailure: @escaping @MainActor @Sendable (any Error) -> Void) {
+        wanted = true
         guard tap == nil else { return }
         let created = makeTap()
         tap = created
-        do {
-            try await created.begin()
-        } catch {
-            created.stop()
-            if tap === created { tap = nil }
-            throw error
+        starting = Task {
+            do {
+                try await created.begin()
+                starting = nil
+                if !wanted { release() }
+            } catch {
+                starting = nil
+                release()
+                if wanted { onFailure(error) }
+            }
         }
     }
 
+    /// Ends the mute now, or as soon as a start still running returns, because a tap can't be stopped mid-start.
     public func unmute() {
+        wanted = false
+        if starting == nil { release() }
+    }
+
+    private func release() {
         tap?.stop()
         tap = nil
     }
@@ -52,7 +66,7 @@ public final class SystemAudioMute: Sendable {
     /// Listens to system audio for a moment, so macOS asks for System Audio Recording when the setting turns on instead of during a dictation.
     public static func requestPermission() async {
         let tap = SystemAudioTap()
-        if (try? await tap.prepare()) != nil { try? tap.start { _, _ in } }
+        if (try? await tap.prepare()) != nil { try? await tap.startInBackground() }
         tap.stop()
     }
 }
