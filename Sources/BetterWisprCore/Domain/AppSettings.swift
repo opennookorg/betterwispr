@@ -49,11 +49,17 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var sendDelayMilliseconds: Int?
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
+    /// Adds a space after pasted text so the next dictation doesn't run into it.
+    public var appendTrailingSpace: Bool = false
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
     public var hideCapsuleWhileDictating: Bool = false
+    /// When off, a dictation with no words ends without the "No speech heard." card and its sound.
+    public var showNoSpeechNotice: Bool = true
     public var soundEffects: Bool = true
+    public static let soundVolumeRange: ClosedRange<Float> = 0.05...1
+    public var soundVolume: Float = 0.6
     /// macOS system sound names picked per cue; missing cues use `DictationSound.defaultSoundName`.
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
@@ -77,6 +83,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
     public var learnCorrections: Bool = true
+    /// Shows a toast with Undo when a correction is learned; learning happens either way.
+    public var notifyLearnedCorrections: Bool = true
     public var cleanup: CleanupLevel = .light
     /// Sends selected text, clipboard text and the focused window's text to the cleanup provider during Medium cleanup.
     public var useScreenContext: Bool = false
@@ -183,10 +191,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         sendDelayMilliseconds = try container.decodeIfPresent(Int.self, forKey: .sendDelayMilliseconds)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
+        appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
+        showNoSpeechNotice = try container.decodeIfPresent(Bool.self, forKey: .showNoSpeechNotice) ?? true
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
+        soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
@@ -207,6 +218,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         separateRoomVoices = try container.decodeIfPresent(Bool.self, forKey: .separateRoomVoices) ?? false
         rememberVoices = try container.decodeIfPresent(Bool.self, forKey: .rememberVoices) ?? false
         learnCorrections = try container.decodeIfPresent(Bool.self, forKey: .learnCorrections) ?? true
+        notifyLearnedCorrections = try container.decodeIfPresent(Bool.self, forKey: .notifyLearnedCorrections) ?? true
         cleanup = try container.decodeIfPresent(CleanupLevel.self, forKey: .cleanup) ?? .light
         useScreenContext = try container.decodeIfPresent(Bool.self, forKey: .useScreenContext) ?? false
         recognizeScreenText = try container.decodeIfPresent(Bool.self, forKey: .recognizeScreenText) ?? false

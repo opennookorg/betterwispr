@@ -195,6 +195,7 @@ final class AppModel {
     @ObservationIgnored private var acceptanceCheck: (started: ContinuousClock.Instant, task: Task<Void, Never>?)?
     @ObservationIgnored private var pendingNotSent: (() -> Void)?
     @ObservationIgnored private var continuesIn: pid_t?
+    @ObservationIgnored private var earlierPasteEndsInSpace = false
     @ObservationIgnored private var dictationContext: Task<DictationContext, Never>?
     @ObservationIgnored private var activeRecording: DictationRecording?
     @ObservationIgnored private var feedbackSound: NSSound?
@@ -661,7 +662,7 @@ final class AppModel {
                 self.recordingDuration = audio.duration
                 guard audio.hasSpeech else {
                     try? FileManager.default.removeItem(at: audio.url)
-                    self.fail(.noSpeech)
+                    self.noSpeechHeard()
                     return
                 }
                 self.playFeedback(.finished)
@@ -742,7 +743,7 @@ final class AppModel {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
-                guard !text.isEmpty else { self.fail(.noSpeech); return }
+                guard !text.isEmpty else { self.noSpeechHeard(); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
@@ -759,7 +760,10 @@ final class AppModel {
                 self.activeRecording = nil
                 let continues = recording.continuesIn != nil && recording.continuesIn == recording.target?.processIdentifier
                 self.continuesIn = nil
-                let result = try await integration?.deliver(continues ? TextJoin.continuing(text) : text, to: recording.target)
+                let addsTrailingSpace = writingSettings.autoPaste && writingSettings.appendTrailingSpace
+                let delivered = TextJoin.pasted(text, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
+                self.earlierPasteEndsInSpace = addsTrailingSpace && delivered.last?.isWhitespace == true
+                let result = try await integration?.deliver(delivered, to: recording.target)
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
@@ -1237,6 +1241,7 @@ final class AppModel {
         vocabulary += added
         do {
             try persist()
+            guard settings.notifyLearnedCorrections else { return }
             let ids = Set(added.map(\.id))
             ToastWindow.shared.show(Toast(title: "Learned \(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))",
                                           message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
@@ -1483,6 +1488,13 @@ final class AppModel {
         phase = .idle
     }
 
+    func noSpeechHeard() {
+        // An earlier dictation waiting for this one to send it must still report that it wasn't sent.
+        guard !settings.showNoSpeechNotice, continuesIn == nil else { fail(.noSpeech); return }
+        statusMessage = ""
+        phase = .idle
+    }
+
     private func abandon(_ failure: DictationFailure) {
         discardRecording()
         fail(failure)
@@ -1503,7 +1515,7 @@ final class AppModel {
     func playFeedback(_ cue: DictationSound) {
         feedbackSound?.stop()
         guard settings.soundEffects, meetings.capturingID == nil, let sound = cue.sound(named: settings.soundName(for: cue)) else { return }
-        sound.volume = 0.6
+        sound.volume = settings.soundVolume
         sound.play()
         feedbackSound = sound
     }
