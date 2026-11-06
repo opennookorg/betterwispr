@@ -169,6 +169,16 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Dictation sounds", caption: "Soft cues when dictation starts listening, finishes, cancels or needs attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
                     if model.settings.soundEffects {
+                        RowDivider()
+                        SettingRow("Sound volume") {
+                            Slider(value: setting(\.soundVolume), in: 0.05...1) { editing in
+                                if !editing { model.playFeedback(.started) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 160)
+                        }
+                    }
+                    if model.settings.soundEffects {
                         ForEach(DictationSound.allCases, id: \.self) { cue in
                             let overridden = cue.url(in: DictationSound.overrideDirectory) != nil
                             RowDivider()

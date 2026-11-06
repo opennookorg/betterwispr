@@ -1503,7 +1503,7 @@ final class AppModel {
     func playFeedback(_ cue: DictationSound) {
         feedbackSound?.stop()
         guard settings.soundEffects, meetings.capturingID == nil, let sound = cue.sound(named: settings.soundName(for: cue)) else { return }
-        sound.volume = 0.6
+        sound.volume = settings.soundVolume
         sound.play()
         feedbackSound = sound
     }
