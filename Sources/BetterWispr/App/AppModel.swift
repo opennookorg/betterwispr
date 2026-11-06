@@ -195,6 +195,7 @@ final class AppModel {
     @ObservationIgnored private var acceptanceCheck: (started: ContinuousClock.Instant, task: Task<Void, Never>?)?
     @ObservationIgnored private var pendingNotSent: (() -> Void)?
     @ObservationIgnored private var continuesIn: pid_t?
+    @ObservationIgnored private var earlierPasteEndsInSpace = false
     @ObservationIgnored private var dictationContext: Task<DictationContext, Never>?
     @ObservationIgnored private var activeRecording: DictationRecording?
     @ObservationIgnored private var feedbackSound: NSSound?
@@ -759,9 +760,9 @@ final class AppModel {
                 self.activeRecording = nil
                 let continues = recording.continuesIn != nil && recording.continuesIn == recording.target?.processIdentifier
                 self.continuesIn = nil
-                // A trailing space already separates this dictation from an earlier one.
-                let delivered = writingSettings.autoPaste && writingSettings.appendTrailingSpace
-                    ? TextJoin.trailing(text) : continues ? TextJoin.continuing(text) : text
+                let addsTrailingSpace = writingSettings.autoPaste && writingSettings.appendTrailingSpace
+                let delivered = TextJoin.pasted(text, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
+                self.earlierPasteEndsInSpace = addsTrailingSpace && delivered.last?.isWhitespace == true
                 let result = try await integration?.deliver(delivered, to: recording.target)
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }

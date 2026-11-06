@@ -478,3 +478,12 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(TextJoin.trailing("你好。") == "你好。")
     #expect(TextJoin.trailing("") == "")
 }
+
+@Test func aDictationJoiningOneThatSkippedItsTrailingSpaceIsStillSpaced() {
+    #expect(TextJoin.trailing("你好").last?.isWhitespace == false)
+    #expect(TextJoin.pasted("Hello", joining: true, addsTrailingSpace: true) == " Hello ")
+    #expect(TextJoin.pasted("Hello", joining: false, addsTrailingSpace: true) == "Hello ")
+    #expect(TextJoin.pasted("Hello", joining: true, addsTrailingSpace: false) == " Hello")
+    #expect(TextJoin.pasted("Hello", joining: false, addsTrailingSpace: false) == "Hello")
+    #expect(TextJoin.pasted("还有", joining: true, addsTrailingSpace: true) == "还有")
+}
