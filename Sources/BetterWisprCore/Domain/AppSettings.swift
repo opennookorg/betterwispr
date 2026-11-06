@@ -33,8 +33,8 @@ public enum ModelIdleUnload: Int, Codable, CaseIterable, Sendable {
 public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
     case forever, latest100, threeDays, twoWeeks, threeMonths
 
-    /// The dictations to keep from `history`, which is ordered newest first.
-    public func kept(_ history: [Transcript], now: Date = .now, calendar: Calendar = .current) -> [Transcript] {
+    /// The dictations to keep from `history` (newest first); age limits delete nothing while `clockIsTrusted` is false.
+    public func kept(_ history: [Transcript], now: Date = .now, calendar: Calendar = .current, clockIsTrusted: Bool = true) -> [Transcript] {
         let age: DateComponents
         switch self {
         case .forever: return history
@@ -43,8 +43,28 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
         case .twoWeeks: age = DateComponents(day: -14)
         case .threeMonths: age = DateComponents(month: -3)
         }
-        guard let cutoff = calendar.date(byAdding: age, to: now) else { return history }
+        guard clockIsTrusted, let cutoff = calendar.date(byAdding: age, to: now) else { return history }
         return history.filter { $0.createdAt >= cutoff }
+    }
+}
+
+/// Remembers when retention last read the clock, so a date set far ahead can't delete saved dictations.
+public struct RetentionClock: Codable, Equatable, Sendable {
+    public var lastSeen: Date?
+    public var jumpSeen: Date?
+
+    public init() {}
+
+    /// Records `now` and says whether age limits may use it: a jump of over a day stays untrusted until it has held for a day.
+    public mutating func observe(_ now: Date, newestDictation: Date?) -> Bool {
+        let window: TimeInterval = 86_400
+        if let last = lastSeen ?? newestDictation, now.timeIntervalSince(last) > window {
+            guard let jump = jumpSeen, jump <= now else { jumpSeen = now; return false }
+            guard now.timeIntervalSince(jump) >= window else { return false }
+        }
+        lastSeen = now
+        jumpSeen = nil
+        return true
     }
 }
 
@@ -69,6 +89,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
     public var historyRetention: HistoryRetention = .forever
+    public var historyClock = RetentionClock()
     /// Adds a space after pasted text so the next dictation doesn't run into it.
     public var appendTrailingSpace: Bool = false
     public var showCapsule: Bool = true
@@ -212,6 +233,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
         historyRetention = try container.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention) ?? .forever
+        historyClock = try container.decodeIfPresent(RetentionClock.self, forKey: .historyClock) ?? RetentionClock()
         appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true

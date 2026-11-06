@@ -218,10 +218,10 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()
-                    SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it.", isOn: setting(\.saveHistory))
+                    SettingToggle("Save dictation history", caption: model.settings.saveHistory ? "Keep text on this Mac so you can find and reuse it." : "New dictations aren’t saved. Dictations already saved stay, and Keep history deletes nothing while this is off.", isOn: setting(\.saveHistory))
                     if model.settings.saveHistory {
                         RowDivider()
-                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation.") {
+                        SettingRow("Keep history", caption: "Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. Usage totals and Insights count only the dictations kept.") {
                             Picker("Keep history", selection: Binding(
                                 get: { model.settings.historyRetention },
                                 set: { retention in
@@ -312,7 +312,7 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: { retention in
             let count = model.historyRemoved(by: retention)
-            Text("\(count) \(count == 1 ? "dictation" : "dictations") will be deleted from this Mac. This can’t be undone.")
+            Text("\(count) \(count == 1 ? "dictation" : "dictations") will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.")
         }
     }
 

@@ -1440,6 +1440,13 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Set Keep history to a limit that would delete dictations. The alert states
   the count. Cancel changes nothing. Delete removes only those dictations, and
   the limit survives relaunch. Meetings and file transcriptions stay.
+- [ ] The alert says usage totals and Insights will shrink. With a limit set,
+  relaunching with an expired dictation shows a toast naming how many went and the
+  limit. With Save history off, the picker hides and a saved limit deletes nothing
+  on relaunch.
+- [ ] With an age limit set, move the Mac's date ahead by more than a day and
+  relaunch. Nothing is deleted. Set the date back: the dictations made meanwhile
+  stay. A date left ahead for a day counts as correct and age limits apply.
 - [ ] With a limit set, confirm older dictations go at launch and after a dictation.
   In a read-only temporary profile, a failed save deletes nothing and the new
   dictation stays listed until a later save writes it.

@@ -235,7 +235,6 @@ final class AppModel {
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
         guard startsServices else { return }
-        if storageIsReadable { setHistoryRetention(settings.historyRetention) }
         applyAppearance()
         migrateLegacyOnboarding()
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
@@ -1194,30 +1193,61 @@ final class AppModel {
 
     /// Adds a dictation and deletes what retention no longer keeps; a failed save deletes nothing and keeps the dictation for the next save.
     func addToHistory(_ transcript: Transcript) throws {
-        let previous = history
-        history = settings.historyRetention.kept([transcript] + previous)
-        do { try persist() } catch {
-            history = [transcript] + previous
+        do { try saveKeeping([transcript] + history) } catch {
+            history.insert(transcript, at: 0)
             throw error
         }
     }
 
     /// Dictations the chosen retention would delete now.
     func historyRemoved(by retention: HistoryRetention) -> Int {
-        history.count - retention.kept(history).count
+        var clock = settings.historyClock
+        let trusted = clock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        return history.count - retention.kept(history, clockIsTrusted: trusted).count
     }
 
-    /// Saves the retention and deletes the dictations it doesn't keep; also run at launch.
+    /// Saves the retention and deletes the dictations it doesn't keep.
     func setHistoryRetention(_ retention: HistoryRetention) {
-        let kept = retention.kept(history)
-        guard retention != settings.historyRetention || kept.count < history.count else { return }
-        let previous = (settings.historyRetention, history)
+        guard retention != settings.historyRetention else { return }
+        let previous = settings.historyRetention
         settings.historyRetention = retention
-        history = kept
-        do { try persist() } catch {
-            (settings.historyRetention, history) = previous
+        do {
+            let trusted = try saveKeeping(history)
+            if !trusted, retention.kept(history).count < history.count {
+                ToastWindow.shared.show(Toast(title: "Keep history saved", message: "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day.",
+                                              systemImage: "clock"))
+            }
+        } catch {
+            settings.historyRetention = previous
             ToastWindow.shared.show(Toast(failure: "Couldn’t change history retention", error))
         }
+    }
+
+    /// Applies a saved limit at launch and says what it removed; paused while Save history is off and never run on an unreadable workspace.
+    func pruneHistoryAtLaunch() {
+        guard storageIsReadable, settings.saveHistory, settings.historyRetention != .forever else { return }
+        let before = history.count
+        do {
+            try saveKeeping(history)
+            if history.count < before { ToastWindow.shared.show(Toast(pruned: before - history.count, by: settings.historyRetention)) }
+        } catch {
+            if settings.historyRetention.kept(history).count < before {
+                ToastWindow.shared.show(Toast(failure: "Couldn’t delete older dictations", error))
+            }
+        }
+    }
+
+    /// Saves `dictations` minus what retention deletes and returns whether the clock was trusted; a failed save changes nothing.
+    @discardableResult
+    private func saveKeeping(_ dictations: [Transcript]) throws -> Bool {
+        let previous = (settings.historyClock, history)
+        let trusted = settings.historyClock.observe(.now, newestDictation: history.map(\.createdAt).max())
+        history = settings.historyRetention.kept(dictations, clockIsTrusted: trusted)
+        do { try persist() } catch {
+            (settings.historyClock, history) = previous
+            throw error
+        }
+        return trusted
     }
 
     func deleteTranscript(_ transcript: Transcript) {
