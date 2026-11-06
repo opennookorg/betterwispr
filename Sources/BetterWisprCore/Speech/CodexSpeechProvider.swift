@@ -40,7 +40,7 @@ public final class CodexSpeechProvider: SpeechProvider {
         let auth = try credentials()
         let language = try Self.language(language)
         let task = Task {
-            let chunks = try await SpeechAudio.wavChunks(audioURL, seconds: 125)
+            let ranges = try await SpeechAudio.chunkRanges(audioURL, seconds: 125)
             try Task.checkCancellation()
             configuration.urlCache = nil
             configuration.httpCookieStorage = nil
@@ -51,7 +51,8 @@ public final class CodexSpeechProvider: SpeechProvider {
             let session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
             defer { session.invalidateAndCancel() }
             var texts: [String] = []
-            for (index, chunk) in chunks.enumerated() {
+            for (index, range) in ranges.enumerated() {
+                let chunk = try await SpeechAudio.wavChunk(audioURL, range)
                 try Task.checkCancellation()
                 let request = Self.request(auth: auth, wav: chunk, language: language)
                 let data: Data
@@ -65,7 +66,7 @@ public final class CodexSpeechProvider: SpeechProvider {
                 try Task.checkCancellation()
                 guard let http = response as? HTTPURLResponse else { throw CodexSpeechError.invalidResponse }
                 texts.append(try Self.transcript(data, status: http.statusCode))
-                onProgress?(Double(index + 1) / Double(chunks.count))
+                onProgress?(Double(index + 1) / Double(ranges.count))
             }
             try Task.checkCancellation()
             return texts.filter { !$0.isEmpty }.joined(separator: " ")

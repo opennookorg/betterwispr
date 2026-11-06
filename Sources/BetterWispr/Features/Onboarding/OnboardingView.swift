@@ -1,3 +1,4 @@
+import AppKit
 import BetterWisprCore
 import SwiftUI
 
@@ -17,7 +18,7 @@ enum OnboardingStep: Int, CaseIterable {
         switch self {
         case .welcome: "Speak in any app and your words appear where your cursor is."
         case .permissions: "BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you."
-        case .model: "Download the recommended model once and dictate offline."
+        case .model: "Choose a speech model. Downloaded models run offline."
         case .practice: "Say a sentence and watch it turn into text."
         }
     }
@@ -45,6 +46,7 @@ struct OnboardingView: View {
     @Bindable var model: AppModel
     @State private var step: OnboardingStep
     @State private var forward = true
+    @State private var appleSpeechAvailable = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(model: AppModel) {
@@ -52,8 +54,9 @@ struct OnboardingView: View {
         _step = State(initialValue: OnboardingStep(rawValue: model.settings.onboardingStep) ?? .welcome)
     }
 
-    private var recommended: SpeechModel? { model.models.first { $0.id == "parakeet-ultra" } }
-    private var installation: ModelInstallation? { model.installation?.id == recommended?.id ? model.installation : nil }
+    private var speechChoices: [SpeechModel] {
+        Self.speechChoices(from: model.models, appleSpeechAvailable: appleSpeechAvailable)
+    }
     private var shortcut: String { model.settings.shortcut.displayName }
 
     var body: some View {
@@ -80,7 +83,7 @@ struct OnboardingView: View {
     }
 
     private var page: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: step == .model ? 18 : 28) {
             hero.frame(height: 96)
             VStack(spacing: 10) {
                 Text(step.title)
@@ -144,39 +147,56 @@ struct OnboardingView: View {
 
     private var modelChoice: some View {
         Form {
-            modelRow
+            ForEach(speechChoices) { speechModel in
+                speechModelRow(speechModel)
+            }
             speakerDetectionRow
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
         .scrollContentBackground(.hidden)
-        .frame(height: 170)
+        .frame(height: 236)
+        .onAppear { appleSpeechAvailable = model.appleSpeechAvailable }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            appleSpeechAvailable = model.appleSpeechAvailable
+        }
     }
 
-    @ViewBuilder private var modelRow: some View {
-        let selected = model.selectedModel
+    static func speechChoices(from models: [SpeechModel], appleSpeechAvailable: Bool) -> [SpeechModel] {
+        (["parakeet-ultra"] + (appleSpeechAvailable ? ["apple"] : []))
+            .compactMap { id in models.first { $0.id == id } }
+    }
+
+    static func canContinue(from step: OnboardingStep, selected: SpeechModel, appleSpeechAvailable: Bool) -> Bool {
+        step != .model || !selected.isUnavailable(appleSpeechAvailable: appleSpeechAvailable)
+    }
+
+    @ViewBuilder private func speechModelRow(_ speechModel: SpeechModel) -> some View {
+        let selected = model.selectedModel.id == speechModel.id
+        let installation = model.installation?.id == speechModel.id ? model.installation : nil
+        let installed = model.isModelInstalled(speechModel)
         LabeledContent {
             if let installation, installation.failure == nil {
                 HStack {
                     ProgressView(value: installation.progress).frame(width: 120)
                     Button("Cancel", action: model.cancelInstallation)
                 }
-            } else if let recommended, selected.id != recommended.id || !model.isModelInstalled(recommended) {
-                if model.isModelInstalled(recommended) {
-                    Button("Use \(recommended.name)") { model.selectModel(recommended) }
-                        .disabled(model.isBusy)
-                } else {
-                    Button(installation == nil ? "Download \(recommended.sizeLabel)" : "Retry") {
-                        model.installModel(recommended)
-                    }
-                    .disabled(model.isInstalling)
-                }
-            } else {
+            } else if installed && selected {
                 ready
+            } else if installed {
+                Button("Use") { model.selectModel(speechModel) }
+                    .disabled(model.isBusy)
+            } else {
+                Button(installation == nil ? "Download \(speechModel.sizeLabel)" : "Retry") {
+                    model.installModel(speechModel)
+                }
+                .disabled(model.isInstalling)
             }
         } label: {
-            Text(recommended?.name ?? selected.name)
-            Text(modelDetail)
+            HStack(spacing: 6) {
+                Text(speechModel.name)
+                if speechModel.id == "parakeet-ultra" { Text("Recommended").font(.caption).foregroundStyle(.secondary) }
+            }
+            Text(modelDetail(for: speechModel, installation: installation))
         }
     }
 
@@ -218,14 +238,19 @@ struct OnboardingView: View {
         .foregroundStyle(.secondary)
     }
 
-    private var modelDetail: String {
+    private func modelDetail(for speechModel: SpeechModel, installation: ModelInstallation?) -> String {
         if let installation {
             return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
         }
-        if let recommended, model.selectedModel.id != recommended.id, model.isModelInstalled(model.selectedModel) {
-            return "You’re using \(model.selectedModel.name). \(recommended.name) is recommended."
-        }
-        return recommended?.detail ?? "Ready to use offline."
+        if speechModel.id == "apple" { return "Uses macOS on-device speech recognition. No download." }
+        let selected = model.selectedModel
+        return Self.selectedModelNote(selected: selected, isInstalled: model.isModelInstalled(selected), choices: speechChoices) ?? speechModel.detail
+    }
+
+    static func selectedModelNote(selected: SpeechModel, isInstalled: Bool, choices: [SpeechModel]) -> String? {
+        guard !choices.contains(where: { $0.id == selected.id }) else { return nil }
+        if selected.engine == .apple { return "Apple on-device speech isn’t available for your language on this Mac. Pick a model here to continue." }
+        return isInstalled ? "You’re using \(selected.name). Parakeet Ultra is recommended." : nil
     }
 
     private var practice: some View {
@@ -276,6 +301,7 @@ struct OnboardingView: View {
                 Button("Continue") { go(to: OnboardingStep(rawValue: step.rawValue + 1)) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!Self.canContinue(from: step, selected: model.selectedModel, appleSpeechAvailable: appleSpeechAvailable))
             }
         }
         .overlay { progressDots }
