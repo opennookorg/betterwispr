@@ -173,7 +173,9 @@ the field, else nothing. A rule wins over the built-in detection because it name
 its app, and unlike that detection it fires wherever the cursor is in the app —
 the setting's footer says so, since the user is trading the shell safeguard for
 reach. Rules also get the `AXManualAccessibility` nudge, without which an
-Electron target exposes no focused field to record.
+Electron target exposes no focused field to record. A rule still sends when no
+field was recorded, so only the frontmost-app check protects it then; Send to
+Claude sends only when the recorded field is still focused.
 
 A `SendKeystroke` takes any key, including a bare Return or Tab, because it is
 never registered as a hot key — only a modifier on its own and Fn are rejected.

@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 enum RecordingPhase: Equatable {
     case idle, preparing, recording, transcribing
     case cancelled, completed(String)
-    /// Pasted and about to press Return; a new dictation in the meantime takes over the send.
+    /// Pasted and about to press the send key; a new dictation in the meantime takes over the send.
     case sending
     case failed(DictationFailure)
     case unpasted(String)
@@ -124,7 +124,6 @@ final class AppModel {
     var liveTranscript = LiveTranscript()
     var voiceLevels = VoiceLevels()
     var isHeldSession = false
-    /// The dictation in progress will press Return after pasting: Send to Claude is on, the field is a Claude prompt and Shift isn't held.
     /// The keystroke finishing the dictation now would post after pasting; nil leaves the text unsent.
     private(set) var sendKeystroke: SendKeystroke?
     var recordingDuration: TimeInterval = 0
@@ -191,7 +190,7 @@ final class AppModel {
     @ObservationIgnored private var holdsBackReturn = false
     @ObservationIgnored private var pendingReturn: Task<Void, Never>?
     @ObservationIgnored private var pendingReturnApp: pid_t?
-    /// Whether the target's focused field was a Claude prompt when last checked, and when that check started.
+    /// The keystroke the target's focused field would get when last checked, and when that check started.
     @ObservationIgnored private var targetKeystroke: SendKeystroke?
     @ObservationIgnored private var acceptanceCheck: (started: ContinuousClock.Instant, task: Task<Void, Never>?)?
     @ObservationIgnored private var pendingNotSent: (() -> Void)?
@@ -397,11 +396,14 @@ final class AppModel {
         pendingReturn = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard let self, !Task.isCancelled else { return }
-            let keystroke = self.settings.sendsAfterPaste ? await resolve(app, self.settings) : nil
+            let settings = self.settings
+            let keystroke = settings.sendsAfterPaste ? await resolve(app, settings) : nil
             guard !Task.isCancelled else { return }
             self.pendingReturn = nil
             self.pendingNotSent = nil
-            let sent = keystroke.map { paste.press($0, in: app) } ?? false
+            let isCurrent = self.settings.sendToClaude == settings.sendToClaude && self.settings.sendRules == settings.sendRules
+            let viaRule = SendAfterPaste.rule(for: app.bundleIdentifier, in: settings.sendRules) != nil
+            let sent = isCurrent && keystroke.map { paste.press($0, in: app, requiringRecordedFocus: !viaRule) } ?? false
             if self.phase == .sending { self.phase = .idle }
             // A sent prompt leaves the field, so there is no correction to learn.
             guard !sent else { return }
@@ -422,7 +424,7 @@ final class AppModel {
 
     /// Follows Shift while recording, so the capsule shows whether finishing now would send, and with which key.
     private func updateSendKeystroke(holdingBack: Bool? = nil) {
-        let sends = (holdingBack ?? (holdsBackReturn || shiftHeld)) ? nil : targetKeystroke
+        let sends = settings.sendsAfterPaste && !(holdingBack ?? (holdsBackReturn || shiftHeld)) ? targetKeystroke : nil
         guard sendKeystroke != sends else { return }
         sendKeystroke = sends
         if phase == .recording, statusMessage.hasPrefix("Listening.") { statusMessage = listeningStatus }

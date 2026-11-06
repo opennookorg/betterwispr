@@ -289,7 +289,7 @@ struct CapsuleView: View {
             }
             Spacer(minLength: 0)
             Button("Don’t send", action: model.holdBackReturn)
-                .help("Leave the text pasted without pressing Return")
+                .help("Leave the text pasted without sending it")
         }
         .foregroundStyle(.white)
         .buttonStyle(CapsuleCardButtonStyle())

@@ -1,3 +1,4 @@
+import ApplicationServices
 import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
@@ -34,6 +35,29 @@ import Testing
     let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
     #expect(loaded.sendRules == settings.sendRules)
     #expect(loaded.sendRules.first?.keystroke == keystroke)
+}
+
+@Test @MainActor func aFileSavedWithSendToClaudeBeforeRulesKeepsItsSendAndOnlySendsToAClaudePrompt() async throws {
+    let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002,"sendToClaude":true,"sendDelayMilliseconds":250}"#
+    let settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
+    #expect(settings.sendToClaude && settings.sendsAfterPaste && settings.sendRules.isEmpty)
+    #expect(settings.sendDelay == .milliseconds(250))
+    #expect(await SendAfterPaste.keystroke(for: .current, settings: settings) == nil)
+}
+
+@Test @MainActor func onlyARuleSendsWithoutARecordedField() {
+    let field = AXUIElementCreateApplication(1)
+    let other = AXUIElementCreateApplication(2)
+    #expect(!FocusedAppIntegration.sendFocusMatches(nil, current: field, requiringRecorded: true))
+    #expect(FocusedAppIntegration.sendFocusMatches(nil, current: field, requiringRecorded: false))
+    #expect(FocusedAppIntegration.sendFocusMatches(field, current: field, requiringRecorded: true))
+    #expect(!FocusedAppIntegration.sendFocusMatches(field, current: other, requiringRecorded: false))
+    #expect(!FocusedAppIntegration.sendFocusMatches(field, current: nil, requiringRecorded: false))
+}
+
+@Test @MainActor func aKeyCodeOutsideTheKeyboardRangeBuildsNoEvents() throws {
+    let keystroke = try #require(SendKeystroke(keyCode: 70_000, modifiers: [], key: "X"))
+    #expect(FocusedAppIntegration.keystrokeEvents(for: keystroke) == nil)
 }
 
 @Test func aRuleOnlyCountsAsSendingWhileItIsOn() {

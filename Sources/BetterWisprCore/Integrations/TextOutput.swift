@@ -77,13 +77,11 @@ public struct FocusedAppIntegration: TextOutputIntegration {
         return .pasted(into: target.localizedName ?? "your app")
     }
 
-    /// Posts `keystroke` to `target` only while it is still the frontmost app with the field the dictation started in,
-    /// so a pasted chat or agent prompt submits. Focus is matched on the same terms as the paste itself, so an app that
-    /// exposed no focused element to record still gets its send.
-    public func press(_ keystroke: SendKeystroke, in target: NSRunningApplication) -> Bool {
+    /// Posts `keystroke` to `target` only while it is still the frontmost app with the field the dictation started in.
+    public func press(_ keystroke: SendKeystroke, in target: NSRunningApplication, requiringRecordedFocus: Bool) -> Bool {
         guard !Task.isCancelled, !target.isTerminated, AXIsProcessTrusted(),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-              Self.focusMatches(expectedFocus, current: Self.focusedElement(in: target)),
+              Self.sendFocusMatches(expectedFocus, current: Self.focusedElement(in: target), requiringRecorded: requiringRecordedFocus),
               let events = Self.keystrokeEvents(for: keystroke) else { return false }
         for event in events { event.postToPid(target.processIdentifier) }
         return true
@@ -114,8 +112,9 @@ public struct FocusedAppIntegration: TextOutputIntegration {
             press.flags = flags
             events.append(press)
         }
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(keystroke.keyCode), keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(keystroke.keyCode), keyDown: false) else { return nil }
+        guard let keyCode = CGKeyCode(exactly: keystroke.keyCode),
+              let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else { return nil }
         down.flags = flags
         up.flags = flags
         events += [down, up]
@@ -196,6 +195,11 @@ public struct FocusedAppIntegration: TextOutputIntegration {
     static func focusMatches(_ expected: AXUIElement?, current: AXUIElement?) -> Bool {
         guard let expected else { return true }
         return current.map { CFEqual(expected, $0) } ?? false
+    }
+
+    /// Whether a send may fire: Send to Claude needs a recorded field to compare, while a rule also accepts an app that exposed none.
+    static func sendFocusMatches(_ expected: AXUIElement?, current: AXUIElement?, requiringRecorded: Bool) -> Bool {
+        (expected != nil || !requiringRecorded) && focusMatches(expected, current: current)
     }
 
     static func clipboardItems(_ pasteboard: NSPasteboard, pending: (items: [NSPasteboardItem], changeCount: Int)?) -> [NSPasteboardItem] {
