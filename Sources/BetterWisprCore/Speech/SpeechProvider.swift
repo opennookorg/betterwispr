@@ -166,7 +166,7 @@ public enum SpeechError: LocalizedError, Sendable {
         case .notPrepared: "Prepare a speech model before starting dictation."
         case .busy: "A speech operation is already running."
         case .permissionDenied: "Allow Speech Recognition for BetterWispr in System Settings → Privacy & Security."
-        case .onDeviceUnavailable(let locale): "Apple on-device recognition is unavailable for \(locale). Install a Whisper model for offline dictation."
+        case .onDeviceUnavailable(let locale): "Apple on-device recognition is unavailable for \(locale). Download a model in Models for offline dictation."
         case .timedOut: "On-device speech recognition timed out. Try a shorter recording or a Whisper model."
         case .emptyAudio: "The recording contains no audio."
         case .audioUnavailable: "Select an existing local audio file."

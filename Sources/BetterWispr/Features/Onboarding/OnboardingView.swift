@@ -58,8 +58,6 @@ struct OnboardingView: View {
         (["parakeet-ultra"] + (appleSpeechAvailable ? ["apple"] : []))
             .compactMap { id in model.models.first { $0.id == id } }
     }
-    private var recommended: SpeechModel? { speechChoices.first { $0.id == "parakeet-ultra" } }
-    private var installation: ModelInstallation? { model.installation?.id == recommended?.id ? model.installation : nil }
     private var shortcut: String { model.settings.shortcut.displayName }
 
     var body: some View {
@@ -157,9 +155,7 @@ struct OnboardingView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .frame(height: 210)
-        .task(id: model.settings.language) {
-            refreshAppleSpeechAvailability()
-        }
+        .onAppear(perform: refreshAppleSpeechAvailability)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshAppleSpeechAvailability()
         }
@@ -214,7 +210,14 @@ struct OnboardingView: View {
             return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
         }
         if speechModel.id == "apple" { return "Uses macOS on-device speech recognition. No download." }
-        return speechModel.detail
+        let selected = model.selectedModel
+        return Self.selectedModelNote(selected: selected, isInstalled: model.isModelInstalled(selected), choices: speechChoices) ?? speechModel.detail
+    }
+
+    static func selectedModelNote(selected: SpeechModel, isInstalled: Bool, choices: [SpeechModel]) -> String? {
+        guard !choices.contains(where: { $0.id == selected.id }) else { return nil }
+        if selected.engine == .apple { return "Apple on-device speech isn’t available for your language on this Mac. Pick a model here, or in Models after setup." }
+        return isInstalled ? "You’re using \(selected.name). Parakeet Ultra is recommended." : nil
     }
 
     private var practice: some View {

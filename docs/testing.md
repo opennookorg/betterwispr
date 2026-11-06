@@ -380,11 +380,11 @@ been measured. Measuring either needs recorded meetings with known speakers:
 call audio, and an in-room corpus with far-field microphones would have to be
 added.
 
-- [ ] Run setup on a fresh user. Speaker detection shows below the speech model
-  and downloads nothing until Download is clicked. Clicking it during the
-  speech model download shows "Downloads when the speech model is ready" and it
-  starts after that download. Its Cancel takes it off the queue, and
-  cancelling the speech model download drops it too.
+- [ ] Run setup on a fresh user. The model step lists Parakeet Ultra, and Apple
+  on-device only when it supports the language on this Mac. Nothing downloads
+  until Download is clicked. Speaker detection is offered in Models, not in setup.
+- [ ] With Apple selected and a language it does not support, the model step says
+  so without changing `selectedModelID`. Download or Use moves to the new model.
 - [ ] With Use Calendar on, record during an event with invitees. The button
   beside a speaker's name field lists the invitees, and picking one fills the
   name and removes it from the other speakers' lists.

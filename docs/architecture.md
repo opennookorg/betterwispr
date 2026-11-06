@@ -293,10 +293,8 @@ changes `summarySourceFingerprint`, so an existing summary shows as out of date.
 When the Mac supports speaker detection but it is not installed, a meeting with
 remote lines shows a card that downloads it only when tapped. It applies from the
 next meeting, because chunk audio is already deleted. "Don’t show again" sets
-`AppSettings.dismissedSpeakerDetectionOffer`. Onboarding offers the same download
-below the speech model. Clicking it while another download runs sets
-`AppModel.speakerDetectionQueued`, and the download starts only if that one
-succeeds.
+`AppSettings.dismissedSpeakerDetectionOffer`. Onboarding does not offer it; Models
+does.
 
 With `AppSettings.rememberVoices` on, `MeetingModel` keeps each detected
 meeting's speaker embeddings in memory as a `HeardVoices`, never in the meeting
