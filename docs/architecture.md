@@ -118,7 +118,12 @@ the policy immediately and persist through the existing workspace store.
    has an available cleanup model. Only the Medium case reads the clipboard. The edit is bounded by a timeout and
    rejected when it answers the dictation, adds new words or changes length too
    much; any failure keeps the Light text, and Medium never picks a different
-   model than the one selected.
+   model than the one selected. When `TranscriptListFormatter.isLikelyList` finds
+   explicit order, a sentence with three or more parts or phrasing repeated three
+   times, one more model call identifies list items, and
+   `TranscriptListLayout.render` quotes them from the edit. Mode instructions and
+   dictated line breaks skip that call, and an edit that loses or adds a dictated
+   line keeps the Light text.
    Next apply the writing tone chosen for the destination app's style context
    (`AppCategory` maps bundle IDs; browsers count as Other). A `WritingMode`
    can override cleanup, tone, screen context and Medium instructions. A spoken
@@ -260,7 +265,9 @@ frontmost app's selection through Accessibility with
 under secure input or from a password field. Empty, short (under
 `TranscriptPolisher.minimumWords`) and non-English selections are refused. The
 trimmed text goes to `TranscriptPolisher` with `AppSettings.cleanupSettings` and
-vocabulary hints, without screen context or mode instructions. Before pasting,
+vocabulary hints, without screen context or mode instructions. It keeps the
+selection's layout: no layout call runs, and an edit that adds or removes list
+markers keeps the original. Before pasting,
 the selection is read again. Matching text in the same Accessibility element
 and selected range is replaced through `FocusedAppIntegration`, which also
 checks the original focused element and frontmost app and restores the clipboard.

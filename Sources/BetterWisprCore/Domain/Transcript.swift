@@ -26,7 +26,7 @@ public struct Transcript: Codable, Identifiable, Equatable, Sendable {
         self.vocabularyFixes = vocabularyFixes
     }
 
-    public var wordCount: Int { text.split(whereSeparator: \.isWhitespace).count }
+    public var wordCount: Int { TranscriptPolisher.withoutListMarkers(text).split(whereSeparator: \.isWhitespace).count }
 }
 
 public struct VocabularyEntry: Codable, Identifiable, Equatable, Sendable {
