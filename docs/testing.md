@@ -1090,7 +1090,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   the file in `Failed Dictations` is 0600. A successful retry removes it.
 - [ ] Quit BetterWispr from the menu bar while dictating, and again while a long
   dictation is transcribing. After relaunch, History lists each one under Not
-  transcribed, and Transcribe produces the text.
+  transcribed, and Transcribe produces the text and removes the row.
+- [ ] Turn off Save dictation history and repeat both checks. Try again still works
+  on the failure card, but nothing appears in `Failed Dictations`. Delete a kept
+  recording while its failure card is showing. Try again then starts a new
+  dictation. Quit during the cancelled card. No recording is kept, and no
+  `betterwispr-*.caf` is left in the temporary folder.
 - [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
   connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
   VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on

@@ -196,7 +196,7 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()
-                    SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it.", isOn: setting(\.saveHistory))
+                    SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it, and the audio of dictations that couldn’t be transcribed.", isOn: setting(\.saveHistory))
                 }
 
                 SettingsSection("Calendar") {

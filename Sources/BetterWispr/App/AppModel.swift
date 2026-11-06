@@ -246,6 +246,14 @@ final class AppModel {
         failedDictationStore.prune()
         failedDictations = failedDictationStore.list()
         guard startsServices else { return }
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3600))
+                guard let self else { return }
+                self.failedDictationStore.prune()
+                self.failedDictations = self.failedDictationStore.list()
+            }
+        }
         applyAppearance()
         migrateLegacyOnboarding()
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
@@ -831,16 +839,18 @@ final class AppModel {
         playFeedback(.cancelled)
     }
 
-    /// Quitting must never lose speech: a dictation still recording or transcribing is saved to
-    /// Failed Dictations, where History lists it to transcribe after the next launch.
+    /// Saves a dictation still recording or transcribing to Failed Dictations when history is on, so History lists it after the next launch.
     func keepDictationForQuit() {
-        var audio: URL?
-        if phase == .recording, let recorded = try? recorder.stop(), recorded.hasSpeech {
-            audio = recorded.url
-        } else if let recording = activeRecording ?? cancelledRecording, recording.keptURL == nil {
-            audio = recording.audio.url
+        if phase == .recording, let recorded = try? recorder.stop() {
+            defer { try? FileManager.default.removeItem(at: recorded.url) }
+            if recorded.hasSpeech { keepAtQuit(recorded.url) }
+        } else if let recording = activeRecording, recording.keptURL == nil {
+            keepAtQuit(recording.audio.url)
         }
-        guard let audio else { return }
+    }
+
+    private func keepAtQuit(_ audio: URL) {
+        guard settings.saveHistory else { return }
         do { try failedDictationStore.keep(audio) } catch {
             Logger(subsystem: "org.betterwispr.app", category: "FailedDictations").error("Couldn’t keep a dictation at quit: \(error.localizedDescription, privacy: .public)")
         }
@@ -857,10 +867,10 @@ final class AppModel {
         transcribe(recording)
     }
 
-    /// Keeps a recording that failed to transcribe, in memory for Try again and on disk for History.
+    /// Keeps a recording that failed to transcribe, in memory for Try again and, when history is on, on disk for History.
     private func keepFailedDictation(_ recording: DictationRecording) {
         failedRecording = recording
-        guard recording.keptURL == nil else { return }
+        guard recording.keptURL == nil, settings.saveHistory else { return }
         do {
             recording.keptURL = try failedDictationStore.keep(recording.audio.url)
         } catch {
@@ -876,10 +886,10 @@ final class AppModel {
         failedDictations = failedDictationStore.list()
     }
 
-    /// Opens a kept recording on the Transcribe page, which leaves the file in place.
+    /// Opens a kept recording on the Transcribe page and deletes it once its transcript is saved.
     func transcribeFailedDictation(_ item: FailedDictation) {
         selectedPage = .transcribe
-        transcribe(file: item.url)
+        transcribe(file: item.url) { [weak self] in self?.deleteFailedDictation(item) }
     }
 
     func revealFailedDictation(_ item: FailedDictation) {
@@ -887,7 +897,7 @@ final class AppModel {
     }
 
     func deleteFailedDictation(_ item: FailedDictation) {
-        if failedRecording?.keptURL == item.url { failedRecording?.keptURL = nil }
+        if failedRecording?.keptURL == item.url { failedRecording = nil }
         failedDictationStore.remove(item.url)
         failedDictations = failedDictationStore.list()
     }

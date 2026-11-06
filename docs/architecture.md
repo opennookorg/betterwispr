@@ -140,9 +140,11 @@ the policy immediately and persist through the existing workspace store.
    kept so Try again re-runs `transcribe(_:)` on the same audio with the model
    selected now. Quitting while recording or transcribing keeps the audio the
    same way before `discardRecording()` runs. The store keeps at most 20
-   recordings and none older than 7 days, deletes one once its retry succeeds,
-   and only ever deletes files inside its own folder. Cancelled and no-speech
-   dictations are not kept.
+   recordings and none older than 7 days, checked at launch, on each keep and
+   hourly. A recording is deleted once its retry succeeds or its Transcribe page
+   transcript is saved, and the store only ever deletes files inside its own
+   folder. Cancelled and no-speech dictations are not kept, and nothing is copied
+   to disk while Save dictation history is off.
 
 With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
