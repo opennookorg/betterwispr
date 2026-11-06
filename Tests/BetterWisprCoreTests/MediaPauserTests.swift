@@ -137,6 +137,36 @@ actor FakeMediaPlayers: MediaPlayers, OtherAppsAudio {
     #expect(await players.log == once + once)
 }
 
+@Test(arguments: [MeetingPhase.starting, .recording])
+@MainActor func dictatingDuringMeetingNotesPausesPlayersButLeavesOtherAppsAudible(meetingPhase: MeetingPhase) async {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let players = FakeMediaPlayers([.music: .playing])
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players, otherApps: players))
+    model.settings.pauseMediaWhileDictating = true
+    let meeting = UUID()
+    model.meetings.runs[meeting] = MeetingRun(meetingID: meeting, phase: meetingPhase)
+    model.phase = .preparing
+    await model.mediaPauser.pending?.value
+    #expect(await players.log == ["pause music"])
+    model.phase = .transcribing
+    await model.mediaPauser.pending?.value
+    #expect(await players.log == ["pause music", "play music"])
+}
+
+@Test @MainActor func turningTheSettingOffMidDictationStillUnmutesOtherApps() async {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let players = FakeMediaPlayers([:])
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: MediaPauser(players: players, otherApps: players))
+    model.settings.pauseMediaWhileDictating = true
+    model.phase = .preparing
+    model.settings.pauseMediaWhileDictating = false
+    model.phase = .transcribing
+    await model.mediaPauser.pending?.value
+    #expect(await players.log == ["mute", "unmute"])
+}
+
 @Test @MainActor func pausingWithoutMutingLeavesOtherAppsAudible() async {
     let players = FakeMediaPlayers([.music: .playing])
     let pauser = MediaPauser(players: players, otherApps: players)
