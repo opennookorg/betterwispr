@@ -1046,8 +1046,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Escape reaches TextEdit again. Escape never stops a running notetaker. With a
   ⌘ ⌥ dictation shortcut, ⌘ ⌥ Escape still opens Force Quit while dictating.
   With an Fn shortcut, pressing Esc while holding Fn cancels.
+- [ ] On macOS 26 or later with Reduce Transparency off, dictate over a plain white
+  window. The capsule stays dark and its white text and icons stay readable. Repeat
+  with Reduce Transparency on, where the capsule is an opaque dark fill.
 - [ ] Hold mode: Settings > Shortcut names it "Hold or tap" and its caption
-  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
+  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point capsule
   shows only the wider waveform, with no cancel or finish buttons. Text is
   inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
   expands to the 108 × 28 point pill with separate × and ✓ controls.

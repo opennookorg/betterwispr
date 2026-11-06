@@ -13,6 +13,9 @@ All notable changes to BetterWispr are listed here. The format follows
 - Send to Claude, in Settings > After you speak and off by default. After pasting, BetterWispr presses Return when the cursor is in Claude Desktop's message box, the Claude Code panel in VS Code, or a Terminal or iTerm2 tab where Claude Code is running, so a dictated prompt is submitted hands-free. Anywhere else, such as a shell or a file, the text is only pasted. A tab counts only while a Claude Code process is in front in it: Terminal and iTerm2 are asked which tab is focused once you allow it. VS Code terminals and Ghostty paste without sending because a stale title cannot prove which process receives Return. Return also answers a question Claude Code is asking, such as a permission prompt. The capsule shows ↵ when a dictation will be sent. Hold Shift as you finish, or start with Shift and your shortcut, to paste only. After pasting, the capsule counts down for a second: dictate again to add more, and the next dictation is pasted after the first and sends both, or press Escape or click Don't send. Wait before sending changes the countdown, from 120 ms to two seconds. Return is skipped, with "Pasted, not sent", when you switched apps or fields. In VS Code this turns on its accessibility support, which may ask once whether to optimize the editor for a screen reader; No is fine.
 - Tell me when no speech is heard, in Settings > App and on by default. Turn it off, and a dictation that ends without words closes quietly instead of showing "No speech heard." with a sound. The card still appears when an earlier dictation was waiting for this one to send it, since that dictation stays pasted but not sent.
 
+### Fixed
+- The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
+
 ## [0.1.6] - 2026-10-15
 
 ### Added
