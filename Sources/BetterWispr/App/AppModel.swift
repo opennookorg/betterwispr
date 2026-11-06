@@ -750,12 +750,7 @@ final class AppModel {
                                             appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
-                    let previous = self.history
-                    self.history = self.settings.historyRetention.kept([transcript] + self.history)
-                    do { try self.persist() } catch {
-                        self.history = previous
-                        persistenceWarning = error.localizedDescription
-                    }
+                    do { try self.addToHistory(transcript) } catch { persistenceWarning = error.localizedDescription }
                 }
                 let returnDelay = recording.settings.sendToClaude && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
                 let paste = FocusedAppIntegration(keepsCopy: writingSettings.copyToClipboard, expectedFocus: recording.targetElement)
@@ -1185,6 +1180,16 @@ final class AppModel {
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
             catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
+        }
+    }
+
+    /// Adds a dictation and deletes what retention no longer keeps; a failed save deletes nothing and keeps the dictation for the next save.
+    func addToHistory(_ transcript: Transcript) throws {
+        let previous = history
+        history = settings.historyRetention.kept([transcript] + previous)
+        do { try persist() } catch {
+            history = [transcript] + previous
+            throw error
         }
     }
 

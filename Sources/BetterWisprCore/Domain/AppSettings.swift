@@ -34,16 +34,16 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
     case forever, latest100, threeDays, twoWeeks, threeMonths
 
     /// The dictations to keep from `history`, which is ordered newest first.
-    public func kept(_ history: [Transcript], now: Date = .now) -> [Transcript] {
-        let days: Int
+    public func kept(_ history: [Transcript], now: Date = .now, calendar: Calendar = .current) -> [Transcript] {
+        let age: DateComponents
         switch self {
         case .forever: return history
         case .latest100: return Array(history.prefix(100))
-        case .threeDays: days = 3
-        case .twoWeeks: days = 14
-        case .threeMonths: days = 90
+        case .threeDays: age = DateComponents(day: -3)
+        case .twoWeeks: age = DateComponents(day: -14)
+        case .threeMonths: age = DateComponents(month: -3)
         }
-        let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
+        guard let cutoff = calendar.date(byAdding: age, to: now) else { return history }
         return history.filter { $0.createdAt >= cutoff }
     }
 }

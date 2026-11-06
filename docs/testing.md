@@ -1413,6 +1413,12 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Disable history, dictate again and relaunch. That new transcript must not
   have been persisted. Delete existing history entries explicitly and verify
   they stay deleted after relaunch.
+- [ ] Set Keep history to a limit that would delete dictations. The alert states
+  the count. Cancel changes nothing. Delete removes only those dictations, and
+  the limit survives relaunch. Meetings and file transcriptions stay.
+- [ ] With a limit set, confirm older dictations go at launch and after a dictation.
+  In a read-only temporary profile, a failed save deletes nothing and the new
+  dictation stays listed until a later save writes it.
 - [ ] Verify temporary audio removal after success, error and cancellation. Force
   termination is a separate check: record whether recovery removes orphaned files.
 - [ ] In a temporary profile, supply malformed JSON or an unsupported schema

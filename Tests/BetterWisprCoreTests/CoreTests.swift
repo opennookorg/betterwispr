@@ -478,9 +478,11 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
         Transcript(createdAt: now.addingTimeInterval(-Double(day) * 86_400), text: "\(day)", rawText: "\(day)",
                    duration: 1, modelName: "test", language: "en")
     }
-    #expect(HistoryRetention.forever.kept(history, now: now).count == 120)
-    #expect(HistoryRetention.latest100.kept(history, now: now).map(\.text) == (0..<100).map { "\($0)" })
-    #expect(HistoryRetention.threeDays.kept(history, now: now).count == 4)
-    #expect(HistoryRetention.twoWeeks.kept(history, now: now).count == 15)
-    #expect(HistoryRetention.threeMonths.kept(history, now: now).count == 91)
+    var utc = Calendar(identifier: .gregorian)
+    utc.timeZone = .gmt
+    #expect(HistoryRetention.forever.kept(history, now: now, calendar: utc).count == 120)
+    #expect(HistoryRetention.latest100.kept(history, now: now, calendar: utc).map(\.text) == (0..<100).map { "\($0)" })
+    #expect(HistoryRetention.threeDays.kept(history, now: now, calendar: utc).count == 4)
+    #expect(HistoryRetention.twoWeeks.kept(history, now: now, calendar: utc).count == 15)
+    #expect(HistoryRetention.threeMonths.kept(history, now: now, calendar: utc).count == 93)
 }
