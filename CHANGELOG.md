@@ -22,6 +22,7 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Fixed
 - The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
+- Leaving History no longer freezes BetterWispr for minutes when you have many dictations. History built every saved dictation at once, so a long history took seconds to open. Switching to another page then made macOS take thousands of views apart one at a time. History now builds only the dictations on screen.
 
 ### Changed
 - Dictation no longer stops at ten minutes. It used to finish by itself at ten minutes, after a "Stops in 0:30" countdown. Now it records until you release or press your shortcut, with a brief reminder every hour, up to a limit of 4,278,190,080 audio frames: about 24 hours 45 minutes at 48 kHz, half that at 96 kHz. At the limit it finishes by itself and transcribes what it captured. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
