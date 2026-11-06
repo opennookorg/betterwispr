@@ -132,6 +132,9 @@ struct SettingsView: View {
                 SettingsSection("After you speak") {
                     SettingToggle("Paste into the active app", caption: "Needs Accessibility. Otherwise, text is copied.", isOn: setting(\.autoPaste))
                     RowDivider()
+                    SettingToggle("Add a space after pasting", caption: "So the next dictation doesn’t run into this one. Skipped after Chinese or Japanese.", isOn: setting(\.appendTrailingSpace))
+                        .disabled(!model.settings.autoPaste)
+                    RowDivider()
                     SettingToggle("Send to Claude", caption: "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt.", isOn: sendToClaude)
                         .task(id: permissionCheck) { await loadTerminals() }
                         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in permissionCheck += 1 }

@@ -470,6 +470,27 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(rushed.observe("") == nil)
 }
 
+@Test func workspaceSavedBeforeTrailingSpacesPastesWithoutOne() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "appendTrailingSpace")
+    #expect(try !JSONDecoder().decode(AppSettings.self, from: settings).appendTrailingSpace)
+}
+
+@Test func trailingSpaceSkipsTextEndingInWhitespaceOrUnspacedScripts() {
+    #expect(TextJoin.trailing("Hello there.") == "Hello there. ")
+    #expect(TextJoin.trailing("Hello\n") == "Hello\n")
+    #expect(TextJoin.trailing("你好。") == "你好。")
+    #expect(TextJoin.trailing("") == "")
+}
+
+@Test func aDictationJoiningOneThatSkippedItsTrailingSpaceIsStillSpaced() {
+    #expect(TextJoin.trailing("你好").last?.isWhitespace == false)
+    #expect(TextJoin.pasted("Hello", joining: true, addsTrailingSpace: true) == " Hello ")
+    #expect(TextJoin.pasted("Hello", joining: false, addsTrailingSpace: true) == "Hello ")
+    #expect(TextJoin.pasted("Hello", joining: true, addsTrailingSpace: false) == " Hello")
+    #expect(TextJoin.pasted("Hello", joining: false, addsTrailingSpace: false) == "Hello")
+    #expect(TextJoin.pasted("还有", joining: true, addsTrailingSpace: true) == "还有")
+}
+
 @Test func workspaceSavedBeforeSoundVolumeKeepsTheOldLevel() throws {
     let settings = try jsonDroppingKey(AppSettings(), "soundVolume")
     #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == 0.6)

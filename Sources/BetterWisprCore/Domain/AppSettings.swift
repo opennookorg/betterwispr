@@ -49,6 +49,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var sendDelayMilliseconds: Int?
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
+    /// Adds a space after pasted text so the next dictation doesn't run into it.
+    public var appendTrailingSpace: Bool = false
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
@@ -189,6 +191,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         sendDelayMilliseconds = try container.decodeIfPresent(Int.self, forKey: .sendDelayMilliseconds)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
+        appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
