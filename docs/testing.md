@@ -1281,6 +1281,10 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Fix a word with the pencil in History. The raw transcription stays
   unchanged and the word appears in Vocabulary as Learned.
 - [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.
+- [ ] Turn off "Notify when a word is learned" and fix a word. No toast appears
+  and the word appears in Vocabulary as Learned. The switch stays off after a
+  relaunch and hides while "Learn from my corrections" is off. Other toasts, such
+  as removing a word from Vocabulary, still appear.
 - [ ] Type in a password field after dictating. Nothing is read or learned.
 
 ### Writing modes

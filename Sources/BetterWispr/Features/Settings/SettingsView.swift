@@ -162,6 +162,10 @@ struct SettingsView: View {
                     SettingToggle("Copy to clipboard", caption: "Keep each dictation ready to paste again. When off, your clipboard is left as it was.", isOn: setting(\.copyToClipboard))
                     RowDivider()
                     SettingToggle("Learn from my corrections", caption: "Words you fix in History, or in the text field within 30 seconds of a paste, are added to Vocabulary. With Medium cleanup, each English fix and a few words around it are first reviewed by the selected notes model.", isOn: setting(\.learnCorrections))
+                    if model.settings.learnCorrections {
+                        RowDivider()
+                        SettingToggle("Notify when a word is learned", caption: "Show what was added to Vocabulary, with Undo. When off, words are still learned quietly; review them in Vocabulary.", isOn: setting(\.notifyLearnedCorrections))
+                    }
                 }
 
                 SettingsSection("App") {

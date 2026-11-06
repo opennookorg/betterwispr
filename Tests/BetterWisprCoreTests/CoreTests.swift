@@ -480,3 +480,8 @@ func savedSoundVolumeDecodesInsideTheSliderRange(saved: Double, decoded: Float) 
     let settings = try JSONSerialization.data(withJSONObject: object)
     #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == decoded)
 }
+
+@Test func workspaceSavedBeforeLearnedNotificationsShowsThem() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "notifyLearnedCorrections")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).notifyLearnedCorrections)
+}
