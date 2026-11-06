@@ -80,6 +80,51 @@ other cleanup providers were not run.
 The structured layout is currently bounded to 20 items. Model output can vary; a likely list may take several seconds longer because it needs a separate layout call. A passing text trial does not establish general
 recognition accuracy or verify microphone, shortcut and paste permissions.
 
+## Microphone silence and stop stall check, 2026-10-31
+
+Diagnosis came from the installed 0.1.6 build with Codex transcription, macOS
+27.2, Mac15,6. On 2026-10-30 one AirPods dictation recorded 26 s of exact
+zeros. coreaudiod logged "HFPInputShimDevice StartIO without owning airpod" and
+took ownership about 100 ms later without restarting the input. A relaunch a
+minute later recorded normally. Fourteen healthy AirPods starts that day sent
+their first nonzero buffer between 0.66 and 1.13 s after the queue started. A
+separate 35 s dictation logged "Finished input" with no recognition, no network
+request and no transcript. The app did not log failures then, so its cause is
+unknown. Two macOS CPU reports from 2026-10-26 show 52% CPU for three minutes
+with the main thread in SwiftUI and Core Animation commits.
+
+The first commit of this change adds
+`finishingKeepsAudioThatArrivedWhileTheMainThreadWasBusy`. It blocks the main
+actor for 0.7 s while the stop buffer arrives 40 ms after Stop. On 2026-10-31 it
+failed with `inputStalled` on the previous code three times out of three, and
+passed three times out of three once the capture worker recorded progress. On
+2026-11-06, after a rebase onto the semantic list cleanup change, it failed with
+`inputStalled` again on that commit. The suite keeps
+`stopBoundaryArrivesFromTheCaptureThreadWithoutTheMainActor` instead, because
+blocking the main actor made other timing tests flaky in a parallel run.
+`swift test --no-parallel` passed 453 tests. `ShortcutTests` registers real
+system hot keys, F17 to F20 and Option-Space, so running it while you work can
+take those keys from other apps for a moment.
+
+The same changes on 0.1.6 ran in daily use from 2026-11-01 to 2026-11-06. The
+retained unified log shows 53 finished dictations, no "stopped delivering audio"
+failure and no silent-input restart.
+
+Still manual:
+
+- [ ] Play audio from an iPhone to AirPods that are also paired with the Mac,
+  then start a dictation on the Mac and keep speaking. `scripts/monitor.sh`
+  events show "Restarting input after 2… s of digital silence" once, and words
+  spoken after the first 2 s are recognized.
+- [ ] With the built-in microphone, and with AirPods already used by the Mac,
+  dictate several times. No restart is logged.
+- [ ] Choose an input that sends exact zeros, such as a virtual device with
+  nothing playing. One restart is logged, not more, and the dictation ends with
+  no speech.
+- [ ] Run `scripts/monitor.sh` for a day. `health.csv` gains a row every 30 s,
+  and each "Main thread behind capture" or "Dictation failed" line adds a
+  snapshot folder with a `sample` of the process.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,

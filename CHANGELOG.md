@@ -22,6 +22,8 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Fixed
 - The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
+- A dictation started while AirPods are playing for your iPhone or another device no longer records only silence. macOS could hand the AirPods to your Mac a moment after BetterWispr opened their microphone and then never send their sound. When a microphone sends nothing but exact silence for 2 seconds, BetterWispr restarts it once and hears what you say after that.
+- Stopping a dictation while BetterWispr is busy no longer throws the recording away with "The microphone stopped delivering audio". BetterWispr waited for the last moment of audio on the same thread that draws its windows, so a busy app could miss it even though the audio had arrived.
 
 ### Changed
 - Dictation no longer stops at ten minutes. It used to finish by itself at ten minutes, after a "Stops in 0:30" countdown. Now it records until you release or press your shortcut, with a brief reminder every hour, up to a limit of 4,278,190,080 audio frames: about 24 hours 45 minutes at 48 kHz, half that at 96 kHz. At the limit it finishes by itself and transcribes what it captured. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
