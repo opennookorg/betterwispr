@@ -48,8 +48,7 @@ public final class APISpeechProvider: SpeechProvider {
             configuration.timeoutIntervalForResource = 120
             let session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
             defer { session.invalidateAndCancel() }
-            // Pieces of a long dictation upload together, at most `concurrentChunks` at a time, so the
-            // wait after a five-minute dictation is about one piece's round trip instead of three.
+            // Pieces of a long dictation upload together, at most `concurrentChunks` at a time.
             let requests = try chunks.map { try Self.request(connection, key: apiKey, wav: $0, language: language) }
             var transcripts = [String](repeating: "", count: requests.count)
             try await withThrowingTaskGroup(of: (Int, String).self) { group in
@@ -69,6 +68,7 @@ public final class APISpeechProvider: SpeechProvider {
                     if next < requests.count { send(next); next += 1 }
                 }
             }
+            try Task.checkCancellation()
             return transcripts.filter { !$0.isEmpty }.joined(separator: " ")
         }
         transcriptionTask = task
