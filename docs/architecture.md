@@ -134,7 +134,23 @@ the policy immediately and persist through the existing workspace store.
    to paste elsewhere. With "Copy to clipboard" on, leave the transcript on the
    clipboard. With it off, restore clipboard contents without overwriting newer
    user clipboard changes. Make failed insertion recoverable through copy either way.
-7. Remove temporary audio on completion/error/cancellation and return to idle.
+7. Remove temporary audio on completion and cancellation and return to idle.
+   When transcription fails, `FailedDictationStore` copies the recording into
+   `Failed Dictations` (folder 0700, files 0600) and the `DictationRecording` is
+   kept so Try again re-runs `transcribe(_:)` on the same audio with the model
+   selected now. Quitting while recording or transcribing keeps the audio the
+   same way before `discardRecording()` runs. The store keeps at most 20
+   recordings, 1 GB in total and none older than 7 days, or the Keep history age
+   limit when that is shorter and the clock is trusted, checked at launch, on
+   each keep and hourly. The oldest go first; the recording that just failed is
+   never evicted, even when it alone is larger than the cap. The folder is
+   excluded from backups. A recording is deleted once its retry succeeds or its
+   Transcribe page transcript is saved, and the store only ever deletes files
+   inside its own folder. Cancelled and no-speech dictations are not kept. Nothing
+   is copied to disk while Save dictation history is off, and turning it off
+   deletes what is kept. Try again and the kept recording's Transcribe action use
+   the model selected at that moment and never fall back to another one; when
+   that model is off this Mac the button names where the audio goes.
 
 With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.

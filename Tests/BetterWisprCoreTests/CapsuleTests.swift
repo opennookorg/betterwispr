@@ -101,6 +101,55 @@ import Testing
     #expect(hover.isHovering && hover.target == nil) // No stale tooltip over an error.
 }
 
+@Test @MainActor func noSpeechCardCanBeTurnedOff() {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+
+    model.phase = .transcribing
+    model.noSpeechHeard()
+    #expect(model.phase == .failed(.noSpeech))
+
+    model.settings.showNoSpeechNotice = false
+    model.phase = .transcribing
+    model.noSpeechHeard()
+    #expect(model.phase == .idle && model.statusMessage.isEmpty)
+}
+
+@Test @MainActor func noSpeechCardStaysWhenAnEarlierDictationWasLeftUnsent() {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+    model.settings.showNoSpeechNotice = false
+    defer { model.discardRecording() }
+
+    model.pressReturn(in: .current, after: .seconds(1), using: FocusedAppIntegration(keepsCopy: false),
+                      otherwise: {}, acceptsPrompt: { _ in false })
+    model.toggleRecording()
+    #expect(model.phase == .preparing)
+
+    model.noSpeechHeard()
+    #expect(model.failure?.title == DictationFailure.noSpeech.title)
+    #expect(model.failure?.message.hasSuffix("Your earlier dictation was pasted but not sent.") == true)
+}
+
+@Test @MainActor func recordingFailureStillShowsWithTheNoSpeechCardOff() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+    model.settings.showNoSpeechNotice = false
+
+    model.phase = .recording
+    model.toggleRecording()
+    let deadline = ContinuousClock.now + .seconds(2)
+    while model.phase == .transcribing, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(model.failure?.title == "Couldn’t finish recording.")
+    #expect(model.statusMessage == AudioRecordingError.notRecording.localizedDescription)
+}
+
 @Test @MainActor func quickTapBecomesHandsFreeAndCancelledReleaseCannotFinishANewSession() {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)

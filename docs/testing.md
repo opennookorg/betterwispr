@@ -380,11 +380,17 @@ been measured. Measuring either needs recorded meetings with known speakers:
 call audio, and an in-room corpus with far-field microphones would have to be
 added.
 
-- [ ] Run setup on a fresh user. Speaker detection shows below the speech model
-  and downloads nothing until Download is clicked. Clicking it during the
-  speech model download shows "Downloads when the speech model is ready" and it
-  starts after that download. Its Cancel takes it off the queue, and
-  cancelling the speech model download drops it too.
+- [ ] Run setup on a fresh user. The model step lists Parakeet Ultra, and Apple
+  on-device only when it supports the language on this Mac. Speaker detection
+  shows below the speech models and nothing downloads until Download is clicked.
+  Clicking it during the speech model download shows "Downloads when the speech
+  model is ready" and it starts after that download. Its Cancel takes it off the
+  queue, and cancelling the speech model download drops it too.
+- [ ] With Apple selected and a language it does not support, the model step says
+  so without changing `selectedModelID`, and Continue stays off. Back then Skip
+  still leaves setup. Download or Use moves to the new model and turns Continue on.
+- [ ] With the same setup, Models shows Apple as "Selected · Unavailable" with no
+  active checkmark and its Use button off, and picking another model works.
 - [ ] With Use Calendar on, record during an event with invitees. The button
   beside a speaker's name field lists the invitees, and picking one fills the
   name and removes it from the other speakers' lists.
@@ -1046,8 +1052,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Escape reaches TextEdit again. Escape never stops a running notetaker. With a
   ⌘ ⌥ dictation shortcut, ⌘ ⌥ Escape still opens Force Quit while dictating.
   With an Fn shortcut, pressing Esc while holding Fn cancels.
+- [ ] On macOS 26 or later with Reduce Transparency off, dictate over a plain white
+  window. The capsule stays dark and its white text and icons stay readable. Repeat
+  with Reduce Transparency on, where the capsule is an opaque dark fill.
 - [ ] Hold mode: Settings > Shortcut names it "Hold or tap" and its caption
-  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
+  explains both. Hold ⌥ Space, speak, release. The 96 × 28 point capsule
   shows only the wider waveform, with no cancel or finish buttons. Text is
   inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
   expands to the 108 × 28 point pill with separate × and ✓ controls.
@@ -1083,6 +1092,34 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
+- [ ] In Settings > App, Sound volume starts at the old fixed level on a workspace
+  saved before the setting existed. Letting go of the slider plays the start
+  sound once at the new level, and start, finish, cancel, needs-attention and
+  `SoundOverrides` cues all follow it, also after relaunch. With a meeting
+  recording, letting go stays quiet. VoiceOver reads the slider as Sound volume.
+  Turning Dictation sounds off hides the slider and keeps its value.
+- [ ] Select an API connection to an endpoint that is down and dictate. The
+  failure card's Try again transcribes the same recording once the endpoint is
+  back, without starting a new dictation. Before retrying, History lists the
+  recording under Not transcribed with Transcribe, Show in Finder and Delete, and
+  the file in `Failed Dictations` is 0600. A successful retry removes it.
+- [ ] Quit BetterWispr from the menu bar while dictating, and again while a long
+  dictation is transcribing. After relaunch, History lists each one under Not
+  transcribed, and Transcribe produces the text and removes the row.
+- [ ] Turn off Save dictation history and repeat both checks. Try again still works
+  on the failure card, but nothing appears in `Failed Dictations`. Delete a kept
+  recording while its failure card is showing. Try again then starts a new
+  dictation. Quit during the cancelled card. No recording is kept, and no
+  `betterwispr-*.caf` is left in the temporary folder.
+- [ ] Keep recordings in `Failed Dictations`, then turn off Save dictation history.
+  The folder empties, Not transcribed disappears, and the caption says no audio
+  is kept. A failure card that was showing still offers Try again from memory.
+- [ ] With an API connection selected, the button on a kept recording and on the
+  failure card reads Send to and the connection's name, and its help names the
+  endpoint. With a local model they read Transcribe and Try again. A failing local
+  model never sends audio to a connection.
+- [ ] `tmutil isexcluded` on `Failed Dictations` reports it as excluded. With Keep
+  history at 3 days, a kept recording older than 3 days is gone at the next launch.
 - [ ] Dictate for 12 minutes in toggle mode with Parakeet, Whisper, Apple and an
   API connection. No countdown appears and recording continues past 10:00 until
   you stop it, then the whole transcript pastes. With Show words as you speak on,
@@ -1099,6 +1136,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.
+- [ ] Turn off Tell me when no speech is heard and stay silent through a dictation.
+  The capsule closes with no card and no sound. Start a dictation with the
+  microphone disconnected or denied: the error card and its sound still appear.
+  With Send to Claude on, dictate again during the countdown and stay silent: the
+  card still appears and says the earlier dictation was pasted but not sent.
 - [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
   bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
@@ -1276,6 +1318,10 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Fix a word with the pencil in History. The raw transcription stays
   unchanged and the word appears in Vocabulary as Learned.
 - [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.
+- [ ] Turn off "Notify when a word is learned" and fix a word. No toast appears
+  and the word appears in Vocabulary as Learned. The switch stays off after a
+  relaunch and hides while "Learn from my corrections" is off. Other toasts, such
+  as removing a word from Vocabulary, still appear.
 - [ ] Type in a password field after dictating. Nothing is read or learned.
 
 ### Writing modes
@@ -1414,6 +1460,19 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Disable history, dictate again and relaunch. That new transcript must not
   have been persisted. Delete existing history entries explicitly and verify
   they stay deleted after relaunch.
+- [ ] Set Keep history to a limit that would delete dictations. The alert states
+  the count. Cancel changes nothing. Delete removes only those dictations, and
+  the limit survives relaunch. Meetings and file transcriptions stay.
+- [ ] The alert says usage totals and Insights will shrink. With a limit set,
+  relaunching with an expired dictation shows a toast naming how many went and the
+  limit. With Save history off, the picker hides and a saved limit deletes nothing
+  on relaunch.
+- [ ] With an age limit set, move the Mac's date ahead by more than a day and
+  relaunch. Nothing is deleted. Set the date back: the dictations made meanwhile
+  stay. A date left ahead for a day counts as correct and age limits apply.
+- [ ] With a limit set, confirm older dictations go at launch and after a dictation.
+  In a read-only temporary profile, a failed save deletes nothing and the new
+  dictation stays listed until a later save writes it.
 - [ ] Verify temporary audio removal after success, error and cancellation. Force
   termination is a separate check: record whether recovery removes orphaned files.
 - [ ] In a temporary profile, supply malformed JSON or an unsupported schema
