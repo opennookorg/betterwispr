@@ -37,7 +37,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var notesCLI: NotesCLI?
     public var claudeNotesModel: String = ""
     public var codexNotesModel: String = ""
-    /// Lets Claude Code notes use any sign-in it reports, such as an API key or a gateway set in its settings; off means a Claude subscription only.
+    /// Lets Claude Code use any sign-in it reports for notes, Ask and cleanup, such as an API key or a gateway set in its settings; off means a Claude subscription only.
     public var claudeCodeAnySignIn: Bool = false
     public var language: String = "auto"
     /// Nil keeps Chinese in the script the speech model wrote.
@@ -156,6 +156,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public mutating func setCLIModel(_ model: String, for cli: NotesCLI) {
         if cli == .claudeCode { claudeNotesModel = model } else { codexNotesModel = model }
+    }
+
+    public func allowsAnySignIn(_ cli: NotesCLI) -> Bool { cli == .claudeCode && claudeCodeAnySignIn }
+
+    /// Whether notes, Ask or cleanup would run through Claude Code, so its sign-in choice applies.
+    public var selectsClaudeCode: Bool {
+        [notesSelection, askSelection, cleanupSelection].contains(.cli(.claudeCode))
     }
 
     public var notesModelName: String {

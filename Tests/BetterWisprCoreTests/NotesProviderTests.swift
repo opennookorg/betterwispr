@@ -251,6 +251,12 @@ func notesAPIFailuresNeverProduceASummary(path: String) async throws {
     #expect(CLINotesModel.claudeSignInProblem(gateway, anySignIn: true) == nil)
     #expect(CLINotesModel.claudeSignInProblem(signedOut, anySignIn: true) != nil)
     #expect(CLINotesModel.claudeSignInProblem("not json", anySignIn: true) != nil)
+    for method in ["oauth_token", "api_key", "api_key_helper", "third_party"] {
+        let status = #"{"loggedIn":true,"authMethod":"\#(method)"}"#
+        #expect(CLINotesModel.claudeSignInProblem(status, anySignIn: false) != nil)
+        #expect(CLINotesModel.claudeSignInProblem(status, anySignIn: true) == nil)
+    }
+    #expect(CLINotesModel(cli: .claudeCode, model: "", anySignIn: true).arguments == CLINotesModel(cli: .claudeCode, model: "").arguments)
 
     let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002,"notesCLI":"claudeCode","claudeNotesModel":"claude-haiku-example"}"#
     var settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
@@ -258,6 +264,23 @@ func notesAPIFailuresNeverProduceASummary(path: String) async throws {
     settings.claudeCodeAnySignIn = true
     let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
     #expect((try MeetingNotesGenerator.languageModel(loaded) as? CLINotesModel)?.anySignIn == true)
+    #expect(loaded.allowsAnySignIn(.claudeCode))
+    #expect(!loaded.allowsAnySignIn(.codex))
+}
+
+@Test func claudeSignInChoiceAppliesWhereverClaudeCodeIsSelected() {
+    var settings = AppSettings()
+    #expect(!settings.selectsClaudeCode)
+    settings.askSelection = .cli(.claudeCode)
+    #expect(settings.selectsClaudeCode)
+    settings.askSelection = .cli(.codex)
+    settings.cleanupSelection = .cli(.claudeCode)
+    #expect(settings.selectsClaudeCode)
+    settings.claudeCodeAnySignIn = true
+    #expect((try? MeetingNotesGenerator.languageModel(settings.cleanupSettings) as? CLINotesModel)?.anySignIn == true)
+    settings.cleanupSelection = nil
+    settings.notesSelection = .cli(.claudeCode)
+    #expect(settings.selectsClaudeCode)
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["BETTERWISPR_LIVE_NOTES"] == "1"),

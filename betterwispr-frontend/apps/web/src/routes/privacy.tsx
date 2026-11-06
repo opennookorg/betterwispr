@@ -29,7 +29,11 @@ export const Route = createFileRoute("/privacy")({
         or an OpenAI compatible endpoint, or a notes model from Claude Code,
         Codex or an API connection. That provider then receives your recordings
         or text for transcription, meeting notes or Medium cleanup, under its
-        own privacy practices. API keys are stored in your login Keychain.
+        own privacy practices. If you turn on Allow any Claude Code sign-in, off
+        by default, that text goes wherever Claude Code is set up to send it,
+        such as an API account, a company cloud account or a gateway, and
+        BetterWispr can’t see that destination. API keys are stored in your
+        login Keychain.
         Apple Intelligence and Ollama notes models run on your Mac.
       </p>
       <h2>History and recordings</h2>

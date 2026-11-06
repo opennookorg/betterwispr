@@ -214,7 +214,7 @@ struct StyleView: View {
         case .apple: "Medium edits with Apple Intelligence on this Mac."
         case .builtIn: "Medium edits with the built-in model on this Mac."
         case .ollama: "Medium edits with Ollama on this Mac."
-        case .cli(let cli): "Medium sends English dictation to \(cli.name) through your subscription, which adds a few seconds."
+        case .cli(let cli): "Medium sends English dictation to \(cli.name) through \(provider.allowsAnySignIn(cli) ? "whatever sign-in it is set up with" : "your subscription"), which adds a few seconds."
         case .connection: "Medium sends English dictation to \(provider.notesModelName) with your API key."
         }
         let results = model.settings.cleanupSelection == nil ? "It uses the same model as meeting notes, and results vary by model." : "Results vary by model."

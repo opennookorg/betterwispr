@@ -553,12 +553,16 @@ Claude Code uses `claude --print` and its existing Claude subscription sign-in;
 Codex uses `codex exec` with ChatGPT authentication required. Claude Code must
 report a `claude.ai` sign-in from `claude auth status` unless Models' "Allow any
 Claude Code sign-in" (`AppSettings.claudeCodeAnySignIn`, off by default) is on.
-That opt-in accepts whatever sign-in Claude Code is configured with, such as an
-API key or an `ANTHROPIC_BASE_URL` gateway like CLIProxyAPI in its settings, and
-billing follows that configuration. BetterWispr does not
-extract OAuth tokens. These CLI routes strip inherited provider/key environment
-variables, run in a private temporary directory, disable tools/customizations as
-supported by each CLI, and disable session persistence. Codex also uses read-only
+That opt-in accepts whatever sign-in Claude Code reports, including `oauth_token`,
+`api_key`, `api_key_helper` and `third_party`, and applies wherever Claude Code is
+selected: notes, Ask, cleanup and correction review. The text then goes to, and is
+billed by, whatever Claude Code is set up with, such as an `ANTHROPIC_BASE_URL`
+gateway in its settings. BetterWispr can't see that destination, and the HTTPS and
+loopback rule of `SpeechConnection.validatedURL` doesn't apply to it. BetterWispr
+does not extract OAuth tokens. These CLI routes strip inherited provider/key
+environment variables, though not Claude Code's own settings files, run in a private
+temporary directory, disable tools/customizations as supported by each CLI, and
+disable session persistence. Codex also uses read-only
 sandboxing. A timeout or cancellation terminates the child and removes temporary
 input/output files. Install/update and sign in to the CLIs separately. Subscription
 limits and model access remain the provider's responsibility. Models discovers

@@ -15,7 +15,7 @@ struct NotesModelPicker: View {
                     .tag(NotesModelSelection?.some(.builtIn))
             }
             ForEach(NotesCLI.allCases, id: \.self) { cli in
-                Text("\(cli.name) · Subscription").tag(NotesModelSelection?.some(.cli(cli)))
+                Text("\(cli.name) · \(model.settings.allowsAnySignIn(cli) ? "Any sign-in" : "Subscription")").tag(NotesModelSelection?.some(.cli(cli)))
             }
             ForEach(ollamaModels, id: \.self) { name in
                 Text("Ollama · \(name)").tag(NotesModelSelection?.some(.ollama(name)))
@@ -93,20 +93,8 @@ struct NotesModelSettings: View {
             } else if let item = model.notesCLICatalogs[cli]?.models.first(where: { $0.id == model.settings.cliModel(cli) }) {
                 Text(item.detail).font(.caption).foregroundStyle(.secondary)
             }
-            Text("Install the latest \(cli.name) CLI and run \(cli.loginCommand) in Terminal. BetterWispr uses that sign-in; subscription limits apply.")
+            Text("Install the latest \(cli.name) CLI and run \(cli.loginCommand) in Terminal. BetterWispr uses that sign-in\(model.settings.allowsAnySignIn(cli) ? "" : "; subscription limits apply").")
                 .font(.caption).foregroundStyle(.secondary)
-            if cli == .claudeCode {
-                Toggle("Allow any Claude Code sign-in", isOn: Binding(
-                    get: { model.settings.claudeCodeAnySignIn },
-                    set: {
-                        model.settings.claudeCodeAnySignIn = $0
-                        model.saveNotesSettings()
-                    }
-                ))
-                .disabled(!model.canEditConnections || testing)
-                Text("Also use an API key, gateway or proxy such as CLIProxyAPI that Claude Code is set up with. Its usage is billed however Claude Code is configured.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         }
         HStack {
             Button(testing ? "Testing…" : "Test notes model") { result = nil; testing = true }
@@ -127,6 +115,18 @@ struct NotesModelSettings: View {
             .disabled(testing)
         Text("Ask sends the most relevant transcript lines and thoughts from the meetings you ask about to this model.")
             .font(.caption).foregroundStyle(.secondary)
+        if model.settings.selectsClaudeCode {
+            Toggle("Allow any Claude Code sign-in", isOn: Binding(
+                get: { model.settings.claudeCodeAnySignIn },
+                set: {
+                    model.settings.claudeCodeAnySignIn = $0
+                    model.saveNotesSettings()
+                }
+            ))
+            .disabled(!model.canEditConnections || testing)
+            Text("Meeting text, Ask questions and text sent for cleanup, including any screen or clipboard context, go wherever Claude Code is set up to send them, now or after its setup changes: an API account, a company cloud account or a gateway. That operator receives the text and its charges apply. BetterWispr can’t see the destination or limit the cost.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
         // A view task cancels the request or CLI when this page is closed or Cancel is clicked.
         Color.clear.frame(height: 0)
             .task { await model.meetings.refreshOllamaModels() }

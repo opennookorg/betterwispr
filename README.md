@@ -70,6 +70,7 @@ For optional subscription transcription, see [Codex subscription setup](docs/cod
 - With Remember named voices on, voice profiles of the speakers you name live in `Voices.json` next to it (not encrypted). Forget Voices in Models deletes them, and deleting a meeting deletes the profiles named in it.
 - Audio is written to temporary files and deleted after each recording.
 - Built-in models only touch the network when you explicitly download one.
+- Claude Code as a notes, Ask or cleanup provider needs a Claude subscription sign-in unless you turn on Allow any Claude Code sign-in in Models, off by default. With it on, that text goes wherever Claude Code is set up to send it, such as an API account, a company cloud account or a gateway, and is billed there. BetterWispr can't see that destination.
 - Send to Claude is off by default. When it is on, BetterWispr reads the list of running processes on this Mac to find Claude Code, and asks Terminal and iTerm2 which tab is in front once you allow it. Nothing is stored or sent.
 - Connected apps is off by default. When you turn it on, apps you connect read your meetings through `BetterWispr --mcp` on this Mac and send what they read to their own AI provider.
 
