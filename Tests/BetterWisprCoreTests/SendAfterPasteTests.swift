@@ -72,15 +72,81 @@ import Testing
     #expect(settings.sendsAfterPaste)
 }
 
-@Test func onlyAnEnabledRuleForTheFrontmostAppMatches() {
-    let rules = [
+@Test @MainActor func onlyAnEnabledRuleForTheFrontmostAppMatches() {
+    var settings = AppSettings()
+    settings.sendRules = [
         AppSendRule(bundleID: "org.mikelyons.harness", keystroke: .return),
         AppSendRule(bundleID: "com.tinyspeck.slackmacgap", keystroke: .return, isEnabled: false),
     ]
-    #expect(SendAfterPaste.rule(for: "org.mikelyons.harness", in: rules)?.keystroke == .return)
-    #expect(SendAfterPaste.rule(for: "com.tinyspeck.slackmacgap", in: rules) == nil)
-    #expect(SendAfterPaste.rule(for: "com.apple.Terminal", in: rules) == nil)
-    #expect(SendAfterPaste.rule(for: nil, in: rules) == nil)
+    #expect(SendAfterPaste.rule(for: "org.mikelyons.harness", settings: settings)?.keystroke == .return)
+    #expect(SendAfterPaste.rule(for: "com.tinyspeck.slackmacgap", settings: settings) == nil)
+    #expect(SendAfterPaste.rule(for: "com.apple.Terminal", settings: settings) == nil)
+    #expect(SendAfterPaste.rule(for: nil, settings: settings) == nil)
+}
+
+@Test @MainActor func aScriptableTerminalNeverGetsARuleEvenIfOneWasSaved() {
+    #expect(ClaudePrompt.scriptableTerminals == ["com.apple.Terminal", "com.googlecode.iterm2"])
+    var settings = AppSettings()
+    for terminal in ClaudePrompt.scriptableTerminals {
+        #expect(!SendAfterPaste.allowsRule(for: terminal))
+        settings.sendRules = [AppSendRule(bundleID: terminal, keystroke: .return)]
+        #expect(SendAfterPaste.rule(for: terminal, settings: settings) == nil)
+    }
+    #expect(SendAfterPaste.allowsRule(for: "org.mikelyons.harness"))
+}
+
+@Test @MainActor func keysThatQuitCloseOrEraseAreRefused() throws {
+    func refusal(_ keyCode: Int, _ modifiers: ShortcutModifiers, _ key: String) throws -> String? {
+        SendAfterPaste.refusal(of: try #require(SendKeystroke(keyCode: UInt32(keyCode), modifiers: modifiers, key: key)), shortcut: .optionSpace)
+    }
+    #expect(try refusal(kVK_ANSI_Q, [.command], "Q") == "⌘ Q could quit the app or close its window.")
+    #expect(try refusal(kVK_ANSI_W, [.command], "W") == "⌘ W could quit the app or close its window.")
+    #expect(try refusal(kVK_ANSI_Q, [.command, .shift], "Q") != nil)
+    #expect(try refusal(kVK_ANSI_W, [.command, .option], "W") != nil)
+    let azertyQ = try refusal(kVK_ANSI_A, [.command], "Q")
+    #expect(azertyQ != nil)
+    #expect(try refusal(kVK_Delete, [], "Delete") == "Delete would erase what you dictated.")
+    #expect(try refusal(kVK_ForwardDelete, [], "Forward Delete") == "Forward Delete would erase what you dictated.")
+    #expect(try refusal(kVK_Delete, [.command], "Delete") != nil)
+
+    #expect(try refusal(kVK_ANSI_Q, [], "Q") == nil)
+    #expect(try refusal(kVK_ANSI_W, [.control], "W") == nil)
+    #expect(try refusal(kVK_Return, [.command], "Return") == nil)
+    #expect(try refusal(kVK_Tab, [], "Tab") == nil)
+}
+
+@Test @MainActor func aKeyThatWouldHitTheDictationShortcutIsRefused() throws {
+    let optionSpace = try #require(SendKeystroke(keyCode: UInt32(kVK_Space), modifiers: [.option], key: "Space"))
+    #expect(SendAfterPaste.refusal(of: optionSpace, shortcut: .optionSpace) == "⌥ Space clashes with your dictation shortcut, ⌥ Space.")
+    let shiftOptionSpace = try #require(SendKeystroke(keyCode: UInt32(kVK_Space), modifiers: [.option, .shift], key: "Space"))
+    #expect(SendAfterPaste.refusal(of: shiftOptionSpace, shortcut: .optionSpace) != nil)
+    let controlSpace = try #require(SendKeystroke(keyCode: UInt32(kVK_Space), modifiers: [.control], key: "Space"))
+    #expect(SendAfterPaste.refusal(of: controlSpace, shortcut: .optionSpace) == nil)
+    let bareSpace = try #require(SendKeystroke(keyCode: UInt32(kVK_Space), modifiers: [], key: "Space"))
+    #expect(SendAfterPaste.refusal(of: bareSpace, shortcut: .optionSpace) == nil)
+
+    let leftCommand = try #require(DictationShortcut(keyCode: UInt32(kVK_Command), modifiers: [], key: "Left Command"))
+    let rightCommand = try #require(DictationShortcut(keyCode: UInt32(kVK_RightCommand), modifiers: [], key: "Right Command"))
+    let commandReturn = try #require(SendKeystroke(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))
+    #expect(SendAfterPaste.refusal(of: commandReturn, shortcut: leftCommand) != nil)
+    #expect(SendAfterPaste.refusal(of: commandReturn, shortcut: rightCommand) == nil)
+    #expect(SendAfterPaste.refusal(of: .return, shortcut: leftCommand) == nil)
+}
+
+@Test @MainActor func aSavedRuleThatIsNowRefusedKeepsItsKeyButDoesNotFire() throws {
+    let harness = "org.mikelyons.harness"
+    let commandQ = try #require(SendKeystroke(keyCode: UInt32(kVK_ANSI_Q), modifiers: [.command], key: "Q"))
+    var settings = AppSettings()
+    settings.sendRules = [AppSendRule(bundleID: harness, keystroke: commandQ)]
+    #expect(SendAfterPaste.rule(for: harness, settings: settings) == nil)
+    let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(loaded.sendRules.first?.keystroke == commandQ)
+
+    let commandReturn = try #require(SendKeystroke(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))
+    settings.sendRules = [AppSendRule(bundleID: harness, keystroke: commandReturn)]
+    #expect(SendAfterPaste.rule(for: harness, settings: settings)?.keystroke == commandReturn)
+    settings.shortcut = try #require(DictationShortcut(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))
+    #expect(SendAfterPaste.rule(for: harness, settings: settings) == nil)
 }
 
 @Test @MainActor func aBareKeystrokeIsPostedWithNoModifiersHeld() throws {

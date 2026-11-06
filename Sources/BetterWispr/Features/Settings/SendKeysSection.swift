@@ -8,12 +8,13 @@ import SwiftUI
 struct SendKeysSection: View {
     let model: AppModel
     @State private var choices: [AppChoice] = []
+    @State private var refusal: String?
 
     var body: some View {
         SettingsSection("Send keys") {
             ForEach(model.settings.sendRules) { rule in
                 SettingRow(AppChoice(rule.bundleID)?.name ?? rule.bundleID, caption: caption(rule)) {
-                    SendKeystrokeRecorder(model: model, rule: rule)
+                    SendKeystrokeRecorder(model: model, rule: rule, refusal: $refusal)
                     Toggle("Send in \(AppChoice(rule.bundleID)?.name ?? rule.bundleID)", isOn: enabled(rule))
                         .labelsHidden()
                         .controlSize(.small)
@@ -38,12 +39,22 @@ struct SendKeysSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
         } footer: {
-            Text("BetterWispr presses the key you record after pasting into these apps, so a dictation submits instead of sitting in the field. Lists apps that are open or that you dictated into recently. Unlike Send to Claude, a send key fires wherever you are in the app, so pick one that can’t do damage in the app’s other fields, and hold Shift while dictating to paste only. Needs Accessibility.")
+            Text("BetterWispr presses the key you record after pasting into these apps, so a dictation submits instead of sitting in the field. Lists apps that are open or that you dictated into recently. Unlike Send to Claude, a send key fires wherever you are in the app, so pick one that can’t do damage in the app’s other fields, and hold Shift while dictating to paste only. Terminal and iTerm2 aren’t listed, because a key there could run a shell command; Send to Claude covers Claude Code in them. Needs Accessibility.")
         }
-        .onAppear { choices = AppChoice.offered(recent: model.history.compactMap(\.appBundleID)) }
+        .onAppear { choices = AppChoice.offered(recent: model.history.compactMap(\.appBundleID)).filter { SendAfterPaste.allowsRule(for: $0.id) } }
+        .onChange(of: refusal) { _, text in
+            if let text { AccessibilityNotification.Announcement(text).post() }
+        }
     }
 
     private func caption(_ rule: AppSendRule) -> String {
+        if model.capturingRecorder == rule.id, let refusal { return "\(refusal) Press another key, or Esc to cancel." }
+        guard SendAfterPaste.allowsRule(for: rule.bundleID) else {
+            return "Nothing is pressed here, because a key could run a shell command. Send to Claude covers Claude Code here."
+        }
+        if let refused = SendAfterPaste.refusal(of: rule.keystroke, shortcut: model.settings.shortcut) {
+            return "\(refused) Nothing is pressed until you record another key."
+        }
         let key = "Presses \(rule.keystroke.displayName) after pasting."
         guard AppChoice(rule.bundleID) != nil else { return "\(key) This app isn’t installed on this Mac." }
         return rule.isEnabled ? key : "\(key) Turned off."
@@ -72,11 +83,11 @@ struct SendKeysSection: View {
     }
 }
 
-/// Records the keystroke one app's rule sends. Any key is allowed, including a bare Return or Tab, since this is never
-/// registered as a hot key — only a modifier on its own is rejected, because it would submit nothing.
+/// Records the keystroke one app's rule sends, refusing a modifier alone and anything `SendAfterPaste.refusal` names.
 private struct SendKeystrokeRecorder: View {
     let model: AppModel
     let rule: AppSendRule
+    @Binding var refusal: String?
     @State private var monitor: Any?
     @State private var held: ShortcutModifiers = []
 
@@ -96,13 +107,17 @@ private struct SendKeystrokeRecorder: View {
         .help(isCapturing ? "Press the key that submits in this app. Esc cancels." : "Record the key to press after pasting")
         .onDisappear(perform: stop)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
+        .onChange(of: model.capturingRecorder) { _, recorder in
+            if recorder != rule.id { stop() }
+        }
 
         if isCapturing { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
     }
 
     private func start() {
         held = []
-        model.suspendShortcut()
+        refusal = nil
+        model.beginKeyCapture(rule.id)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             MainActor.assumeIsolated { capture(event) }
             return nil
@@ -113,7 +128,7 @@ private struct SendKeystrokeRecorder: View {
         guard let monitor else { return }
         NSEvent.removeMonitor(monitor)
         self.monitor = nil
-        model.registerShortcut()
+        model.endKeyCapture(rule.id)
     }
 
     private func capture(_ event: NSEvent) {
@@ -127,6 +142,10 @@ private struct SendKeystrokeRecorder: View {
         if Int(event.keyCode) == kVK_Escape, modifiers.isEmpty { return stop() }
         let key = Self.keyNames[Int(event.keyCode)] ?? event.characters(byApplyingModifiers: [])?.uppercased() ?? ""
         guard let keystroke = SendKeystroke(keyCode: UInt32(event.keyCode), modifiers: modifiers, key: key) else {
+            return NSSound.beep()
+        }
+        if let reason = SendAfterPaste.refusal(of: keystroke, shortcut: model.settings.shortcut) {
+            refusal = reason
             return NSSound.beep()
         }
         if let index = model.settings.sendRules.firstIndex(where: { $0.id == rule.id }) {

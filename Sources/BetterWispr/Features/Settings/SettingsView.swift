@@ -444,6 +444,7 @@ private struct ShortcutRecorder: View {
     @State private var held: ShortcutModifiers = []
     @State private var modifierCandidate: DictationShortcut?
     @State private var feedback: String?
+    @State private var recorderID = UUID()
 
     private var isCapturing: Bool { monitor != nil }
     private var shortcut: DictationShortcut? {
@@ -492,6 +493,9 @@ private struct ShortcutRecorder: View {
         }
         .animation(.ui, value: isCapturing)
         .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
+        .onChange(of: model.capturingRecorder) { _, recorder in
+            if recorder != recorderID { stop() }
+        }
         .onDisappear(perform: stop)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
     }
@@ -525,7 +529,7 @@ private struct ShortcutRecorder: View {
         held = []
         modifierCandidate = nil
         feedback = nil
-        model.suspendShortcut()
+        model.beginKeyCapture(recorderID)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             MainActor.assumeIsolated { capture(event) }
             return nil
@@ -537,7 +541,7 @@ private struct ShortcutRecorder: View {
         NSEvent.removeMonitor(monitor)
         self.monitor = nil
         modifierCandidate = nil
-        model.registerShortcut()
+        model.endKeyCapture(recorderID)
     }
 
     private func change(_ shortcut: DictationShortcut?) {

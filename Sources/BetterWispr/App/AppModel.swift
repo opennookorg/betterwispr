@@ -249,6 +249,7 @@ final class AppModel {
 
     var selectedModel: SpeechModel { models.first { $0.id == settings.selectedModelID } ?? models[0] }
     var isBusy: Bool { phase.isBusy }
+    private(set) var capturingRecorder: UUID?
     var isInstalling: Bool { installation != nil && installation?.failure == nil }
     var needsOnboarding: Bool { storageIsReadable && settings.completedOnboardingVersion < Self.onboardingVersion }
     var failure: DictationFailure? { if case .failed(let failure) = phase { failure } else { nil } }
@@ -368,6 +369,19 @@ final class AppModel {
         selectedTextShortcut.unregister()
     }
 
+    /// Makes one recorder the only one capturing; any other recorder stops when it sees this change.
+    func beginKeyCapture(_ recorder: UUID) {
+        capturingRecorder = recorder
+        suspendShortcut()
+    }
+
+    /// Restores the shortcuts, unless another recorder has taken over and still needs them suspended.
+    func endKeyCapture(_ recorder: UUID) {
+        guard capturingRecorder == recorder else { return }
+        capturingRecorder = nil
+        registerShortcut()
+    }
+
     private func armCancelShortcut(_ busy: Bool) {
         if busy {
             cancelShortcut.register(keyCode: UInt32(kVK_Escape), modifiers: settings.shortcut.cancelModifiers)
@@ -443,8 +457,7 @@ final class AppModel {
     /// Shift held while starting or finishing a dictation pastes it without sending.
     private var shiftHeld: Bool { !settings.shortcut.usesShift && NSEvent.modifierFlags.contains(.shift) }
 
-    /// Waits while the app takes the paste, and while a new dictation may still take over the send, then posts the
-    /// keystroke the target asks for now — removing its rule, or moving to a shell or a file, during the wait sends nothing.
+    /// Waits for the paste and any takeover by a new dictation, then posts the key the target still asks for, if any.
     func pressSendKey(in app: NSRunningApplication, after delay: Duration, using paste: FocusedAppIntegration,
                       otherwise notSent: @escaping () -> Void,
                       resolving resolve: @escaping @MainActor (NSRunningApplication, AppSettings) async -> SendKeystroke? = SendAfterPaste.keystroke) {
@@ -462,7 +475,7 @@ final class AppModel {
             self.pendingReturn = nil
             self.pendingNotSent = nil
             let isCurrent = self.settings.sendToClaude == settings.sendToClaude && self.settings.sendRules == settings.sendRules
-            let viaRule = SendAfterPaste.rule(for: app.bundleIdentifier, in: settings.sendRules) != nil
+            let viaRule = SendAfterPaste.rule(for: app.bundleIdentifier, settings: settings) != nil
             let sent = isCurrent && keystroke.map { paste.press($0, in: app, requiringRecordedFocus: !viaRule) } ?? false
             if self.phase == .sending { self.phase = .idle }
             // A sent prompt leaves the field, so there is no correction to learn.

@@ -132,8 +132,17 @@ the event sequence but not real delivery, so these need a live run.
   a bare Return (↵), ⌘Return, Tab and an F-key (keyboard glyph, with the tooltip
   naming the key). Press a modifier on its own: it beeps and nothing is recorded.
   Press Esc: recording stops with the previous key kept.
+- [ ] With only a throwaway app focused, press ⌘Q, ⌘W, Delete, Forward Delete and
+  the dictation shortcut while recording. Each beeps, leaves recording on, keeps the
+  previous key and says why in the row, and nothing quits or closes.
+- [ ] Start recording in one row, then click another row's key or a shortcut under
+  Settings > Shortcut: the first stops and only the second captures.
+- [ ] Settings > Send keys > Add App… doesn't list Terminal or iTerm2 while they are
+  open. Send to Claude still sends to Claude Code in them.
+- [ ] Change the dictation shortcut to a rule's key: the row says it clashes, and a
+  dictation into that app is pasted, not sent.
 - [ ] Dictate into that app. The text is pasted and the recorded key arrives, with
-  no stray modifier — a bare Return must not land as ⇧Return or ⌥Return, including
+  no stray modifier: a bare Return must not land as ⇧Return or ⌥Return, including
   when the shortcut's Option is still held after the paste.
 - [ ] Turn the rule's switch off and dictate again: pasted, not sent. Turn it back
   on without re-recording: the key is still there.

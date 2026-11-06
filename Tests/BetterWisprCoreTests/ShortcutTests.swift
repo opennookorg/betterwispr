@@ -233,3 +233,28 @@ import Testing
     try cancel.register(shiftF18)
     #expect(throws: ShortcutError.self) { try cancel.register(f18) }
 }
+
+@Test @MainActor func aRecorderThatLostTheCaptureLeavesTheShortcutSuspended() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    let f16 = try #require(DictationShortcut(keyCode: UInt32(kVK_F16), modifiers: [], key: "F16"))
+    let other = GlobalShortcut(id: 11)
+    defer { other.unregister(); model.suspendShortcut() }
+    model.changeShortcut(f16)
+    #expect(throws: ShortcutError.self) { try other.register(f16) }
+
+    let first = UUID()
+    let second = UUID()
+    model.beginKeyCapture(first)
+    #expect(model.capturingRecorder == first)
+    model.beginKeyCapture(second)
+    model.endKeyCapture(first)
+    #expect(model.capturingRecorder == second)
+    try other.register(f16)
+    other.unregister()
+
+    model.endKeyCapture(second)
+    #expect(model.capturingRecorder == nil)
+    #expect(throws: ShortcutError.self) { try other.register(f16) }
+}

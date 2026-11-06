@@ -195,15 +195,27 @@ Send keys (`AppSettings.sendRules`, empty by default) cover the apps
 `SendAfterPaste.keystroke(for:settings:)` resolves what a pasted dictation gets:
 an enabled rule for the frontmost app, else Return when `ClaudePrompt` recognizes
 the field, else nothing. A rule wins over the built-in detection because it names
-its app, and unlike that detection it fires wherever the cursor is in the app —
+its app, and unlike that detection it fires wherever the cursor is in the app:
 the setting's footer says so, since the user is trading the shell safeguard for
 reach. Rules also get the `AXManualAccessibility` nudge, without which an
 Electron target exposes no focused field to record. A rule still sends when no
 field was recorded, so only the frontmost-app check protects it then; Send to
 Claude sends only when the recorded field is still focused.
 
-A `SendKeystroke` takes any key, including a bare Return or Tab, because it is
-never registered as a hot key — only a modifier on its own and Fn are rejected.
+A `SendKeystroke` takes a bare Return or Tab, because it is never registered as a
+hot key: only a modifier on its own and Fn fail to decode. `SendAfterPaste.refusal`
+names the keys a rule may not use: ⌘Q and ⌘W with any other modifiers, since they
+could quit the app or close its window, Delete and Forward Delete with any
+modifiers, since they would erase the dictation, and the dictation shortcut,
+including its Shift variant. For a modifier-only shortcut only the left-hand key
+clashes, because a posted modifier always comes from that key. Rules also never
+apply to `ClaudePrompt.scriptableTerminals`, where a key could run a shell
+command. The recorder and the picker enforce these, and
+`SendAfterPaste.rule(for:settings:)` enforces them again before sending, because a
+saved rule can be edited by hand or clash with a shortcut changed later. Such a
+rule stays saved, its row says why it does nothing, and the app falls through to
+Send to Claude. `AppModel.beginKeyCapture` lets one recorder capture at a time, and
+a recorder that lost the capture leaves the shortcuts suspended for its successor.
 `FocusedAppIntegration.keystrokeEvents(for:)` posts it the way a keyboard does:
 one `.flagsChanged` event per modifier with the left-hand key's device-dependent
 bit, the key down and up, then the modifiers released, every event carrying

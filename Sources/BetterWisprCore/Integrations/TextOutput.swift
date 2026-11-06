@@ -90,7 +90,7 @@ public struct FocusedAppIntegration: TextOutputIntegration {
     static let leftCommandDeviceFlag = CGEventFlags(rawValue: 0x8)
 
     /// The device-dependent bits a real keyboard sets alongside each modifier mask, for the left-hand key.
-    private static let modifierKeys: [(modifier: ShortcutModifiers, virtualKey: CGKeyCode, flags: CGEventFlags)] = [
+    static let modifierKeys: [(modifier: ShortcutModifiers, virtualKey: CGKeyCode, flags: CGEventFlags)] = [
         (.control, CGKeyCode(kVK_Control), [.maskControl, CGEventFlags(rawValue: 0x1)]),
         (.option, CGKeyCode(kVK_Option), [.maskAlternate, CGEventFlags(rawValue: 0x20)]),
         (.shift, CGKeyCode(kVK_Shift), [.maskShift, CGEventFlags(rawValue: 0x2)]),

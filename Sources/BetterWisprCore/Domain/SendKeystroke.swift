@@ -1,8 +1,7 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// A keystroke BetterWispr posts after pasting, so a chat or agent prompt submits. Unlike `DictationShortcut` this is
-/// never registered as a hot key, so it takes a bare Return, Tab or Escape and only rejects what can't submit anything.
+/// A keystroke posted after pasting to submit a prompt; never a hot key, so a bare Return or Tab is allowed.
 public struct SendKeystroke: Codable, Equatable, Hashable, Sendable {
     public let keyCode: UInt32
     public let modifiers: ShortcutModifiers
