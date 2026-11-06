@@ -1083,6 +1083,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   picking a sound stays quiet. Put `finished.wav` in `SoundOverrides` and reopen
   Settings: the Finish picker is greyed out, says the file plays instead, and
   dictation plays the file. Turning Dictation sounds off hides the pickers.
+- [ ] In Settings > App, Sound volume starts at the old fixed level on a workspace
+  saved before the setting existed. Letting go of the slider plays the start
+  sound once at the new level, and start, finish, cancel, needs-attention and
+  `SoundOverrides` cues all follow it, also after relaunch. With a meeting
+  recording, letting go stays quiet. VoiceOver reads the slider as Sound volume.
+  Turning Dictation sounds off hides the slider and keeps its value.
 - [ ] Dictate past 9:30 in toggle mode with Parakeet, Whisper, Apple and an API
   connection. At 9:30 the capsule shows "Stops in 0:30" and counts down, and
   VoiceOver says "Dictation stops in 30 seconds." At 10:00 dictation finishes on
@@ -1098,6 +1104,11 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Meeting recording still shows its pill. Dictating during a meeting hides the
   pill and a meeting prompt until the dictation ends, then both return. Turning
   the setting off restores the capsule during dictation.
+- [ ] Turn off Tell me when no speech is heard and stay silent through a dictation.
+  The capsule closes with no card and no sound. Start a dictation with the
+  microphone disconnected or denied: the error card and its sound still appear.
+  With Send to Claude on, dictate again during the countdown and stay silent: the
+  card still appears and says the earlier dictation was pasted but not sent.
 - [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
   bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
@@ -1275,6 +1286,10 @@ player; real playback and the Automation prompt need these steps.
 - [ ] Fix a word with the pencil in History. The raw transcription stays
   unchanged and the word appears in Vocabulary as Learned.
 - [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.
+- [ ] Turn off "Notify when a word is learned" and fix a word. No toast appears
+  and the word appears in Vocabulary as Learned. The switch stays off after a
+  relaunch and hides while "Learn from my corrections" is off. Other toasts, such
+  as removing a word from Vocabulary, still appear.
 - [ ] Type in a password field after dictating. Nothing is read or learned.
 
 ### Writing modes

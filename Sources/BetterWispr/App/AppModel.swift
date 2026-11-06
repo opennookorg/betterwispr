@@ -662,7 +662,7 @@ final class AppModel {
                 self.recordingDuration = audio.duration
                 guard audio.hasSpeech else {
                     try? FileManager.default.removeItem(at: audio.url)
-                    self.fail(.noSpeech)
+                    self.noSpeechHeard()
                     return
                 }
                 self.playFeedback(.finished)
@@ -743,7 +743,7 @@ final class AppModel {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
-                guard !text.isEmpty else { self.fail(.noSpeech); return }
+                guard !text.isEmpty else { self.noSpeechHeard(); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
@@ -1241,6 +1241,7 @@ final class AppModel {
         vocabulary += added
         do {
             try persist()
+            guard settings.notifyLearnedCorrections else { return }
             let ids = Set(added.map(\.id))
             ToastWindow.shared.show(Toast(title: "Learned \(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))",
                                           message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
@@ -1487,6 +1488,13 @@ final class AppModel {
         phase = .idle
     }
 
+    func noSpeechHeard() {
+        // An earlier dictation waiting for this one to send it must still report that it wasn't sent.
+        guard !settings.showNoSpeechNotice, continuesIn == nil else { fail(.noSpeech); return }
+        statusMessage = ""
+        phase = .idle
+    }
+
     private func abandon(_ failure: DictationFailure) {
         discardRecording()
         fail(failure)
@@ -1507,7 +1515,7 @@ final class AppModel {
     func playFeedback(_ cue: DictationSound) {
         feedbackSound?.stop()
         guard settings.soundEffects, meetings.capturingID == nil, let sound = cue.sound(named: settings.soundName(for: cue)) else { return }
-        sound.volume = 0.6
+        sound.volume = settings.soundVolume
         sound.play()
         feedbackSound = sound
     }

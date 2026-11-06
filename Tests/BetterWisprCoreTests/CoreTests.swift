@@ -36,6 +36,7 @@ import Testing
     #expect(!settings.copyToClipboard)
     #expect(settings.soundEffects)
     #expect(!settings.hideCapsuleWhileDictating)
+    #expect(settings.showNoSpeechNotice)
     #expect(DictationSound.allCases.map(settings.soundName) == ["Tink", "Purr", "Bottle", "Basso"])
     #expect(!settings.pauseMediaWhileDictating)
     #expect(!settings.showInDock)
@@ -53,7 +54,9 @@ import Testing
     toggled.onboardingStep = 2
     toggled.copyToClipboard = true
     toggled.soundEffects = false
+    toggled.soundVolume = 0.3
     toggled.hideCapsuleWhileDictating = true
+    toggled.showNoSpeechNotice = false
     toggled.sounds = [.started: "Pop", .attention: "Funk"]
     toggled.pauseMediaWhileDictating = true
     toggled.showInDock = true
@@ -486,4 +489,22 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(TextJoin.pasted("Hello", joining: true, addsTrailingSpace: false) == " Hello")
     #expect(TextJoin.pasted("Hello", joining: false, addsTrailingSpace: false) == "Hello")
     #expect(TextJoin.pasted("还有", joining: true, addsTrailingSpace: true) == "还有")
+}
+
+@Test func workspaceSavedBeforeSoundVolumeKeepsTheOldLevel() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "soundVolume")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == 0.6)
+}
+
+@Test(arguments: [(-1, 0.05), (0, 0.05), (0.01, 0.05), (0.4, 0.4), (2, 1)] as [(Double, Float)])
+func savedSoundVolumeDecodesInsideTheSliderRange(saved: Double, decoded: Float) throws {
+    var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettings())) as! [String: Any]
+    object["soundVolume"] = saved
+    let settings = try JSONSerialization.data(withJSONObject: object)
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).soundVolume == decoded)
+}
+
+@Test func workspaceSavedBeforeLearnedNotificationsShowsThem() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "notifyLearnedCorrections")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).notifyLearnedCorrections)
 }
