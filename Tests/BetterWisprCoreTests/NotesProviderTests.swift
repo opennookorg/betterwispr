@@ -242,45 +242,192 @@ func notesAPIFailuresNeverProduceASummary(path: String) async throws {
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings)).claudeNotesModel == "claude-haiku-example")
 }
 
-@Test func claudeSignInNeedsASubscriptionUnlessAnySignInIsAllowed() throws {
-    let subscription = #"{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}"#
-    let gateway = #"{"loggedIn":true,"authMethod":"oauth_token","apiProvider":"firstParty"}"#
-    let signedOut = #"{"loggedIn":false,"authMethod":"none"}"#
-    #expect(CLINotesModel.claudeSignInProblem(subscription, anySignIn: false) == nil)
-    #expect(CLINotesModel.claudeSignInProblem(gateway, anySignIn: false)?.contains("Allow any Claude Code sign-in") == true)
-    #expect(CLINotesModel.claudeSignInProblem(gateway, anySignIn: true) == nil)
-    #expect(CLINotesModel.claudeSignInProblem(signedOut, anySignIn: true) != nil)
-    #expect(CLINotesModel.claudeSignInProblem("not json", anySignIn: true) != nil)
-    for method in ["oauth_token", "api_key", "api_key_helper", "third_party"] {
-        let status = #"{"loggedIn":true,"authMethod":"\#(method)"}"#
-        #expect(CLINotesModel.claudeSignInProblem(status, anySignIn: false) != nil)
-        #expect(CLINotesModel.claudeSignInProblem(status, anySignIn: true) == nil)
-    }
-    #expect(CLINotesModel(cli: .claudeCode, model: "", anySignIn: true).arguments == CLINotesModel(cli: .claudeCode, model: "").arguments)
-
-    let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002,"notesCLI":"claudeCode","claudeNotesModel":"claude-haiku-example"}"#
-    var settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
-    #expect((try MeetingNotesGenerator.languageModel(settings) as? CLINotesModel)?.anySignIn == false)
-    settings.claudeCodeAnySignIn = true
-    let loaded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
-    #expect((try MeetingNotesGenerator.languageModel(loaded) as? CLINotesModel)?.anySignIn == true)
-    #expect(loaded.allowsAnySignIn(.claudeCode))
-    #expect(!loaded.allowsAnySignIn(.codex))
+private func claudeStatus(_ method: String, provider: String = "firstParty") -> String {
+    #"{"loggedIn":true,"authMethod":"\#(method)","apiProvider":"\#(provider)"}"#
 }
 
-@Test func claudeSignInChoiceAppliesWhereverClaudeCodeIsSelected() {
+private func claudeDestination(_ method: String, provider: String = "firstParty", settings: [String] = []) throws -> ClaudeCodeDestination {
+    try ClaudeCodeDestination(status: claudeStatus(method, provider: provider), settingsFiles: settings.map { Data($0.utf8) })
+}
+
+@Test func claudeDestinationNamesTheRouteAndNeverASecret() throws {
+    #expect(try claudeDestination("claude.ai").label == "Anthropic · Claude subscription")
+    #expect(try claudeDestination("claude.ai").isSubscription)
+    #expect(try claudeDestination("api_key").label == "Anthropic · API key")
+    #expect(try claudeDestination("api_key").isSubscription == false)
+    #expect(try claudeDestination("third_party", provider: "bedrock").label == "Amazon Bedrock · cloud provider sign-in")
+    #expect(try claudeDestination("claude.ai", provider: "bedrock").isSubscription == false)
+    #expect(try claudeDestination("something_new", provider: "elsewhere").label == "elsewhere · something_new")
+
+    let gateway = #"{"env":{"ANTHROPIC_BASE_URL":"https://me:hunter2@gateway.example.com:8443/v1?token=hunter2","ANTHROPIC_API_KEY":"hunter2","OTHER":"x"}}"#
+    let routed = try claudeDestination("oauth_token", settings: [#"{"model":"x"}"#, gateway])
+    #expect(routed.label == "https://gateway.example.com:8443/v1 · OAuth token")
+    #expect(!routed.label.contains("hunter2"))
+    #expect(try claudeDestination("claude.ai", settings: [gateway]).isSubscription == false)
+    let managed = #"{"env":{"ANTHROPIC_BEDROCK_BASE_URL":"https://bedrock.example.com/"}}"#
+    #expect(try claudeDestination("api_key", settings: [gateway, managed]).label
+        == "https://bedrock.example.com · https://gateway.example.com:8443/v1 · API key")
+}
+
+@Test func claudeDestinationFailsClosedWhenItCannotTell() {
+    for status in ["not json", #"{"loggedIn":false,"authMethod":"none"}"#, #"{"loggedIn":true}"#, #"{"loggedIn":true,"authMethod":""}"#] {
+        #expect(throws: MeetingNotesError.self) { try ClaudeCodeDestination(status: status, settingsFiles: []) }
+    }
+    #expect(throws: MeetingNotesError.self) { try ClaudeCodeDestination(status: claudeStatus("api_key"), settingsFiles: [nil]) }
+    for settings in ["", "not json", "[]", #"{"env":"x"}"#, #"{"env":{"ANTHROPIC_BASE_URL":42}}"#, #"{"env":{"ANTHROPIC_BASE_URL":"gateway:8443"}}"#, #"{"env":{"ANTHROPIC_FOUNDRY_BASE_URL":""}}"#] {
+        #expect(throws: MeetingNotesError.self) { try claudeDestination("claude.ai", settings: [settings]) }
+    }
+}
+
+@Test func claudeSignInNeedsASubscriptionOrAConfirmedDestination() throws {
+    let subscription = try claudeDestination("claude.ai")
+    #expect(CLINotesModel.claudeSignInProblem(subscription, anySignIn: false, confirmed: nil) == nil)
+    for method in ["oauth_token", "api_key", "api_key_helper", "third_party"] {
+        let destination = try claudeDestination(method)
+        #expect(CLINotesModel.claudeSignInProblem(destination, anySignIn: false, confirmed: destination.label)?.contains("Allow any Claude Code sign-in") == true)
+        #expect(CLINotesModel.claudeSignInProblem(destination, anySignIn: true, confirmed: nil)?.contains("Confirm") == true)
+        #expect(CLINotesModel.claudeSignInProblem(destination, anySignIn: true, confirmed: subscription.label)?.contains(destination.label) == true)
+        #expect(CLINotesModel.claudeSignInProblem(destination, anySignIn: true, confirmed: destination.label) == nil)
+    }
+    let custom = try claudeDestination("claude.ai", settings: [#"{"env":{"ANTHROPIC_BASE_URL":"https://gateway.example.com"}}"#])
+    #expect(CLINotesModel.claudeSignInProblem(custom, anySignIn: false, confirmed: nil)?.contains("https://gateway.example.com") == true)
+}
+
+@Test func anyClaudeSignInAppliesOnlyToMeetingNotes() throws {
     var settings = AppSettings()
-    #expect(!settings.selectsClaudeCode)
-    settings.askSelection = .cli(.claudeCode)
-    #expect(settings.selectsClaudeCode)
-    settings.askSelection = .cli(.codex)
-    settings.cleanupSelection = .cli(.claudeCode)
-    #expect(settings.selectsClaudeCode)
-    settings.claudeCodeAnySignIn = true
-    #expect((try? MeetingNotesGenerator.languageModel(settings.cleanupSettings) as? CLINotesModel)?.anySignIn == true)
-    settings.cleanupSelection = nil
     settings.notesSelection = .cli(.claudeCode)
-    #expect(settings.selectsClaudeCode)
+    settings.claudeCodeAnySignIn = true
+    settings.claudeCodeConfirmedDestination = "Anthropic · API key"
+    let notes = try #require(try MeetingNotesGenerator.meetingNotesModel(settings) as? CLINotesModel)
+    #expect(notes.anySignIn)
+    #expect(notes.confirmedDestination == "Anthropic · API key")
+    #expect(notes.arguments.suffix(2) == ["--max-budget-usd", "1.00"])
+
+    settings.cleanupSelection = .cli(.claudeCode)
+    settings.askSelection = .cli(.claudeCode)
+    for other in [settings, settings.cleanupSettings, settings.askSettings] {
+        let model = try #require(try MeetingNotesGenerator.languageModel(other, lowLatency: true) as? CLINotesModel)
+        #expect(!model.anySignIn)
+        #expect(model.confirmedDestination == nil)
+        #expect(!model.arguments.contains("--max-budget-usd"))
+    }
+
+    settings.notesSelection = .cli(.codex)
+    #expect((try MeetingNotesGenerator.meetingNotesModel(settings) as? CLINotesModel)?.anySignIn == false)
+    settings.notesSelection = .apple
+    #expect(!(try MeetingNotesGenerator.meetingNotesModel(settings) is CLINotesModel))
+    settings.notesSelection = .cli(.claudeCode)
+    settings.claudeCodeAnySignIn = false
+    #expect((try MeetingNotesGenerator.meetingNotesModel(settings) as? CLINotesModel)?.anySignIn == false)
+}
+
+@Test func claudeConfirmedDestinationDecodesOldAndCorruptFiles() throws {
+    let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002,"notesCLI":"claudeCode","claudeNotesModel":"claude-haiku-example"%@}"#
+    let old = try JSONDecoder().decode(AppSettings.self, from: Data(String(format: saved, "").utf8))
+    #expect(old.claudeCodeConfirmedDestination == nil)
+    #expect(!old.claudeCodeAnySignIn)
+    #expect(!(try #require(try MeetingNotesGenerator.meetingNotesModel(old) as? CLINotesModel)).anySignIn)
+
+    let corrupt = try JSONDecoder().decode(AppSettings.self, from: Data(String(format: saved, #","claudeCodeAnySignIn":true,"claudeCodeConfirmedDestination":42"#).utf8))
+    #expect(corrupt.claudeCodeConfirmedDestination == nil)
+    #expect(corrupt.claudeCodeAnySignIn)
+    #expect(corrupt.claudeNotesModel == "claude-haiku-example")
+
+    var settings = old
+    settings.claudeCodeConfirmedDestination = "Anthropic · API key"
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings)).claudeCodeConfirmedDestination == "Anthropic · API key")
+}
+
+private struct FakeClaude {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("fake-claude-\(UUID())")
+    var log: URL { directory.appendingPathComponent("log") }
+    var input: URL { directory.appendingPathComponent("input") }
+
+    init(status: String, reply: String, exit: Int = 0) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(reply.utf8).write(to: directory.appendingPathComponent("reply"))
+        try setStatus(status)
+        let script = """
+        #!/bin/sh
+        echo "$*" >> '\(log.path)'
+        if [ "$1" = auth ]; then /bin/cat '\(directory.path)/status'; exit 0; fi
+        /bin/cat > '\(input.path)'
+        /bin/cat '\(directory.path)/reply'
+        exit \(exit)
+        """
+        #expect(FileManager.default.createFile(atPath: directory.appendingPathComponent("claude").path, contents: Data(script.utf8), attributes: [.posixPermissions: 0o755]))
+    }
+
+    func setStatus(_ status: String) throws { try Data(status.utf8).write(to: directory.appendingPathComponent("status")) }
+
+    func route(_ settings: AppSettings, notes: Bool = true) throws -> CLINotesModel {
+        var model = try #require(try (notes ? MeetingNotesGenerator.meetingNotesModel(settings) : MeetingNotesGenerator.languageModel(settings, lowLatency: true)) as? CLINotesModel)
+        model.locatedExecutable = directory.appendingPathComponent("claude")
+        model.settingsFiles = { [] }
+        return model
+    }
+
+    var sentPrompt: Bool { ((try? String(contentsOf: log, encoding: .utf8)) ?? "").contains("--print") || FileManager.default.fileExists(atPath: input.path) }
+    func remove() { try? FileManager.default.removeItem(at: directory) }
+}
+
+private let claudeNotesReply = #"{"is_error":false,"result":"{\"title\":\"T\",\"overview\":\"O\",\"keyPoints\":[],\"decisions\":[],\"actionItems\":[]}","modelUsage":{"claude-x":{}}}"#
+
+@Test func meetingNotesSendNothingUntilTheCurrentDestinationIsConfirmed() async throws {
+    let fake = try FakeClaude(status: claudeStatus("api_key"), reply: claudeNotesReply)
+    defer { fake.remove() }
+    var settings = AppSettings()
+    settings.notesSelection = .cli(.claudeCode)
+    settings.claudeCodeAnySignIn = true
+    for confirmed in [nil, "Anthropic · Claude subscription"] as [String?] {
+        settings.claudeCodeConfirmedDestination = confirmed
+        await #expect(throws: MeetingNotesError.self) { try await fake.route(settings).draft("Secret meeting text") }
+        #expect(!fake.sentPrompt)
+    }
+
+    settings.claudeCodeConfirmedDestination = "Anthropic · API key"
+    let draft = try await fake.route(settings).draft("Secret meeting text")
+    #expect(draft.generatedWith == "Claude Code · claude-x · Anthropic · API key")
+    #expect(try String(contentsOf: fake.input, encoding: .utf8).contains("Secret meeting text"))
+    #expect(try String(contentsOf: fake.log, encoding: .utf8).contains("--max-budget-usd 1.00"))
+
+    try FileManager.default.removeItem(at: fake.input)
+    try FileManager.default.removeItem(at: fake.log)
+    try fake.setStatus(claudeStatus("oauth_token"))
+    await #expect(throws: MeetingNotesError.self) { try await fake.route(settings).draft("Secret meeting text") }
+    #expect(!fake.sentPrompt)
+}
+
+@Test func dictationNeverReachesANonSubscriptionClaudeSignIn() async throws {
+    let fake = try FakeClaude(status: claudeStatus("api_key"), reply: claudeNotesReply)
+    defer { fake.remove() }
+    var settings = AppSettings()
+    settings.notesSelection = .cli(.claudeCode)
+    settings.claudeCodeAnySignIn = true
+    settings.claudeCodeConfirmedDestination = "Anthropic · API key"
+    await #expect(throws: MeetingNotesError.self) { try await fake.route(settings.cleanupSettings, notes: false).respond(to: "Spoken words") }
+    #expect(!fake.sentPrompt)
+
+    try fake.setStatus(claudeStatus("claude.ai"))
+    #expect(try await fake.route(settings.cleanupSettings, notes: false).respond(to: "Spoken words").contains("title"))
+    #expect(fake.sentPrompt)
+}
+
+@Test(arguments: [0, 1])
+func claudeSpendingLimitSaysSoAndKeepsTheMeeting(exit: Int) async throws {
+    let reply = #"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"total_cost_usd":1.01}"#
+    let fake = try FakeClaude(status: claudeStatus("api_key"), reply: reply, exit: exit)
+    defer { fake.remove() }
+    var settings = AppSettings()
+    settings.notesSelection = .cli(.claudeCode)
+    settings.claudeCodeAnySignIn = true
+    settings.claudeCodeConfirmedDestination = "Anthropic · API key"
+    await #expect {
+        try await fake.route(settings).draft("Secret meeting text")
+    } throws: { error in
+        let message = error.localizedDescription
+        return message.contains("spending limit") && message.contains("Your meeting is still saved")
+    }
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["BETTERWISPR_LIVE_NOTES"] == "1"),

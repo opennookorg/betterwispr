@@ -83,21 +83,28 @@ struct CLINotesModel: NotesLanguageModel {
     let model: String
     var instructions = NotesWriter.instructions
     var lowLatency = false
-    /// Accepts any Claude Code sign-in, not only a Claude subscription; see `AppSettings.claudeCodeAnySignIn`.
+    /// Accepts any Claude Code sign-in once its destination is confirmed; only `MeetingNotesGenerator.meetingNotesModel` sets it.
     var anySignIn = false
+    var confirmedDestination: String?
+    var locatedExecutable: URL?
+    var settingsFiles: @Sendable () -> [Data?] = ClaudeCodeDestination.installedSettingsFiles
 
     func respond(to prompt: String) async throws -> String {
         try await response(to: prompt).text
     }
 
     private func response(to prompt: String) async throws -> (text: String, modelName: String) {
-        guard let executable = await cli.locateExecutable() else {
+        let located: URL? = if let locatedExecutable { locatedExecutable } else { await cli.locateExecutable() }
+        guard let executable = located else {
             throw MeetingNotesError.unavailable("Install \(cli.name), then sign in with \(cli.loginCommand) in Terminal.")
         }
+        var destination: ClaudeCodeDestination?
         // Use the CLI's login, never extract or store its OAuth credentials in BetterWispr.
         if cli == .claudeCode {
             let status = try await Self.run(executable, arguments: ["auth", "status"], input: "", cli: cli)
-            if let problem = Self.claudeSignInProblem(status, anySignIn: anySignIn) { throw MeetingNotesError.unavailable(problem) }
+            let current = try ClaudeCodeDestination(status: status, settingsFiles: settingsFiles())
+            if let problem = Self.claudeSignInProblem(current, anySignIn: anySignIn, confirmed: confirmedDestination) { throw MeetingNotesError.unavailable(problem) }
+            destination = current
         }
         let chosen = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard chosen.count <= 200, !chosen.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
@@ -108,10 +115,11 @@ struct CLINotesModel: NotesLanguageModel {
         if cli == .claudeCode {
             guard let result = try? JSONDecoder().decode(ClaudeResult.self, from: Data(output.utf8)),
                   !result.is_error, let text = result.result, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw Self.failure(cli)
+                throw Self.failure(cli, output: output)
             }
             let actual = result.modelUsage?.keys.sorted().joined(separator: ", ") ?? ""
-            return (text, "\(cli.name) · \(actual.isEmpty ? chosen : actual)")
+            let route = anySignIn ? (destination.map { " · \($0.label)" } ?? "") : ""
+            return (text, "\(cli.name) · \(actual.isEmpty ? chosen : actual)\(route)")
         }
         return (output, "\(cli.name) · \(chosen)")
     }
@@ -122,6 +130,7 @@ struct CLINotesModel: NotesLanguageModel {
             ["--print", "--output-format", "json", "--no-session-persistence", "--safe-mode",
              "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
              "--system-prompt", instructions] + (lowLatency ? ["--effort", "low"] : [])
+                + (anySignIn ? ["--max-budget-usd", Self.spendingLimitPerRequest] : [])
         case .codex:
             ["--no-daemon", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
              "--sandbox", "read-only", "--color", "never", "-c", "approval_policy=\"never\"",
@@ -140,19 +149,18 @@ struct CLINotesModel: NotesLanguageModel {
         return draft
     }
 
-    /// Why `claude auth status` output can't be used for notes, or nil when it can.
-    /// Without `anySignIn` only a Claude subscription ("claude.ai") passes, so API keys and gateways are never used by surprise.
-    static func claudeSignInProblem(_ status: String, anySignIn: Bool) -> String? {
-        guard let auth = try? JSONDecoder().decode(ClaudeAuth.self, from: Data(status.utf8)), auth.loggedIn else {
-            return "Sign in to your Claude subscription with claude auth login in Terminal."
+    /// Why Claude Code may not send this request to `destination`, or nil when it may.
+    static func claudeSignInProblem(_ destination: ClaudeCodeDestination, anySignIn: Bool, confirmed: String?) -> String? {
+        if anySignIn {
+            guard destination.label != confirmed else { return nil }
+            return "Confirm that Claude Code may send meeting text to \(destination.label) in Models > Meeting notes, then try again. Nothing was sent."
         }
-        guard anySignIn || auth.authMethod == "claude.ai" else {
-            return "Claude Code isn’t signed in to a Claude subscription. Run claude auth login in Terminal, or turn on Allow any Claude Code sign-in in Models to use its current sign-in."
-        }
-        return nil
+        guard !destination.isSubscription else { return nil }
+        return "Claude Code sends to \(destination.label), not only your Claude subscription, so nothing was sent. Run claude auth login in Terminal and remove any custom base URL. For meeting notes only, you can instead turn on Allow any Claude Code sign-in in Models."
     }
 
-    private struct ClaudeAuth: Decodable { var loggedIn: Bool; var authMethod: String? }
+    private static let spendingLimitPerRequest = "1.00"
+
     private struct ClaudeResult: Decodable {
         struct Usage: Decodable {}
         var is_error: Bool
@@ -160,8 +168,13 @@ struct CLINotesModel: NotesLanguageModel {
         var modelUsage: [String: Usage]?
     }
 
-    private static func failure(_ cli: NotesCLI) -> MeetingNotesError {
-        .unavailable("\(cli.name) couldn’t write notes. Update the CLI, check your subscription limits and model, and sign in with \(cli.loginCommand) in Terminal. Your meeting is still saved.")
+    private struct ClaudeStop: Decodable { var subtype: String? }
+
+    private static func failure(_ cli: NotesCLI, output: String? = nil) -> MeetingNotesError {
+        if let output, (try? JSONDecoder().decode(ClaudeStop.self, from: Data(output.utf8)))?.subtype == "error_max_budget_usd" {
+            return .unavailable("\(cli.name) stopped at BetterWispr’s spending limit of about $\(spendingLimitPerRequest) per request. Your meeting is still saved.")
+        }
+        return .unavailable("\(cli.name) couldn’t write notes. Update the CLI, check your usage limits or spending cap and model, and sign in with \(cli.loginCommand) in Terminal. Your meeting is still saved.")
     }
 
     /// File-backed stdio avoids pipe deadlocks. All Process access stays on the main actor;
@@ -188,7 +201,7 @@ struct CLINotesModel: NotesLanguageModel {
         process.executableURL = executable
         process.arguments = arguments + (finalMessage ? ["--output-last-message", finalURL.path, "-"] : [])
         process.currentDirectoryURL = directory
-        // Prevent inherited API keys or provider URLs from changing the selected subscription route.
+        // Prevent inherited API keys or provider URLs from changing the route; Claude Code's settings files still apply, so ClaudeCodeDestination reads them.
         let allowed = ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME", "CLAUDE_CONFIG_DIR"]
         var environment = ProcessInfo.processInfo.environment.filter { allowed.contains($0.key) }
         environment["PATH"] = ([executable.deletingLastPathComponent().path] + NotesCLI.searchDirectories + ["/usr/bin", "/bin"]).joined(separator: ":")
@@ -226,7 +239,7 @@ struct CLINotesModel: NotesLanguageModel {
             try Task.checkCancellation()
             return completed
         }
-        guard process.terminationStatus == 0 else { throw Self.failure(cli) }
+        guard process.terminationStatus == 0 else { throw Self.failure(cli, output: try? String(contentsOf: outputURL, encoding: .utf8)) }
         let text = try String(contentsOf: finalMessage ? finalURL : outputURL, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw Self.failure(cli) }

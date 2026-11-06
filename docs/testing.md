@@ -1671,8 +1671,13 @@ Additional regression checks:
   be actionable without exposing provider output or starting another provider.
 - [ ] With Claude Code signed in with an API key or gateway, leave Allow any Claude
   Code sign-in off: notes and Ask report the switch and send nothing. Turn it on and
-  the picker says Any sign-in. Move notes to another provider while Ask or Cleanup
-  stays on Claude Code: the switch stays visible in Models and can be turned off.
+  the notes picker says Any sign-in while Ask and Cleanup say Subscription. Sends to
+  shows the destination, and notes send nothing until you confirm it. Change the
+  sign-in or add `ANTHROPIC_BASE_URL` to Claude Code's settings: Check again and the
+  next notes run ask you to confirm again. Corrupt that settings file: notes and
+  Medium cleanup send nothing. Medium dictation with this sign-in sends nothing and
+  gets Light cleanup, and generated summaries name the destination. A request that
+  reaches the spending limit reports it and keeps the meeting.
 - [ ] Edit thoughts during summary generation. The completed summary should be
   marked for update until regenerated with the new text. Cancel generation and
   verify the previous summary remains intact with no late replacement.

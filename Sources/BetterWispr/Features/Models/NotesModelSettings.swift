@@ -15,7 +15,7 @@ struct NotesModelPicker: View {
                     .tag(NotesModelSelection?.some(.builtIn))
             }
             ForEach(NotesCLI.allCases, id: \.self) { cli in
-                Text("\(cli.name) · \(model.settings.allowsAnySignIn(cli) ? "Any sign-in" : "Subscription")").tag(NotesModelSelection?.some(.cli(cli)))
+                Text("\(cli.name) · \(overrideSelection == nil && model.settings.allowsAnySignIn(cli) ? "Any sign-in" : "Subscription")").tag(NotesModelSelection?.some(.cli(cli)))
             }
             ForEach(ollamaModels, id: \.self) { name in
                 Text("Ollama · \(name)").tag(NotesModelSelection?.some(.ollama(name)))
@@ -95,6 +95,7 @@ struct NotesModelSettings: View {
             }
             Text("Install the latest \(cli.name) CLI and run \(cli.loginCommand) in Terminal. BetterWispr uses that sign-in\(model.settings.allowsAnySignIn(cli) ? "" : "; subscription limits apply").")
                 .font(.caption).foregroundStyle(.secondary)
+            if cli == .claudeCode { ClaudeCodeAnySignInSettings(model: model, testing: testing) }
         }
         HStack {
             Button(testing ? "Testing…" : "Test notes model") { result = nil; testing = true }
@@ -115,18 +116,6 @@ struct NotesModelSettings: View {
             .disabled(testing)
         Text("Ask sends the most relevant transcript lines and thoughts from the meetings you ask about to this model.")
             .font(.caption).foregroundStyle(.secondary)
-        if model.settings.selectsClaudeCode {
-            Toggle("Allow any Claude Code sign-in", isOn: Binding(
-                get: { model.settings.claudeCodeAnySignIn },
-                set: {
-                    model.settings.claudeCodeAnySignIn = $0
-                    model.saveNotesSettings()
-                }
-            ))
-            .disabled(!model.canEditConnections || testing)
-            Text("Meeting text, Ask questions and text sent for cleanup, including any screen or clipboard context, go wherever Claude Code is set up to send them, now or after its setup changes: an API account, a company cloud account or a gateway. That operator receives the text and its charges apply. BetterWispr can’t see the destination or limit the cost.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
         // A view task cancels the request or CLI when this page is closed or Cancel is clicked.
         Color.clear.frame(height: 0)
             .task { await model.meetings.refreshOllamaModels() }
@@ -146,5 +135,63 @@ struct NotesModelSettings: View {
                 testing = false
             }
             .onChange(of: model.settings) { _, _ in result = nil }
+    }
+}
+
+private struct ClaudeCodeAnySignInSettings: View {
+    @Bindable var model: AppModel
+    let testing: Bool
+    @State private var destination: ClaudeCodeDestination?
+    @State private var problem: String?
+    @State private var checks = 0
+
+    var body: some View {
+        Toggle("Allow any Claude Code sign-in", isOn: Binding(
+            get: { model.settings.claudeCodeAnySignIn },
+            set: {
+                model.settings.claudeCodeAnySignIn = $0
+                model.settings.claudeCodeConfirmedDestination = nil
+                model.saveNotesSettings()
+            }
+        ))
+        .disabled(!model.canEditConnections || testing)
+        Text("For meeting notes only. Meeting text goes to the destination below, such as an API account, a company cloud account or a gateway. That operator receives the text and its charges apply. Each request stops at about $1, and a long meeting takes several requests. Ask, Medium cleanup and correction review never use this switch.")
+            .font(.caption).foregroundStyle(.secondary)
+        if model.settings.claudeCodeAnySignIn {
+            LabeledContent("Sends to", value: destination?.label ?? (problem == nil ? "Checking…" : "Unknown"))
+            if let problem { Text(problem).font(.caption).foregroundStyle(.secondary) }
+            HStack {
+                if let destination {
+                    if destination.label == confirmed {
+                        Label("Confirmed", systemImage: "checkmark.circle")
+                    } else {
+                        Button("Confirm destination") {
+                            model.settings.claudeCodeConfirmedDestination = destination.label
+                            model.saveNotesSettings()
+                        }
+                        .disabled(!model.canEditConnections || testing)
+                    }
+                }
+                Button("Check again") { checks += 1 }
+            }
+            if let destination, let confirmed, destination.label != confirmed {
+                Text("This changed from \(confirmed). Nothing is sent until you confirm.").font(.caption).foregroundStyle(.secondary)
+            }
+            Color.clear.frame(height: 0).task(id: checks) { await readDestination() }
+        }
+    }
+
+    private var confirmed: String? { model.settings.claudeCodeConfirmedDestination }
+
+    private func readDestination() async {
+        do {
+            let current = try await ClaudeCodeDestination.current()
+            destination = current
+            problem = nil
+        } catch is CancellationError {
+        } catch {
+            destination = nil
+            problem = error.localizedDescription
+        }
     }
 }
