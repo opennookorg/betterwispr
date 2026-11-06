@@ -1,27 +1,46 @@
 import CoreAudio
 import Foundation
 
-/// Silences every other app's output, such as a browser playing a video, through a private muted process tap.
-/// A tap only mutes while its device runs, so the tap's private aggregate device runs and discards what it hears.
-/// BetterWispr's own sounds still play, the output device's volume and mute are never touched, and the tap and
-/// device are private to this process, so Core Audio removes them if BetterWispr exits without unmuting.
+@available(macOS 14.2, *)
+@MainActor
+protocol MutingTap: AnyObject {
+    func begin() async throws
+    func stop()
+}
+
+@available(macOS 14.2, *)
+extension SystemAudioTap: MutingTap {
+    func begin() async throws {
+        _ = try await prepare()
+        try start { _, _ in }
+    }
+}
+
+/// Silences every other app's output through a private process tap, without touching the output device's volume or mute.
 @available(macOS 14.2, *)
 @MainActor
 public final class SystemAudioMute: Sendable {
-    private var tap: SystemAudioTap?
+    private let makeTap: @MainActor () -> any MutingTap
+    private var tap: (any MutingTap)?
 
-    public init() {}
+    public convenience init() {
+        self.init(makeTap: { SystemAudioTap(muteBehavior: .mutedWhenTapped) })
+    }
 
-    public func mute() async {
+    init(makeTap: @escaping @MainActor () -> any MutingTap) {
+        self.makeTap = makeTap
+    }
+
+    public func mute() async throws {
         guard tap == nil else { return }
-        let created = SystemAudioTap(muteBehavior: .muted)
+        let created = makeTap()
         tap = created
         do {
-            _ = try await created.prepare()
-            try created.start { _, _ in }
+            try await created.begin()
         } catch {
             created.stop()
             if tap === created { tap = nil }
+            throw error
         }
     }
 

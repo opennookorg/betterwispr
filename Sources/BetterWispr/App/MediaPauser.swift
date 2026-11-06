@@ -1,5 +1,6 @@
 import AppKit
 import BetterWisprCore
+import OSLog
 
 enum MediaApp: String, CaseIterable, Sendable {
     case music = "com.apple.Music"
@@ -25,7 +26,7 @@ protocol MediaPlayers: Sendable {
 
 /// Silences apps that can't be paused, such as browsers, without changing whether they play.
 protocol OtherAppsAudio: Sendable {
-    func mute() async
+    func mute() async throws
     func unmute() async
 }
 
@@ -36,13 +37,17 @@ extension SystemAudioMute: OtherAppsAudio {}
 final class MediaPauser {
     private let players: any MediaPlayers
     private let otherApps: (any OtherAppsAudio)?
+    private let callInProgress: @MainActor () -> Bool
     private var paused: [MediaApp] = []
     private var muted = false
     private(set) var pending: Task<Void, Never>?
+    var onMuteFailure: (@MainActor (any Error) -> Void)?
 
-    init(players: any MediaPlayers = AppleEventMediaPlayers(), otherApps: (any OtherAppsAudio)? = MediaPauser.systemMute()) {
+    init(players: any MediaPlayers = AppleEventMediaPlayers(), otherApps: (any OtherAppsAudio)? = MediaPauser.systemMute(),
+         callInProgress: @escaping @MainActor () -> Bool = { MeetingPlatform.mayBeInCall(recording: MicrophoneActivity.recordingBundleIDs()) }) {
         self.players = players
         self.otherApps = otherApps
+        self.callInProgress = callInProgress
     }
 
     static func systemMute() -> (any OtherAppsAudio)? {
@@ -50,14 +55,10 @@ final class MediaPauser {
         return SystemAudioMute()
     }
 
-    func pause(mutingOtherApps: Bool = true) {
+    func pause() {
         let previous = pending
         pending = Task {
             await previous?.value
-            if mutingOtherApps, let otherApps {
-                await otherApps.mute()
-                muted = true
-            }
             for app in MediaApp.allCases where await players.state(of: app) == .playing {
                 await players.pause(app)
                 paused.append(app)
@@ -69,15 +70,37 @@ final class MediaPauser {
         guard let previous = pending else { return }
         pending = Task {
             await previous.value
-            if muted {
-                muted = false
-                await otherApps?.unmute()
-            }
             let apps = paused
             paused = []
             for app in apps where await players.state(of: app) == .paused {
                 await players.play(app)
             }
+        }
+    }
+
+    /// Mutes other apps unless a call may be running; a failure is reported and leaves them audible.
+    func muteOtherApps() {
+        guard otherApps != nil, !callInProgress() else { return }
+        let previous = pending
+        pending = Task {
+            await previous?.value
+            do {
+                try await otherApps?.mute()
+                muted = true
+            } catch {
+                Logger(subsystem: "org.betterwispr.app", category: "MediaPauser").error("Couldn’t mute other apps: \(error.localizedDescription, privacy: .public)")
+                onMuteFailure?(error)
+            }
+        }
+    }
+
+    func unmuteOtherApps() {
+        guard let previous = pending else { return }
+        pending = Task {
+            await previous.value
+            guard muted else { return }
+            muted = false
+            await otherApps?.unmute()
         }
     }
 }

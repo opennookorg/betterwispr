@@ -156,7 +156,7 @@ the policy immediately and persist through the existing workspace store.
    the model selected at that moment and never fall back to another one; when
    that model is off this Mac the button names where the audio goes.
 
-With "Pause media while dictating" on, `MediaPauser` sends Apple Events to pause
+With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
 When the phase leaves recording for any other phase it resumes only the apps it
 paused that still report paused. Operations run one at a time, address the
@@ -164,19 +164,46 @@ running process so a closed app is never launched, and never prompt during
 dictation; consent is asked once when the setting turns on. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
 
-Browsers and other players can't be asked whether they play without private
-MediaRemote APIs, which macOS 15.4 closed to other apps, and a play/pause media
-key could start something the user had paused. So on macOS 14.2 and later the
-same pause also starts `SystemAudioMute`, a private Core Audio process tap with
-`muteBehavior = .muted` that excludes BetterWispr's own process. A tap only mutes
-while its device runs, so its private aggregate device runs and discards what it
-hears, like the meeting tap without the writer. Every other app keeps playing silently, the capsule sounds stay audible,
-and the output device's volume and mute are never changed. The resume destroys
-the tap and its device before resuming Music and Spotify, and because both are
-private to BetterWispr, Core Audio also removes them if the app exits without resuming.
-Muting is skipped while meeting notes record, so the call stays audible. Turning
-the setting on also starts a system audio tap once, so macOS asks for System
-Audio Recording then rather than during a dictation.
+"Mute other apps while dictating" (`AppSettings.muteOtherAppsWhileDictating`, off
+by default, shown on macOS 14.2 and later) is a separate setting. Browsers and
+other players can't be asked whether they play without private MediaRemote APIs,
+which macOS 15.4 closed to other apps, and a play/pause media key could start
+something the user had paused. So `MediaPauser` starts `SystemAudioMute`, a
+private Core Audio process tap with `muteBehavior = .mutedWhenTapped` that excludes
+BetterWispr's own process, and its private aggregate device reads and discards
+what it hears. Every other app keeps playing silently and the capsule sounds stay
+audible. The output device's volume and mute are never read or changed, so a user
+who muted their Mac stays muted.
+
+The mute starts only when the phase enters recording, so other apps stay audible
+during a long model load, and ends when the phase leaves recording for any reason:
+stop, the hard stop, cancel, failure, discard or quit. The long dictation question card comes
+after recording, so nothing is muted while it waits. A dictation that fails while
+preparing, such as a denied permission or a model that won't load, never mutes. A
+mute runs on the `MediaPauser` queue, not in the recording path, so a failure can't
+stop the dictation: it is logged and shown as a toast, and other apps stay audible.
+macOS may report no error when System Audio Recording is denied, in which case
+nothing is muted and nothing is shown. That case is not exercised.
+
+Muting is skipped while meeting notes record, or when `MicrophoneActivity` reports
+a known call app or a browser using the microphone as the recording starts.
+Browsers count without a window title check, so a browser using the microphone for
+something else also stays audible. The check runs once and has limits: a call in an
+app `MeetingPlatform` doesn't know, a call where the app has released the
+microphone, and a call that starts during the dictation all go silent until the
+recording stops. `MeetingDetector.meeting` isn't used because it only holds the
+prompt on offer, which clears on dismissal and expiry.
+
+Turning the setting on starts an unmuted system audio tap once, so macOS asks for
+System Audio Recording then rather than during a dictation.
+
+If BetterWispr crashes or is force quit while muting, it can't remove the tap, and
+Apple doesn't document that Core Audio does. `.mutedWhenTapped` is chosen because
+Apple's header says audio is withheld only for the duration of read activity on the
+tap, and reads stop with the process, so other apps should become audible without
+a relaunch. This is not verified: see the crash check in `docs/testing.md`. Nothing
+is persisted or restored at the next launch, because BetterWispr changes no saved
+system state and a new process can't see the private tap of the old one.
 
 With "Send to Claude" on (`AppSettings.sendToClaude`, off by default), a pasted
 dictation is followed by a Return key press when `ClaudePrompt` recognizes the

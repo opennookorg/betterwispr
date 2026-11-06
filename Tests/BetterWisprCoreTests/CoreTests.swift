@@ -27,6 +27,24 @@ import Testing
     #expect(try String(contentsOf: store.stateURL, encoding: .utf8) == "broken")
 }
 
+@Test func aWorkspaceSavedWithMediaPausingOnLoadsWithMutingOff() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let store = LocalStore(directory: folder)
+    var state = SavedState()
+    state.settings.pauseMediaWhileDictating = true
+    state.settings.muteOtherAppsWhileDictating = true
+    try store.save(state)
+    var saved = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: store.stateURL)) as? [String: Any])
+    var settings = try #require(saved["settings"] as? [String: Any])
+    settings["muteOtherAppsWhileDictating"] = nil
+    saved["settings"] = settings
+    try JSONSerialization.data(withJSONObject: saved).write(to: store.stateURL)
+    let loaded = try store.load().settings
+    #expect(loaded.pauseMediaWhileDictating)
+    #expect(!loaded.muteOtherAppsWhileDictating)
+}
+
 @Test func settingsSavedBeforeDictationModesStillLoad() throws {
     let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002}"#
     let settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
@@ -39,6 +57,7 @@ import Testing
     #expect(settings.showNoSpeechNotice)
     #expect(DictationSound.allCases.map(settings.soundName) == ["Tink", "Purr", "Bottle", "Basso"])
     #expect(!settings.pauseMediaWhileDictating)
+    #expect(!settings.muteOtherAppsWhileDictating)
     #expect(!settings.showInDock)
     #expect(settings.theme == .dark)
     #expect(settings.shortcut == .optionSpace)
@@ -59,6 +78,7 @@ import Testing
     toggled.showNoSpeechNotice = false
     toggled.sounds = [.started: "Pop", .attention: "Funk"]
     toggled.pauseMediaWhileDictating = true
+    toggled.muteOtherAppsWhileDictating = true
     toggled.showInDock = true
     toggled.theme = .system
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")

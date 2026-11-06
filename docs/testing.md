@@ -1224,13 +1224,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
 - [ ] Switch between System, Light, Cream and Dark. Light and Dark look as they
   did before Cream, and the theme survives relaunch.
 
-## Pausing media while dictating
+## Pausing music while dictating
 
-Manual checks. Unit tests cover the pause, mute and resume bookkeeping with a
-fake player; real playback, the muted tap and the permission prompts need these
-steps.
+Manual checks. Unit tests cover the pause and resume bookkeeping with a fake
+player; real playback and the Automation prompt need these steps.
 
-- [ ] Music playing: open Music, turn on Settings → App → Pause media while
+- [ ] Music playing: open Music, turn on Settings → App → Pause music while
   dictating and allow the Automation prompt. Play a track and dictate. Music
   pauses when the capsule appears and resumes as soon as the recording stops.
   Repeat with a dictation cancelled with Escape and with "No speech heard."
@@ -1254,28 +1253,51 @@ steps.
   paused during the new recording and resumes after it; it never plays while
   the microphone is open.
 - [ ] Start meeting notes while Music plays. Music keeps playing.
-- [ ] Browser video: play a YouTube video in Safari, then in Chrome, and dictate.
-  The video goes silent when the capsule appears, keeps playing, and is audible
-  again as soon as the recording stops. Repeat with a cancelled dictation and
-  with "No speech heard."
+
+## Muting other apps while dictating
+
+Manual checks. Unit tests cover the mute bookkeeping and every exit with a fake;
+the real tap, real audio, call detection and the permission prompt need these
+steps.
+
+- [ ] Off by default: with the setting off, or a workspace saved before it existed,
+  a video stays audible during a dictation and no System Audio Recording prompt
+  appears, including with Pause music while dictating on.
+- [ ] Browser video: turn on Settings → App → Mute other apps while dictating. Play
+  a YouTube video in Safari, then in Chrome, and dictate. The video goes silent once
+  recording starts, keeps playing, and is audible again as soon as the recording
+  stops. Repeat with a cancelled dictation and with "No speech heard."
+- [ ] Nothing playing: dictate with no app playing audio. The capsule and the
+  shortcut respond normally, and the dictation stops when asked.
+- [ ] Model load: with a model that takes a while to load and a video playing, start
+  a dictation. The video stays audible until recording starts.
+- [ ] Question card: record a dictation long enough to reach the question card. The
+  video is audible while the card waits.
+- [ ] Quit: quit from the menu bar while dictating with a video playing. The video is
+  audible again.
 - [ ] Own sounds: with Dictation sounds on and a video playing, dictate. The Start,
   Finish and Cancel sounds are heard while the video is silent.
 - [ ] System Audio Recording: with BetterWispr not yet allowed under Privacy &
   Security → Screen & System Audio Recording (`tccutil reset AudioCapture
   org.betterwispr.app`), turn the setting off and on. macOS asks once, and no
-  prompt appears during dictation. Note whether the video is still silenced
-  after denying the prompt.
+  prompt appears during dictation. Note whether the video is silenced and whether
+  a message appears after denying the prompt.
+- [ ] Your own mute: mute the Mac, then dictate and stop. The Mac is still muted.
 - [ ] Volume untouched: the menu bar Sound icon and the output volume don't change
   during a dictation. Press the volume keys mid-dictation; the video stays
   silent until the recording stops.
 - [ ] Output switch: start a video on the speakers, connect AirPods mid-dictation.
   The video stays silent on the AirPods until the recording stops.
 - [ ] Crash: start dictating with a video playing and run `killall -9 BetterWispr`.
-  The video is audible again without relaunching.
+  The video should be audible again without relaunching. This has not been
+  verified; if it stays silent, record it in `docs/architecture.md`.
+- [ ] Calls: dictate during a Zoom or FaceTime call, and during a Google Meet call in
+  a browser, with the microphone in use. The call stays audible. Repeat with the
+  call muted in the app, which may release the microphone, and note what happens.
 - [ ] Meeting notes recording: dictate during meeting notes with a call or video
-  playing. It stays audible; only Music and Spotify pause.
-- [ ] macOS 14.0 or 14.1, if available: only Music and Spotify pause and no System
-  Audio Recording prompt appears.
+  playing. It stays audible.
+- [ ] macOS 14.0 or 14.1, if available: the setting isn't shown and no System Audio
+  Recording prompt appears.
 
 ## Clipboard and insertion
 
