@@ -466,3 +466,15 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(rushed.observe("Claude Cod") == nil)
     #expect(rushed.observe("") == nil)
 }
+
+@Test func workspaceSavedBeforeTrailingSpacesPastesWithoutOne() throws {
+    let settings = try jsonDroppingKey(AppSettings(), "appendTrailingSpace")
+    #expect(try !JSONDecoder().decode(AppSettings.self, from: settings).appendTrailingSpace)
+}
+
+@Test func trailingSpaceSkipsTextEndingInWhitespaceOrUnspacedScripts() {
+    #expect(TextJoin.trailing("Hello there.") == "Hello there. ")
+    #expect(TextJoin.trailing("Hello\n") == "Hello\n")
+    #expect(TextJoin.trailing("你好。") == "你好。")
+    #expect(TextJoin.trailing("") == "")
+}

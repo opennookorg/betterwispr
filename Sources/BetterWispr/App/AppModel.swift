@@ -759,7 +759,10 @@ final class AppModel {
                 self.activeRecording = nil
                 let continues = recording.continuesIn != nil && recording.continuesIn == recording.target?.processIdentifier
                 self.continuesIn = nil
-                let result = try await integration?.deliver(continues ? TextJoin.continuing(text) : text, to: recording.target)
+                // A trailing space already separates this dictation from an earlier one.
+                let delivered = writingSettings.autoPaste && writingSettings.appendTrailingSpace
+                    ? TextJoin.trailing(text) : continues ? TextJoin.continuing(text) : text
+                let result = try await integration?.deliver(delivered, to: recording.target)
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
