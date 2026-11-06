@@ -230,16 +230,13 @@ func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) thr
     } catch AudioRecordingError.inputStalled {}
 }
 
-@MainActor
-@Test func finishingKeepsAudioThatArrivedWhileTheMainThreadWasBusy() async throws {
+@Test func stopBoundaryArrivesFromTheCaptureThreadWithoutTheMainActor() async throws {
     let progress = AudioCaptureProgress()
     let capture = progress.begin()
-    let finishing = Task { try await progress.wait(through: 2) }
-    try await Task.sleep(for: .milliseconds(5))
+    let finishing = Task.detached { try await progress.wait(through: 2) }
     DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(40)) {
-        Task { @MainActor in progress.receive(through: 2, generation: capture) }
+        progress.receive(through: 2, generation: capture)
     }
-    usleep(700_000)
     try await finishing.value
 }
 

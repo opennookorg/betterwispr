@@ -192,10 +192,10 @@ public final class AudioRecorder {
             let loudness = writer.write(buffer)
             let atLimit = writer.reachedFrameLimit
             tap?.receive(buffer)
+            progress.receive(through: end, generation: capture)
             let step = Double(buffer.frameLength) / sampleRate / Double(max(1, loudness.count))
             Task { @MainActor [weak self] in
                 guard let self, self.recordingID == id, progress.generation == capture else { return }
-                progress.receive(through: end, generation: capture)
                 let values = loudness.map { self.meter.update(rms: $0, over: step) }
                 self.onLevel?(VoiceLevels(values: values, start: .now.addingTimeInterval(-step * Double(max(0, values.count - 1))), step: step))
                 if atLimit { self.onFrameLimit?() }
