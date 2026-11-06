@@ -45,7 +45,6 @@ import Testing
     model.settings.hideCapsuleWhileDictating = true
     #expect(!model.showsCapsule)
 
-    // Dictation has no time limit, so a hidden capsule stays hidden however long it runs.
     model.advanceRecording(to: 3 * 3600)
     #expect(model.phase == .recording && !model.showsCapsule && presentations == 0)
 

@@ -72,7 +72,7 @@ private final class FailingDictation {
     let store: FailedDictationStore
     var recording: DictationRecording?
 
-    init() throws {
+    init(duration: TimeInterval = 1) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         audio = folder.appendingPathComponent("betterwispr-test.caf")
         try Data("synthetic audio".utf8).write(to: audio)
@@ -84,7 +84,7 @@ private final class FailingDictation {
         model.settings.copyToClipboard = false
         model.settings.speechConnections = [connection]
         model.settings.selectedModelID = connection.speechModel.id
-        recording = DictationRecording(audio: RecordedAudio(url: audio, duration: 1, hasSpeech: true), model: model.selectedModel,
+        recording = DictationRecording(audio: RecordedAudio(url: audio, duration: duration, hasSpeech: true), model: model.selectedModel,
                                        settings: model.settings, vocabulary: [], target: nil)
     }
 
@@ -402,4 +402,189 @@ private let megabyte: UInt64 = 1_000_000
     #expect(!dictation.model.canRetryFailure)
     #expect(dictation.model.failedDictations == [kept])
     dictation.model.discardRecording()
+}
+
+private let longDictation = DictationLimits.confirmationDuration + 60
+
+@Test @MainActor func aLongRecordingAsksBeforeItLeavesTheMacAndNoKeepsIt() async throws {
+    let dictation = try FailingDictation(duration: longDictation)
+    let selected = dictation.model.selectedModel
+    try dictation.start()
+    #expect(dictation.model.phase == .asking(.send(duration: longDictation, model: selected)))
+    #expect(dictation.model.phase.armsCancelShortcut)
+    #expect(dictation.model.cardDeadline == nil)
+    #expect(dictation.model.failedDictations.isEmpty)
+
+    dictation.model.answerQuestion(false)
+    #expect(dictation.model.failure?.title == "Not sent.")
+    #expect(dictation.model.canRetryFailure)
+    #expect(dictation.model.failedDictations.count == 1)
+    #expect(dictation.hasTemporaryAudio)
+    #expect(dictation.model.selectedModel == selected)
+
+    dictation.model.retryFailure()
+    #expect(dictation.model.phase == .transcribing)
+    try await dictation.settle { dictation.model.failure != nil }
+    #expect(dictation.model.failure != nil)
+    #expect(dictation.model.failedDictations.count == 1)
+    dictation.model.discardRecording()
+}
+
+@Test @MainActor func approvingAnUploadTranscribesWithoutAskingAgain() async throws {
+    let dictation = try FailingDictation(duration: longDictation)
+    try dictation.start()
+    dictation.model.answerQuestion(true)
+    #expect(dictation.model.phase == .transcribing)
+    try await dictation.settle { dictation.model.failure != nil }
+    #expect(dictation.model.failure != nil)
+    #expect(dictation.model.canRetryFailure)
+    #expect(dictation.model.failedDictations.count == 1)
+    dictation.model.discardRecording()
+}
+
+@Test @MainActor func dismissingOrDiscardingAnUploadQuestionStillKeepsTheAudio() throws {
+    let dismissed = try FailingDictation(duration: longDictation)
+    try dismissed.start()
+    dismissed.model.dismissCard()
+    #expect(dismissed.model.failure?.title == "Not sent.")
+    #expect(dismissed.model.failedDictations.count == 1)
+
+    let discarded = try FailingDictation(duration: longDictation)
+    try discarded.start()
+    discarded.model.discardRecording()
+    #expect(discarded.model.phase == .idle)
+    #expect(discarded.store.list().count == 1)
+    #expect(!discarded.hasTemporaryAudio)
+}
+
+@Test @MainActor func quittingWhileAnUploadQuestionIsOpenKeepsExactlyOneCopy() throws {
+    let dictation = try FailingDictation(duration: longDictation)
+    try dictation.start()
+    dictation.model.keepDictationForQuit()
+    dictation.model.discardRecording()
+    #expect(dictation.store.list().count == 1)
+
+    let privateDictation = try FailingDictation(duration: longDictation)
+    privateDictation.model.settings.saveHistory = false
+    try privateDictation.start()
+    privateDictation.model.keepDictationForQuit()
+    privateDictation.model.discardRecording()
+    #expect(privateDictation.store.list().isEmpty)
+    #expect(!privateDictation.hasTemporaryAudio)
+}
+
+@Test @MainActor func shortUploadsAndLongOnDeviceRecordingsDoNotAsk() throws {
+    let short = try FailingDictation()
+    try short.start()
+    #expect(short.model.phase == .transcribing)
+    short.model.discardRecording()
+
+    let local = try FailingDictation(duration: longDictation)
+    let recording = try #require(local.recording)
+    recording.model = try #require(SpeechModel.catalog.first { $0.processingLocation.isOnDevice })
+    try local.start()
+    #expect(local.model.phase == .transcribing)
+    local.model.discardRecording()
+}
+
+@MainActor private final class Copies { var count = 0 }
+
+@Test @MainActor func aLongDictationAsksBeforePastingAndNoLeavesItCopied() async throws {
+    let dictation = try FailingDictation(duration: longDictation)
+    let model = dictation.model
+    let copies = Copies()
+
+    let approved = Task { await model.confirmPaste(duration: longDictation, app: "Notes") { copies.count += 1 } }
+    try await dictation.settle { model.phase.isAsking }
+    #expect(model.phase == .asking(.paste(duration: longDictation, app: "Notes")))
+    model.answerQuestion(true)
+    #expect(await approved.value)
+    #expect(copies.count == 0)
+    model.phase = .transcribing
+
+    let refused = Task { await model.confirmPaste(duration: longDictation, app: nil) { copies.count += 1 } }
+    try await dictation.settle { model.phase.isAsking }
+    model.dismissCard()
+    #expect(await !refused.value)
+    #expect(copies.count == 1)
+    model.phase = .transcribing
+
+    let discarded = Task { await model.confirmPaste(duration: longDictation, app: nil) { copies.count += 1 } }
+    try await dictation.settle { model.phase.isAsking }
+    model.discardRecording()
+    #expect(await !discarded.value)
+    #expect(copies.count == 2)
+    #expect(model.phase == .idle)
+}
+
+@Test func questionsSayWhatWillHappen() throws {
+    let connection = SpeechConnection(api: .smallest)
+    let send = DictationQuestion.send(duration: 3 * 3600 + 12 * 60, model: connection.speechModel)
+    #expect(send.title.contains("3h 12m"))
+    #expect(send.approval.hasPrefix("Send to "))
+    #expect(send.refusal == "Don’t send")
+    let paste = DictationQuestion.paste(duration: 12 * 60, app: nil)
+    #expect(paste.title == "Paste this 12m dictation into the focused app?")
+    #expect(paste.approval == "Paste")
+    #expect(paste.refusal == "Copy instead")
+}
+
+@Test @MainActor func anInterruptedRecordingWithSpeechReachesTheKeptAudioPath() throws {
+    let dictation = try FailingDictation()
+    let audio = RecordedAudio(url: dictation.audio, duration: 40, hasSpeech: true)
+    let interruption = RecordingInterruption(audio: audio, cause: AudioRecordingError.inputStalled)
+    dictation.model.recordingInterrupted(by: interruption, title: "Couldn’t continue recording.")
+    #expect(dictation.model.failure?.title == "Couldn’t continue recording.")
+    #expect(dictation.model.failure?.message.hasSuffix("You can try this same recording again.") == true)
+    #expect(dictation.model.canRetryFailure)
+    #expect(dictation.model.failedDictations.count == 1)
+    #expect(dictation.hasTemporaryAudio)
+    dictation.model.discardRecording()
+}
+
+@Test @MainActor func anInterruptedRecordingWithoutSpeechIsDeleted() throws {
+    let dictation = try FailingDictation()
+    dictation.recording = nil
+    let copy = dictation.folder.appendingPathComponent("betterwispr-silent.caf")
+    try Data("silence".utf8).write(to: copy)
+    let audio = RecordedAudio(url: copy, duration: 40, hasSpeech: false)
+    dictation.model.recordingInterrupted(by: RecordingInterruption(audio: audio, cause: AudioRecordingError.inputStalled), title: "Couldn’t continue recording.")
+    #expect(!dictation.model.canRetryFailure)
+    #expect(dictation.model.failedDictations.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: copy.path))
+    #expect(dictation.model.failure != nil)
+}
+
+@Test @MainActor func aPlainCaptureErrorStaysAPlainFailure() throws {
+    let dictation = try FailingDictation()
+    dictation.model.recordingInterrupted(by: AudioRecordingError.inputStalled, title: "Couldn’t finish recording.")
+    #expect(dictation.model.failure?.title == "Couldn’t finish recording.")
+    #expect(!dictation.model.canRetryFailure)
+    #expect(dictation.model.failedDictations.isEmpty)
+}
+
+@Test @MainActor func theHardStopFinishesTheRecordingInsteadOfDroppingIt() async throws {
+    let dictation = try FailingDictation()
+    dictation.model.phase = .recording
+    dictation.model.recordingReachedLimit()
+    #expect(dictation.model.phase == .transcribing)
+    dictation.model.recordingReachedLimit()
+    #expect(dictation.model.phase == .transcribing)
+    try await dictation.settle { dictation.model.phase != .transcribing }
+    #expect(dictation.model.failure?.title == "Couldn’t finish recording.")
+}
+
+@Test @MainActor func remindersNeverInterruptAndFireOncePerHour() throws {
+    let dictation = try FailingDictation()
+    dictation.model.phase = .recording
+    dictation.model.advanceRecording(to: 3599)
+    #expect(dictation.model.remindedHour == 0)
+    dictation.model.advanceRecording(to: 3 * 3600 + 5)
+    #expect(dictation.model.remindedHour == 3)
+    dictation.model.advanceRecording(to: 3 * 3600 + 6)
+    #expect(dictation.model.remindedHour == 3)
+    #expect(dictation.model.recordingDuration == 3 * 3600 + 6)
+    #expect(dictation.model.phase == .recording)
+    #expect(dictation.model.cardDeadline == nil)
+    dictation.model.phase = .idle
 }

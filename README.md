@@ -43,7 +43,10 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 
 If paste can't safely reach the previous app, the text is copied to your
 clipboard instead, so you never lose a dictation. A dictation records until you
-release or press the shortcut again, however long that is.
+release or press the shortcut again, up to about 24 hours 45 minutes at 48 kHz
+(a limit on audio frames, so half that at 96 kHz), then finishes by itself. A
+recording of ten minutes or longer asks before it is sent to an API connection
+or pasted automatically.
 
 ## Bring your own model
 

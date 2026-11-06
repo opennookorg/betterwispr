@@ -38,7 +38,7 @@ public final class APISpeechProvider: SpeechProvider {
         // Validate before doing audio work, and read the key anew after rotation/removal.
         _ = try Self.request(connection, key: apiKey, wav: Data(), language: language)
         let task = Task {
-            let chunks = try await SpeechAudio.wavChunks(audioURL, seconds: connection.api == .sarvam ? 25 : 125)
+            let ranges = try await SpeechAudio.chunkRanges(audioURL, seconds: connection.api == .sarvam ? 25 : 125)
             try Task.checkCancellation()
             configuration.urlCache = nil
             configuration.httpCookieStorage = nil
@@ -49,7 +49,8 @@ public final class APISpeechProvider: SpeechProvider {
             let session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
             defer { session.invalidateAndCancel() }
             var transcripts: [String] = []
-            for chunk in chunks {
+            for range in ranges {
+                let chunk = try await SpeechAudio.wavChunk(audioURL, range)
                 try Task.checkCancellation()
                 let request = try Self.request(connection, key: apiKey, wav: chunk, language: language)
                 let (data, response) = try await session.data(for: request)

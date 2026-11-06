@@ -23,7 +23,11 @@ All notable changes to BetterWispr are listed here. The format follows
 - The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
 
 ### Changed
-- Dictation no longer stops on its own. It used to finish by itself at ten minutes, after a "Stops in 0:30" countdown. Now it records until you release or press your shortcut, however long that is. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
+- Dictation no longer stops at ten minutes. It used to finish by itself at ten minutes, after a "Stops in 0:30" countdown. Now it records until you release or press your shortcut, with a brief reminder every hour, up to a limit of 4,278,190,080 audio frames: about 24 hours 45 minutes at 48 kHz, half that at 96 kHz. At the limit it finishes by itself and transcribes what it captured. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
+- A recording of ten minutes or longer now asks before it is sent to an API connection and before it is pasted automatically. If you don't send it, the audio stays on your Mac and you can try it again. If you don't paste it, the text is left on your clipboard. Local models never ask before transcribing.
+- API connections now load one piece of a long recording at a time for upload, instead of holding the whole recording in memory first.
+- A dictation interrupted by a microphone or recording failure now keeps what was captured, so you can try it again and find it in History when history is on. Before, the audio was deleted.
+- Recordings left in the temporary folder by a crash are deleted at the next launch, once they are more than a day old.
 
 ## [0.1.6] - 2026-10-15
 

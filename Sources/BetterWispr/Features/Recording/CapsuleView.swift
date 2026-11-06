@@ -20,7 +20,7 @@ struct CapsuleView: View {
     }
     private var showsCard: Bool {
         switch model.phase {
-        case .cancelled, .completed, .unpasted, .failed, .sending: true
+        case .cancelled, .completed, .unpasted, .failed, .sending, .asking: true
         default: failure != nil || meetingPrompt != nil
         }
     }
@@ -73,6 +73,7 @@ struct CapsuleView: View {
                 AccessibilityNotification.Announcement(model.canUndoCancellation ? "Transcript cancelled. Undo is available for five seconds." : "Transcript cancelled.").post()
             case .completed(let message): AccessibilityNotification.Announcement(message).post()
             case .sending: AccessibilityNotification.Announcement("Sending. Dictate again to add more first.").post()
+            case .asking(let question): AccessibilityNotification.Announcement("\(question.title) \(question.message)").post()
             default: break
             }
         }
@@ -91,6 +92,9 @@ struct CapsuleView: View {
                     .transition(swap)
             } else if model.phase == .sending {
                 sendingCard
+                    .transition(swap)
+            } else if case .asking(let question) = model.phase {
+                questionCard(question)
                     .transition(swap)
             } else if case .completed(let message) = model.phase {
                 completionCard(message)
@@ -298,6 +302,27 @@ struct CapsuleView: View {
         .buttonStyle(CapsuleCardButtonStyle())
         .padding(.horizontal, 18)
         .frame(width: 320, height: 56)
+    }
+
+    private func questionCard(_ question: DictationQuestion) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(question.title)
+                .font(.system(size: 14, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(question.message)
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Button(question.refusal) { model.answerQuestion(false) }
+                Button(question.approval) { model.answerQuestion(true) }
+            }
+        }
+        .foregroundStyle(.white)
+        .buttonStyle(CapsuleCardButtonStyle())
+        .padding(18)
+        .frame(width: 360, alignment: .leading)
     }
 
     private func completionCard(_ message: String) -> some View {

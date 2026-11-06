@@ -15,11 +15,48 @@ enum RecordingPhase: Equatable {
     case sending
     case failed(DictationFailure)
     case unpasted(String)
+    /// Waiting, with no timeout, for the user to approve what happens to a long dictation.
+    case asking(DictationQuestion)
 
     var isBusy: Bool { self == .preparing || self == .recording || self == .transcribing }
-    /// Escape cancels a busy dictation, and holds back a pending send.
-    var armsCancelShortcut: Bool { isBusy || self == .sending }
+    var isAsking: Bool { if case .asking = self { true } else { false } }
+    /// Escape cancels a busy dictation, holds back a pending send, and answers no to a question.
+    var armsCancelShortcut: Bool { isBusy || self == .sending || isAsking }
     var holdsMicrophone: Bool { self == .preparing || self == .recording }
+}
+
+enum DictationQuestion: Equatable {
+    case send(duration: TimeInterval, model: SpeechModel)
+    case paste(duration: TimeInterval, app: String?)
+
+    var title: String {
+        switch self {
+        case .send(let duration, let model): "Send \(Self.length(duration)) of audio to \(model.audioDestination ?? model.name)?"
+        case .paste(let duration, let app): "Paste this \(Self.length(duration)) dictation into \(app ?? "the focused app")?"
+        }
+    }
+    var message: String {
+        switch self {
+        case .send: "If you don’t send it, the recording stays on your Mac."
+        case .paste: "Copy instead leaves the text on your clipboard."
+        }
+    }
+    var approval: String {
+        switch self {
+        case .send(_, let model): model.recordingAction(onDevice: (title: "Send", help: "")).title
+        case .paste: "Paste"
+        }
+    }
+    var refusal: String {
+        switch self {
+        case .send: "Don’t send"
+        case .paste: "Copy instead"
+        }
+    }
+
+    private static func length(_ duration: TimeInterval) -> String {
+        Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes], width: .narrow, maximumUnitCount: 2))
+    }
 }
 
 struct DictationFailure: Equatable {
@@ -47,6 +84,8 @@ final class DictationRecording {
     var model: SpeechModel
     /// The copy kept in Failed Dictations after this recording failed to transcribe.
     var keptURL: URL?
+    /// The user already agreed to send this recording off this Mac, so a long one isn't asked about again.
+    var uploadApproved = false
     let settings: AppSettings
     let vocabulary: [VocabularyEntry]
     let target: NSRunningApplication?
@@ -202,6 +241,8 @@ final class AppModel {
     @ObservationIgnored private var dictationContext: Task<DictationContext, Never>?
     @ObservationIgnored private var activeRecording: DictationRecording?
     @ObservationIgnored private var feedbackSound: NSSound?
+    @ObservationIgnored private var pendingAnswer: ((Bool) -> Void)?
+    @ObservationIgnored private(set) var remindedHour = 0
     @ObservationIgnored private var storageIsReadable = true
     @ObservationIgnored private var installedModelIDs: Set<String> = []
     var modelRevision = 0
@@ -240,6 +281,7 @@ final class AppModel {
         }
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
+        AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3600))
@@ -258,10 +300,15 @@ final class AppModel {
         refreshCalendars()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
         recorder.onError = { [weak self] error in
-            guard let self, self.phase == .recording else { return }
+            guard let self else { return }
+            guard self.phase == .recording else {
+                (error as? RecordingInterruption)?.discardAudio()
+                return
+            }
             self.discardRecording()
-            self.fail(DictationFailure(title: "Couldn’t continue recording.", message: error.localizedDescription))
+            self.recordingInterrupted(by: error, title: "Couldn’t continue recording.")
         }
+        recorder.onFrameLimit = { [weak self] in self?.recordingReachedLimit() }
         refreshMicrophones()
         microphoneObserver = AudioInputObserver { [weak self] in self?.refreshMicrophones() }
         meetingDetector.isEnabled = settings.detectMeetings
@@ -389,7 +436,7 @@ final class AppModel {
     }
 
     private func cancelOrHoldBack() {
-        if phase == .sending { holdBackReturn() } else { cancelRecording() }
+        if phase.isAsking { answerQuestion(false) } else if phase == .sending { holdBackReturn() } else { cancelRecording() }
     }
 
     /// Shift held while starting or finishing a dictation pastes it without sending it to Claude.
@@ -517,6 +564,7 @@ final class AppModel {
 
     private func startRecording(held: Bool) {
         guard !isBusy else { return }
+        answerQuestion(false)
         cancelledRecording = nil
         failedRecording = nil
         feedbackSound?.stop()
@@ -557,6 +605,7 @@ final class AppModel {
         partialTranscript = ""
         liveTranscript = LiveTranscript()
         recordingDuration = 0
+        remindedHour = 0
         let model = selectedModel
         let live = model.engine == .parakeet && settings.showLiveText && !settings.hideCapsuleWhileDictating ? LiveTranscriber() : nil
         live?.onUpdate = { [weak self] transcript in
@@ -619,6 +668,21 @@ final class AppModel {
 
     func advanceRecording(to duration: TimeInterval) {
         recordingDuration = duration
+        let hour = DictationLimits.reminderHour(after: duration)
+        guard hour > remindedHour else { return }
+        remindedHour = hour
+        guard startsServices, let limit = recorder.maximumDuration else { return }
+        let finish = "\(isHeldSession ? "Release" : "Press") \(settings.shortcut.displayName) to finish."
+        ToastWindow.shared.show(Toast(title: "Still recording", message: "\(hour)h so far. \(finish) It stops by itself at about \(Int(limit / 3600))h.", systemImage: "waveform"))
+    }
+
+    /// Finishes a recording whose file can't safely grow any longer; what was captured transcribes as usual.
+    func recordingReachedLimit() {
+        guard phase == .recording else { return }
+        let limit = recorder.maximumDuration
+        finishRecording()
+        guard startsServices, let limit else { return }
+        ToastWindow.shared.show(Toast(title: "Recording stopped", message: "It reached the limit of about \(Int(limit / 3600)) hours. Transcribing what was captured.", systemImage: "stop.circle"))
     }
 
     /// Runs preview passes once the warm-up load has finished; it never starts a load itself.
@@ -686,15 +750,31 @@ final class AppModel {
                                                   vocabulary: entries, target: target, targetElement: targetElement, mode: mode, context: context,
                                                   holdsBackReturn: holdsBackReturn, continuesIn: continuesIn))
             } catch {
-                guard self.generation == token else { return }
+                guard self.generation == token else {
+                    (error as? RecordingInterruption)?.discardAudio()
+                    return
+                }
                 self.recorder.cancel()
                 self.endLivePreview()
-                self.fail(DictationFailure(title: "Couldn’t finish recording.", message: error.localizedDescription))
+                self.recordingInterrupted(by: error, title: "Couldn’t finish recording.")
             }
         }
     }
 
     func transcribe(_ recording: DictationRecording) {
+        if !recording.uploadApproved, DictationLimits.asksBeforeSending(duration: recording.audio.duration, isOnDevice: recording.model.processingLocation.isOnDevice) {
+            ask(.send(duration: recording.audio.duration, model: recording.model)) { [weak self] approved in
+                guard let self else { return }
+                if approved {
+                    recording.uploadApproved = true
+                    self.transcribe(recording)
+                } else {
+                    self.keepFailedDictation(recording)
+                    self.fail(DictationFailure(title: "Not sent.", message: self.settings.saveHistory ? "The recording stayed on your Mac and is kept in History." : "The recording stayed on your Mac. You can try it again now."))
+                }
+            }
+            return
+        }
         let token = generation
         activeRecording = recording
         let audio = recording.audio
@@ -774,7 +854,16 @@ final class AppModel {
                 let addsTrailingSpace = writingSettings.autoPaste && writingSettings.appendTrailingSpace
                 let delivered = TextJoin.pasted(text, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
                 self.earlierPasteEndsInSpace = addsTrailingSpace && delivered.last?.isWhitespace == true
-                let result = try await integration?.deliver(delivered, to: recording.target)
+                var approved = true
+                if DictationLimits.asksBeforePasting(duration: audio.duration, autoPaste: writingSettings.autoPaste) {
+                    approved = await self.confirmPaste(duration: audio.duration, app: recording.target?.localizedName) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(delivered, forType: .string)
+                    }
+                    guard self.generation == token else { return }
+                    self.phase = .transcribing
+                }
+                let result = approved ? try await integration?.deliver(delivered, to: recording.target) : OutputResult.copied
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
@@ -817,9 +906,7 @@ final class AppModel {
         guard isBusy else { return }
         let recoverable: DictationRecording?
         if phase == .recording, let audio = try? recorder.stop() {
-            let recording = DictationRecording(audio: audio, model: selectedModel, settings: settings, vocabulary: vocabulary,
-                                              target: targetApplication, targetElement: targetElement, mode: writingMode, context: dictationContext.take(),
-                                              holdsBackReturn: holdsBackReturn || !targetAccepts, continuesIn: continuesIn)
+            let recording = sessionRecording(audio)
             recoverable = audio.hasSpeech ? recording : nil
         } else {
             recoverable = activeRecording
@@ -830,9 +917,51 @@ final class AppModel {
         playFeedback(.cancelled)
     }
 
+    private func sessionRecording(_ audio: RecordedAudio) -> DictationRecording {
+        DictationRecording(audio: audio, model: selectedModel, settings: settings, vocabulary: vocabulary,
+                           target: targetApplication, targetElement: targetElement, mode: writingMode, context: dictationContext.take(),
+                           holdsBackReturn: holdsBackReturn || !targetAccepts, continuesIn: continuesIn)
+    }
+
+    /// Reports a recording that capture cut short, keeping any speech that reached the file so it can be transcribed.
+    func recordingInterrupted(by error: any Error, title: String) {
+        var failure = DictationFailure(title: title, message: error.localizedDescription)
+        if let audio = (error as? RecordingInterruption)?.audio {
+            let recording = sessionRecording(audio)
+            if audio.hasSpeech {
+                keepFailedDictation(recording)
+                failure.message += " You can try this same recording again."
+            }
+        }
+        fail(failure)
+    }
+
+    private func ask(_ question: DictationQuestion, answer: @escaping (Bool) -> Void) {
+        pendingAnswer = answer
+        statusMessage = ""
+        phase = .asking(question)
+        playFeedback(.attention)
+    }
+
+    func answerQuestion(_ approved: Bool) {
+        pendingAnswer.take()?(approved)
+    }
+
+    /// Waits for approval to paste; `copyInstead` runs right away on "no", since a resumed task wouldn't run if the app is quitting.
+    func confirmPaste(duration: TimeInterval, app: String?, copyInstead: @escaping () -> Void) async -> Bool {
+        await withCheckedContinuation { continuation in
+            ask(.paste(duration: duration, app: app)) { approved in
+                if !approved { copyInstead() }
+                continuation.resume(returning: approved)
+            }
+        }
+    }
+
     /// Saves a dictation still recording or transcribing to Failed Dictations when history is on, so History lists it after the next launch.
     func keepDictationForQuit() {
-        if phase == .recording, let recorded = try? recorder.stop() {
+        if phase.isAsking {
+            answerQuestion(false)
+        } else if phase == .recording, let recorded = recorder.stopSalvaging() {
             defer { try? FileManager.default.removeItem(at: recorded.url) }
             if recorded.hasSpeech { keepAtQuit(recorded.url) }
         } else if let recording = activeRecording, recording.keptURL == nil {
@@ -855,6 +984,7 @@ final class AppModel {
         generation = UUID()
         isHeldSession = false
         recording.model = selectedModel
+        recording.uploadApproved = true
         transcribe(recording)
     }
 
@@ -918,6 +1048,7 @@ final class AppModel {
 
     /// Immediate cleanup for failures and quitting; only user cancellation offers Undo.
     func discardRecording() {
+        answerQuestion(false)
         generation = UUID()
         pressesReturn = false
         pendingReturn?.cancel()
@@ -1645,6 +1776,7 @@ final class AppModel {
 
     func dismissCard() {
         guard !isBusy else { return }
+        if phase.isAsking { answerQuestion(false); return }
         if phase == .sending { holdBackReturn(); return }
         cancelledRecording = nil
         failedRecording = nil

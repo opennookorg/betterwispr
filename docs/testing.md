@@ -1124,7 +1124,18 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   API connection. No countdown appears and recording continues past 10:00 until
   you stop it, then the whole transcript pastes. With Show words as you speak on,
   the Parakeet preview stops following after ten minutes while recording
-  continues. Hold mode behaves the same while held.
+  continues. Hold mode behaves the same while held. With an API connection the
+  capsule asks before sending, and with automatic paste it asks before pasting,
+  with no countdown on either card. Don't send leaves the recording on the failure
+  card and, with history on, in History. Copy instead leaves the text on the
+  clipboard. Escape answers no to both. Both questions stay away under 10:00.
+- [ ] Toggle-record past one hour. A short toast reminds you it is still recording
+  and names the limit, without taking focus or changing the capsule, and comes
+  back each hour. The hard stop (4,278,190,080 frames, about 24 hours 45 minutes at
+  48 kHz) is covered by `theWriterStopsAtItsFrameLimitAndKeepsWhatItCaptured` and
+  `theHardStopFinishesTheRecordingInsteadOfDroppingIt`, not by a real recording.
+- [ ] Unplug the only microphone during a long dictation. The failure card offers
+  Try again on what was captured, and with history on History lists it.
 - [ ] Turn on Hide capsule while dictating, with the floating capsule both on
   and off. Dictate in hold and toggle mode. No capsule appears while listening
   or transcribing, the menu bar icon is a microphone while listening, the text

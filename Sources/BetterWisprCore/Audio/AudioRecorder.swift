@@ -9,6 +9,22 @@ public struct RecordedAudio: Sendable {
     public let hasSpeech: Bool
 }
 
+/// A recording that capture interrupted; `audio` holds what reached the file, which the catcher now owns.
+public struct RecordingInterruption: LocalizedError {
+    public let audio: RecordedAudio
+    public let cause: any Error
+    public var errorDescription: String? { cause.localizedDescription }
+
+    public init(audio: RecordedAudio, cause: any Error) {
+        self.audio = audio
+        self.cause = cause
+    }
+
+    public func discardAudio() {
+        try? FileManager.default.removeItem(at: audio.url)
+    }
+}
+
 public enum AudioRecordingError: LocalizedError {
     case permissionDenied, unavailable, inputStalled, alreadyRecording, notRecording
 
@@ -27,6 +43,10 @@ public enum AudioRecordingError: LocalizedError {
 public final class AudioRecorder {
     public var onLevel: (@MainActor @Sendable (VoiceLevels) -> Void)?
     public var onError: (@MainActor (any Error) -> Void)?
+    /// Called on each buffer once the file holds `DictationLimits.maximumFrames`, until the recording stops.
+    public var onFrameLimit: (@MainActor () -> Void)?
+    /// How long the running recording may last at its file's sample rate.
+    public var maximumDuration: TimeInterval? { writer.map { DictationLimits.maximumDuration(sampleRate: $0.sampleRate) } }
     /// RMS amplitude gate, not a semantic speech detector. Lower this for quiet microphones.
     public var silenceThreshold: Float = 0.002
     /// Nil uses Automatic.
@@ -91,28 +111,61 @@ public final class AudioRecorder {
             try await progress.wait(through: ProcessInfo.processInfo.systemUptime)
             guard recordingID == id else { throw CancellationError() }
         } catch {
-            if recordingID == id { cancel() }
-            throw error
+            guard recordingID == id, !(error is CancellationError) else {
+                if recordingID == id { cancel() }
+                throw error
+            }
+            recoveryError = error
         }
-        return try stop()
+        return try stopKeepingAudio()
     }
 
     /// Stops immediately, used when cancelling without waiting for more microphone data.
     public func stop() throws -> RecordedAudio {
+        do {
+            return try stopKeepingAudio()
+        } catch let interruption as RecordingInterruption {
+            interruption.discardAudio()
+            throw interruption.cause
+        }
+    }
+
+    /// Stops for quitting, returning whatever reached the file even when capture had failed.
+    public func stopSalvaging() -> RecordedAudio? {
+        do {
+            return try stopKeepingAudio()
+        } catch let interruption as RecordingInterruption {
+            return interruption.audio
+        } catch {
+            return nil
+        }
+    }
+
+    /// Deletes dictation audio left by a crash; a day's grace spares a recording another running copy is still writing.
+    public static func removeLeftovers(in folder: URL = FileManager.default.temporaryDirectory, now: Date = Date()) {
+        let prefix = "betterwispr-"
+        let items = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        for url in items where url.pathExtension == "caf" {
+            let name = url.deletingPathExtension().lastPathComponent
+            guard name.hasPrefix(prefix), UUID(uuidString: String(name.dropFirst(prefix.count))) != nil else { continue }
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
+            if now.timeIntervalSince(modified) > 24 * 3600 { try? FileManager.default.removeItem(at: url) }
+        }
+    }
+
+    private func stopKeepingAudio() throws -> RecordedAudio {
         guard let writer, let url = recordingURL else { throw AudioRecordingError.notRecording }
         haltMicrophone()
         let result = writer.finish()
         let error = result.error ?? recoveryError
         reset()
-        if let error {
-            try? FileManager.default.removeItem(at: url)
-            throw error
-        }
         guard result.duration > 0 else {
             try? FileManager.default.removeItem(at: url)
-            throw SpeechError.emptyAudio
+            throw error ?? SpeechError.emptyAudio
         }
-        return RecordedAudio(url: url, duration: result.duration, hasSpeech: result.hasSpeech)
+        let audio = RecordedAudio(url: url, duration: result.duration, hasSpeech: result.hasSpeech)
+        if let error { throw RecordingInterruption(audio: audio, cause: error) }
+        return audio
     }
 
     public func cancel() {
@@ -137,6 +190,7 @@ public final class AudioRecorder {
         try await input.start { @Sendable [weak self] buffer, time in
             let end = AudioCaptureProgress.endTime(time, frames: buffer.frameLength, sampleRate: sampleRate)
             let loudness = writer.write(buffer)
+            let atLimit = writer.reachedFrameLimit
             tap?.receive(buffer)
             let step = Double(buffer.frameLength) / sampleRate / Double(max(1, loudness.count))
             Task { @MainActor [weak self] in
@@ -144,6 +198,7 @@ public final class AudioRecorder {
                 progress.receive(through: end, generation: capture)
                 let values = loudness.map { self.meter.update(rms: $0, over: step) }
                 self.onLevel?(VoiceLevels(values: values, start: .now.addingTimeInterval(-step * Double(max(0, values.count - 1))), step: step))
+                if atLimit { self.onFrameLimit?() }
             }
         }
         guard recordingID == id, !Task.isCancelled else {
@@ -172,8 +227,7 @@ public final class AudioRecorder {
             if recoveryAttempts < 3 {
                 inputObserver?.scheduleCheck()
             } else {
-                cancel()
-                onError?(error)
+                do { _ = try stopKeepingAudio() } catch { onError?(error) }
             }
         }
     }
@@ -289,19 +343,23 @@ final class RecordingWriter: @unchecked Sendable {
     private var maximumRMS: Float = 0
     private var error: (any Error)?
     private let formatter = FormatConverter()
-    private let sampleRate: Double
+    let sampleRate: Double
     private let threshold: Float
+    private let frameLimit: AVAudioFramePosition
 
-    init(url: URL, format: AVAudioFormat, threshold: Float) throws {
+    init(url: URL, format: AVAudioFormat, threshold: Float, frameLimit: AVAudioFramePosition = DictationLimits.maximumFrames) throws {
         file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved)
         sampleRate = format.sampleRate
         self.threshold = threshold.isFinite ? max(0, threshold) : 0.002
+        self.frameLimit = frameLimit
     }
+
+    var reachedFrameLimit: Bool { lock.withLock { frames >= frameLimit } }
 
     func write(_ input: AVAudioPCMBuffer) -> [Float] {
         lock.lock()
         defer { lock.unlock() }
-        guard let file, error == nil, input.frameLength > 0 else { return [] }
+        guard let file, error == nil, frames < frameLimit, input.frameLength > 0 else { return [] }
         let buffer: AVAudioPCMBuffer
         do {
             buffer = try formatter.convert(input, to: file.processingFormat)

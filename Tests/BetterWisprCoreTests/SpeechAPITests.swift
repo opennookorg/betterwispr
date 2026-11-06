@@ -3,6 +3,16 @@ import Foundation
 import Testing
 @testable import BetterWisprCore
 
+private extension SpeechAudio {
+    static func wavChunks(_ url: URL, seconds: Double) async throws -> [Data] {
+        var chunks: [Data] = []
+        for range in try await chunkRanges(url, seconds: seconds) {
+            chunks.append(try await wavChunk(url, range))
+        }
+        return chunks
+    }
+}
+
 @Test func speechConnectionsValidateDestinationsAndKeepSecretsOutOfSettings() throws {
     var connection = SpeechConnection(api: .openAICompatible)
     for endpoint in ["http://localhost:8000/v1/audio/transcriptions", "http://127.0.0.1:8000/transcribe", "http://[::1]:8000/transcribe", "https://speech.example/transcribe"] {
@@ -223,7 +233,6 @@ private final class SpeechEndpointStub: URLProtocol, @unchecked Sendable {
 }
 
 @Test func speechAPIAcceptsDictationsLongerThanTenMinutes() async throws {
-    // Dictation has no time limit; a 25-minute recording is cut into pieces like any other.
     let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-api-test-\(UUID()).wav")
     defer { try? FileManager.default.removeItem(at: url) }
     try SpeechAudio.wav(Array(repeating: 0.1, count: 16_000 * 1_500)).write(to: url)
