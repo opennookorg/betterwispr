@@ -271,7 +271,8 @@ func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocab
             let cleaning = clock.now
             var cleaned = TranscriptCleaner.clean(hypothesis, language: spoken)
             if settings.cleanup == .medium, TranscriptCleaner.isEnglish(cleaned, language: spoken) {
-                cleaned = await TranscriptPolisher.polish(cleaned, settings: settings, vocabulary: vocabulary, context: nil) ?? cleaned
+                let commanded = VoiceCommands.apply(cleaned)
+                cleaned = await TranscriptPolisher.polish(commanded, settings: settings, vocabulary: vocabulary, context: nil) ?? commanded
             }
             result.cleaned = cleaned
             result.cleanupSeconds = seconds(cleaning.duration(to: clock.now))

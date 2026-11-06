@@ -6,6 +6,80 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Semantic spoken lists: local trial
+
+Use English (or Auto with English speech), Style → Auto cleanup → Medium,
+and Apple's on-device cleanup model. Keep Use screen context off for this
+trial. Text goes through `TranscriptPolisher.polish`, which uses the model to
+infer list structure from meaning. The selected model decides whether the text is a list and identifies item boundaries. A shared renderer matches the quoted fragments to the original text and refuses invented items, reordered spans or omitted non-framing words. Explicit numbering cues select numbering only after the model has identified a list. The renderer needs three items, or two when the speaker numbered them, so "Pick up milk, bread and eggs" with a two-item answer stays a sentence. Each item starts with a capital and ends with a period or its spoken question or exclamation mark, and numbered items lose the spoken ordinal.
+The first edit can form a list by itself. The layout pass runs only when `TranscriptListFormatter.isLikelyList` finds explicit order, a sentence with three or more parts, or phrasing repeated three times. "New line" and "new paragraph" are converted by `VoiceCommands` before the model. A dictation with such breaks skips the layout pass, and an edit that loses or adds lines keeps the Light text, so the breaks survive. Selected-text cleanup uses `TranscriptPolisher.selectionInstructions`, skips the layout pass, and keeps the Light text if the edit adds or removes list markers.
+Light cleanup only removes fillers, stutters and clear repairs. Parakeet remains the independent speech-recognition engine. The layout pass uses the same selected cleanup provider as editing; Apple Intelligence is used for this local trial. No subscription is required, and no cloud provider is used as a fallback. The existing built-in model and other cleanup providers use the same layout interface; their quality has not been live-verified in this trial.
+
+| Say naturally | Expected structure |
+| --- | --- |
+| Okay, let's do my shopping list. I need to buy milk, I need to buy bread, another thing, buy eggs, then buy flour, then buy donuts. | Introduction and five bullets |
+| I need to buy milk I need to buy bread and I need to buy eggs. | Three bullets, without an introduction |
+| I need milk, bread, eggs, flour and donuts. | Five bullets |
+| We need to update the website, send the invoices and book the room. | Three bullets |
+| The release needs a keyboard shortcut that works, a history that survives restarts, and a way to copy the result. | Three bullets |
+| For tomorrow please call Sam, renew the insurance, pick up the parcel and water the plants. | Four bullets |
+| Open the app, sign in, choose the report and press export. | Four numbered steps |
+| I bought milk after work, then went home because it was raining. | Prose |
+| I put the milk next to the bread and realised I had forgotten the eggs. | Prose |
+| The first room is upstairs and the second room is downstairs. | Prose |
+| I met Alex, Sam and Jo at the station. | Prose |
+| I visited Paris and Tokyo last year. | Prose |
+| Call Sam next Tuesday about the renewal. | Prose, keeping "next" |
+| Send the report to Sam today new line call the vendor about the delivery date | Two lines, no list |
+| Thanks for the update new paragraph I will review the draft this afternoon | Two paragraphs, no list |
+| We launched a new line of products last spring. | Prose, keeping "new line" |
+
+The first seven examples are lists because they enumerate requested items,
+requirements, independent tasks or ordered actions. The rest describe a
+connected narrative or comparison, or dictate a line break. Words like “then”,
+“first” and object names alone do not decide the format. Keep every action, item,
+quantity, qualifier and negation; formatting is not permission to invent or
+summarize content.
+
+Local model trials invoke the production text method directly with synthetic
+text, so they test semantic formatting independently of speech-recognition
+mistakes. Run the same phrases through the live app to test the full path.
+
+On 2026-11-06 (macOS 27.2, Apple's on-device model, the commit that adds this
+record), the internal `TranscriptPolisher.polish` method ran on synthetic text
+after `VoiceCommands.apply`, with no microphone, recognition or paste:
+
+| Samples | Runs | Result | Layout calls |
+| --- | --- | --- | --- |
+| Short "new line" and "new paragraph" dictations | 18 | 18 kept the break, none became a list | 0 |
+| Long dictations with a cue | 4 | 2 edited with the break kept; 2 flattened by the model, so `polish` returned nil, which keeps the Light text and its break | 0 |
+| Ordinary "new line" and "new paragraph" wording | 4 | 4 unchanged, no break | 0 |
+| Ordinals in prose | 24 | 24 stayed prose | 0 |
+| Explicitly numbered points | 6 | 6 numbered lists | 4 |
+| Lists without numbering | 16 | 16 lists | 12 |
+| Prose | 18 | 18 stayed prose | 4 |
+| Selected text (two sentences, one existing list) | 6 | 6 formed no list; the existing list kept its markers | 0 |
+
+Four self-correction samples ran 12 times each on this prompt and on the prompt
+it replaced: 44 of 48 and 43 of 48 removed the rejected wording. The misses
+differed: this prompt left "Sorry I mean eight." in 4 of 12 table bookings; the
+earlier prompt left "Sorry I meant Priya." or similar in 5 of 12 name swaps. Both
+prompts also dropped "please" from the room sample every time. "Email the draft to
+Jordan no wait Casey before lunch." was not corrected in 5 of 5 runs on either
+prompt. These small runs validate those cases, not arbitrary model accuracy, and
+other cleanup providers were not run.
+
+- [ ] Dictate these examples into TextEdit with Medium and Apple selected.
+  Compare History's original transcription and formatted text.
+- [ ] Repeat with each writing tone; numbers/bullets and line breaks survive.
+- [ ] With Light/None or a non-English language selected, no model-based list
+  inference runs. If the selected cleanup model is unavailable, times out or
+  returns an unsafe edit, the app retains Light cleanup without a cloud fallback.
+  If only the layout pass fails, the edit is kept without list formatting.
+
+The structured layout is currently bounded to 20 items. Model output can vary; a likely list may take several seconds longer because it needs a separate layout call. A passing text trial does not establish general
+recognition accuracy or verify microphone, shortcut and paste permissions.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,

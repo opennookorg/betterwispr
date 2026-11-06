@@ -528,7 +528,7 @@ final class AppModel {
         if let refusal = SelectedTextCleanupOutcome.refusal(of: selected, settings: settings) { return refusal }
         showSelectedTextProgress()
         let edited = await TranscriptPolisher.polish(selected.trimmingCharacters(in: .whitespacesAndNewlines), settings: settings,
-                                                     vocabulary: VocabularyProcessor.hints(vocabulary), context: nil)
+                                                     vocabulary: VocabularyProcessor.hints(vocabulary), context: nil, formsLists: false)
         guard !Task.isCancelled else { return nil }
         guard let edited else { return .leftAsIs(model: settings.notesModelName) }
         guard let replacement = SelectedTextCleanupOutcome.replacement(keepingWhitespaceOf: selected, ifChangedTo: edited) else { return .alreadyClean }
