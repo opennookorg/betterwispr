@@ -40,6 +40,10 @@ import Testing
     #expect(TextJoin.continuing("").isEmpty)
     #expect(TextJoin.continuing("还有一件事。") == "还有一件事。")
     #expect(TextJoin.continuing("それから") == "それから")
+    #expect(TextJoin.continuing("1. Open the app\n2. Sign in") == "\n\n1. Open the app\n2. Sign in")
+    #expect(TextJoin.continuing("- Milk\n- Bread") == "\n\n- Milk\n- Bread")
+    #expect(TextJoin.continuing("-5 degrees today") == " -5 degrees today")
+    #expect(TextJoin.continuing("We need:\n\n- Milk") == " We need:\n\n- Milk")
 }
 
 @Test func onlyATextInputInClaudeDesktopTakesReturn() {

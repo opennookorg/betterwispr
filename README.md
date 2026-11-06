@@ -42,8 +42,11 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 5. Click into a text field in any app, hold **⌥ Space**, speak, and release.
 
 If paste can't safely reach the previous app, the text is copied to your
-clipboard instead, so you never lose a dictation. Recordings stop automatically
-after ten minutes, with a countdown in the last 30 seconds.
+clipboard instead, so you never lose a dictation. A dictation records until you
+release or press the shortcut again, up to about 24 hours 45 minutes at 48 kHz
+(a limit on audio frames, so half that at 96 kHz), then finishes by itself. A
+recording of ten minutes or longer asks before it is sent to an API connection
+or pasted automatically.
 
 ## Bring your own model
 
@@ -68,7 +71,7 @@ For optional subscription transcription, see [Codex subscription setup](docs/cod
 - Settings, vocabulary and history live in `~/Library/Application Support/BetterWispr/workspace.json` (not encrypted).
 - Models live in the `Models` folder next to it.
 - With Remember named voices on, voice profiles of the speakers you name live in `Voices.json` next to it (not encrypted). Forget Voices in Models deletes them, and deleting a meeting deletes the profiles named in it.
-- Audio is written to temporary files and deleted after each recording.
+- Audio is written to temporary files and deleted after each recording. A dictation that fails to transcribe, or is still in progress when BetterWispr quits, is kept in the `Failed Dictations` folder next to it, readable only by your macOS user, unless Save dictation history is off. It is deleted once it is transcribed, after 7 days or a shorter Keep history age limit, when more than 20 are kept or they pass 1 GB (oldest first), or when you turn Save dictation history off. The folder is left out of backups, and History lists each one under Not transcribed. When the selected speech model is an API connection, its button names where the audio will be sent.
 - Built-in models only touch the network when you explicitly download one.
 - Claude Code as a notes, Ask or cleanup provider needs a Claude subscription sign-in unless you turn on Allow any Claude Code sign-in in Models, off by default. With it on, that text goes wherever Claude Code is set up to send it, such as an API account, a company cloud account or a gateway, and is billed there. BetterWispr can't see that destination.
 - Send to Claude is off by default. When it is on, BetterWispr reads the list of running processes on this Mac to find Claude Code, and asks Terminal and iTerm2 which tab is in front once you allow it. Nothing is stored or sent.

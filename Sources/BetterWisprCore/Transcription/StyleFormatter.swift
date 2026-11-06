@@ -36,6 +36,8 @@ public enum StyleFormatter {
         guard let end = text.lastIndex(where: { ".!?".contains($0) }), text[end] == "." else { return nil }
         let after = text.index(after: end)
         guard after == text.endIndex || text[after].isWhitespace else { return nil }
+        let isListMarker = after != text.endIndex && text[..<end].reversed().prefix { !$0.isNewline }.allSatisfy(\.isNumber)
+        guard !isListMarker else { return nil }
         let word = text[..<end].reversed().prefix { !$0.isWhitespace }
         return word.first?.isLetter == true || word.first?.isNumber == true ? (word.contains(".") ? nil : end) : nil
     }

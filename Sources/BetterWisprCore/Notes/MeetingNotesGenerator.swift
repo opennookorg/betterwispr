@@ -158,6 +158,13 @@ struct NotesDraft: Decodable, Sendable {
 protocol NotesLanguageModel: Sendable {
     func respond(to prompt: String) async throws -> String
     func draft(_ prompt: String) async throws -> NotesDraft
+    func layout(_ prompt: String) async throws -> TranscriptListLayout
+}
+
+extension NotesLanguageModel {
+    func layout(_ prompt: String) async throws -> TranscriptListLayout {
+        try TranscriptListLayout.decode(await respond(to: prompt + "\nReturn only JSON: {\"kind\":\"prose|bullets|numbered\",\"items\":[\"exact text fragment\"],\"closing\":\"\"}. For lists use one entry per item; for prose items may be empty."))
+    }
 }
 
 extension NotesAvailability {
@@ -233,12 +240,38 @@ struct GeneratedNotes {
 }
 
 @available(macOS 26.0, *)
+@Generable private enum GeneratedTranscriptKind { case prose, bullets, numbered }
+
+@available(macOS 26.0, *)
+@Generable private struct GeneratedTranscriptLayout {
+    @Guide(description: "Infer meaning: prose for a connected story or comparison; bullets for requested objects, requirements or independent tasks; numbered for a workflow or explicit enumeration.")
+    var kind: GeneratedTranscriptKind
+    @Guide(description: "Copy one exact fragment per separate requested object, task, requirement or step. Never combine multiple items or include an entry that is only a transition. Preserve actions, quantities, qualifiers and negations. For prose, any two original clauses suffice; the application keeps the original prose unchanged.", .minimumCount(2), .maximumCount(20))
+    var items: [String]
+    @Guide(description: "An exact closing sentence after the list, otherwise empty. Do not invent text.")
+    var closing: String
+}
+
+@available(macOS 26.0, *)
 struct AppleNotesModel: NotesLanguageModel {
     var instructions = NotesWriter.instructions
     private static let options = GenerationOptions(temperature: 0.3)
 
     func respond(to prompt: String) async throws -> String {
         try await LanguageModelSession(instructions: instructions).respond(to: prompt, options: Self.options).content
+    }
+
+    func layout(_ prompt: String) async throws -> TranscriptListLayout {
+        let result = try await LanguageModelSession(instructions: instructions)
+            .respond(to: prompt, generating: GeneratedTranscriptLayout.self,
+                     options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 1024)).content
+        let kind: TranscriptListLayout.Kind
+        switch result.kind {
+        case .prose: kind = .prose
+        case .bullets: kind = .bullets
+        case .numbered: kind = .numbered
+        }
+        return TranscriptListLayout(kind: kind, items: result.items, closing: result.closing)
     }
 
     func draft(_ prompt: String) async throws -> NotesDraft {

@@ -12,6 +12,30 @@ struct HistoryView: View {
 
     var body: some View {
         Form {
+            if query.isEmpty, !model.failedDictations.isEmpty {
+                Section {
+                    let action = model.transcriptionModel.recordingAction(onDevice: ("Transcribe", "Transcribe this recording on the Transcribe page"))
+                    ForEach(model.failedDictations) { item in
+                        HStack(spacing: 6) {
+                            Text(item.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                            Spacer()
+                            Button(action.title) { model.transcribeFailedDictation(item) }
+                                .help(action.help)
+                            Button { model.revealFailedDictation(item) } label: { Image(systemName: "folder") }
+                                .help("Show in Finder")
+                                .accessibilityLabel("Show in Finder")
+                            Button { model.deleteFailedDictation(item) } label: { Image(systemName: "trash") }
+                                .help("Delete recording")
+                                .accessibilityLabel("Delete recording")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                } header: {
+                    Text("Not transcribed")
+                } footer: {
+                    Text("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups.")
+                }
+            }
             if !filteredHistory.isEmpty {
                 Section {
                     ForEach(filteredHistory) { transcript in
@@ -36,7 +60,9 @@ struct HistoryView: View {
         .formStyle(.grouped)
         .overlay {
             if filteredHistory.isEmpty {
-                if query.isEmpty {
+                if query.isEmpty, !model.failedDictations.isEmpty {
+                    EmptyView()
+                } else if query.isEmpty {
                     ContentUnavailableView(
                         "No Dictations",
                         systemImage: "clock",

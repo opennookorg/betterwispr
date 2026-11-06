@@ -201,6 +201,31 @@ private final class ScriptedProvider: SpeechProvider {
     #expect(MeetingStore(directory: folder.appending(path: "Transcriptions")).load().meetings.count == 1)
 }
 
+@MainActor
+@Test func transcribedFileReportsSavedOnlyAfterItsTranscriptIsSaved() async throws {
+    let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let url = try await mediaFile(seconds: 40, silent: [], tone: false)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    let speechModel = try #require(SpeechModel.catalog.first { $0.id == "parakeet-110m" })
+    let transcriptions = model.transcriptions
+    var saved = 0
+
+    transcriptions.transcribe(file: url, with: speechModel, provider: ScriptedProvider([{ "  " }]), language: "en", vocabulary: [], onSaved: { saved += 1 })
+    await transcriptions.work?.value
+    #expect(saved == 0)
+
+    transcriptions.transcribe(file: url, with: speechModel, provider: ScriptedProvider([{ throw SpeechError.timedOut }]), language: "en", vocabulary: [], onSaved: { saved += 1 })
+    await transcriptions.work?.value
+    #expect(saved == 0)
+
+    transcriptions.transcribe(file: url, with: speechModel, provider: ScriptedProvider([{ "thanks everyone" }]), language: "en", vocabulary: [], onSaved: { saved += 1 })
+    await transcriptions.work?.value
+    #expect(saved == 1)
+    #expect(MeetingStore(directory: folder.appending(path: "Transcriptions")).load().meetings.count == 1)
+}
+
 @Test func transcriptionTextNamesOnlyVoicesSpeakerDetectionFound() {
     var meeting = Meeting(title: "Panel", segments: [
         MeetingSegment(speaker: .them, start: 0, duration: 5, text: "Welcome.", rawText: "welcome", participant: 2),

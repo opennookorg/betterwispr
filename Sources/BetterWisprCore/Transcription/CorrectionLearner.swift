@@ -24,7 +24,7 @@ public enum CorrectionLearner {
 
     /// Returns word-level fixes the user made to dictated text, skipping rewrites and ordinary word swaps.
     public static func corrections(from original: String, to edited: String) -> [LearnedCorrection] {
-        let before = tokenize(original), after = tokenize(edited)
+        let before = tokenize(TranscriptPolisher.withoutListMarkers(original)), after = tokenize(TranscriptPolisher.withoutListMarkers(edited))
         guard !before.isEmpty, !after.isEmpty, before != after else { return [] }
         let substitutions = substitutions(before, after)
         guard substitutions.count <= max(1, before.count / 2) else { return [] }

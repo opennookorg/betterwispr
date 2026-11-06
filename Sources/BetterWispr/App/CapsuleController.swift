@@ -84,7 +84,7 @@ private final class CapsuleHostingView: NSHostingView<CapsuleView> {
 
 extension AppModel {
     var showsCapsule: Bool {
-        if isBusy && settings.hideCapsuleWhileDictating && recordingSecondsLeft == nil { return false }
+        if isBusy && settings.hideCapsuleWhileDictating { return false }
         return settings.showCapsule || phase != .idle || !meetings.runs.isEmpty || meetings.message != nil || meetingDetector.meeting != nil
     }
 }
