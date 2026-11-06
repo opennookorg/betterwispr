@@ -67,15 +67,24 @@ public enum TranscriptPolisher {
     public static func polish(_ text: String, settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "") async -> String? {
         let words = text.split(whereSeparator: \.isWhitespace).count
         let (system, request) = exchange(text, for: settings.notesSelection, vocabulary: vocabulary, context: context, instructions: extra)
-        guard words >= minimumWords, let model = try? MeetingNotesGenerator.languageModel(settings, instructions: system, lowLatency: true) else { return nil }
+        guard words >= minimumWords,
+              let editor = try? MeetingNotesGenerator.languageModel(settings, instructions: system, lowLatency: true),
+              let formatter = try? MeetingNotesGenerator.languageModel(settings, instructions: TranscriptListFormatter.instructions, lowLatency: true) else { return nil }
         let (attempts, timeout) = schedule(for: settings.notesSelection, words: words)
+        return await polish(text, request: request, instructions: extra, editor: editor, formatter: formatter, attempts: attempts, timeout: timeout)
+    }
+
+    /// Edits with retries, then lays the edit out once unless a mode's instructions apply; a failed layout keeps the edit.
+    static func polish(_ text: String, request: String, instructions extra: String, editor: any NotesLanguageModel, formatter: any NotesLanguageModel,
+                       attempts: Int, timeout: Duration) async -> String? {
         for attempt in 1...attempts {
-            let outcome = await respond(within: timeout) {
-                let reply = try await model.respond(to: request)
-                let edited = accepted(filtered(reply), for: text) ?? text
-                return try await TranscriptListFormatter.format(edited, settings: settings)
+            let outcome = await respond(within: timeout) { try await editor.respond(to: request) }
+            if case .reply(let reply) = outcome {
+                guard let edited = accepted(filtered(reply), for: text) else { return nil }
+                guard extra.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      case .reply(let listed) = await respond(within: timeout, operation: { try await TranscriptListFormatter.format(edited, using: formatter) }) else { return edited }
+                return accepted(listed, for: text) ?? edited
             }
-            if case .reply(let reply) = outcome { return accepted(filtered(reply), for: text) }
             guard let delay = retryDelay(after: outcome, attempt: attempt, of: attempts) else { return nil }
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return nil }
@@ -110,10 +119,10 @@ public enum TranscriptPolisher {
         case reply(String), timedOut, transientFailure, failure
     }
 
-    /// Notes CLIs start a process per request, so they get one long attempt; other models get three of 14 seconds plus 1 per 5 words for editing and layout.
+    /// Notes CLIs start a process per request, so they get one long attempt; other models get three short ones. The layout pass gets one more timeout of the same length.
     static func schedule(for selection: NotesModelSelection, words: Int) -> (attempts: Int, timeout: Duration) {
-        if case .cli = selection { return (1, .seconds(20 + words / 5)) }
-        return (3, .seconds(14 + words / 5))
+        if case .cli = selection { return (1, .seconds(10 + words / 10)) }
+        return (3, .seconds(7 + words / 10))
     }
 
     /// Retries timeouts at once and transient network failures after 1 then 2 seconds; nil gives up.
@@ -206,6 +215,11 @@ public enum TranscriptPolisher {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Removes the bullet or number that starts each line.
+    static func withoutListMarkers(_ text: String) -> String {
+        text.replacing(#/(?m)^[ \t]*(?:\d+[.)]|[-*•])[ \t]+/#, with: "")
+    }
+
     /// Rejects replies that answer the dictation, add new content or change its length too much to be an edit.
     static func accepted(_ reply: String, for text: String) -> String? {
         var edited = reply.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,7 +227,7 @@ public enum TranscriptPolisher {
            "\"“".contains(first), "\"”".contains(last), !text.hasPrefix(String(first)) {
             edited = edited.dropFirst().dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        let words = edited.replacing(#/(?m)^[ \t]*(?:\d+[.)]|[-*•])[ \t]+/#, with: "")
+        let words = withoutListMarkers(edited)
         let before = text.split(whereSeparator: \.isWhitespace).count
         let after = words.split(whereSeparator: \.isWhitespace).count
         guard after >= max(1, before * 2 / 5), after <= before + max(2, before / 5) else { return nil }

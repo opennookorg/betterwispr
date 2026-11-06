@@ -226,7 +226,8 @@ enhancement prompt of [VoiceInk](https://github.com/Beingpax/VoiceInk) revision
 [`VoiceInk/Core/Enhancement/AIPrompts.swift`](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Core/Enhancement/AIPrompts.swift)
 with the Default prompt from
 [`VoiceInk/Features/Enhancement/Templates/PromptTemplates.swift`](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Features/Enhancement/Templates/PromptTemplates.swift)
-inlined as its task instructions. The vocabulary and context sections follow
+inlined as its task instructions; the fixed instructions have since been rewritten
+around list structure, so little of that wording remains. The vocabulary and context sections follow
 [`VoiceInk/Features/Enhancement/Workflows/AIEnhancementService.swift`](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Features/Enhancement/Workflows/AIEnhancementService.swift)
 and the reply filter follows
 [`VoiceInk/Core/Enhancement/AIEnhancementOutputFilter.swift`](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Core/Enhancement/AIEnhancementOutputFilter.swift).
@@ -241,7 +242,9 @@ none of it reaches Claude Code's command line, and keep BetterWispr's check that
 rejects replies that are not edits, which now ignores list markers. On timeouts
 and transient network errors it makes up to three attempts of 7 seconds plus 1
 second per 10 words each; CLI models get one attempt of 10 seconds plus 1 second
-per 10 words. A failure keeps the light cleanup.
+per 10 words. A second pass of one more such timeout asks the same model for list
+structure; a failed layout keeps the edit, and a mode's instructions skip the pass.
+A failed edit keeps the light cleanup.
 `Sources/BetterWisprCore/Integrations/ContextCapture.swift` adapts the window
 matching and Vision text recognition of
 [`VoiceInk/Infrastructure/SystemIntegration/ScreenCapture/ScreenCaptureService.swift`](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Infrastructure/SystemIntegration/ScreenCapture/ScreenCaptureService.swift)

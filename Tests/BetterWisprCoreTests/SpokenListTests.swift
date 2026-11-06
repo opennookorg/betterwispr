@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import BetterWisprCore
 
@@ -83,4 +84,111 @@ func lightCleanupLeavesListDecisionsToTheLanguageModel(_ example: SemanticListEx
     let layout = try TranscriptListLayout.decode("```json\n{\"kind\":\"bullets\",\"items\":[\"milk\",\"bread\"]}\n```")
     #expect(layout.items == ["milk", "bread"])
     #expect(throws: (any Error).self) { try TranscriptListLayout.decode("{\"kind\":\"invented\",\"items\":[]}") }
+}
+
+private struct ScriptedModel: NotesLanguageModel {
+    let reply: @Sendable () async throws -> String
+
+    func respond(to prompt: String) async throws -> String { try await reply() }
+
+    func draft(_ prompt: String) -> NotesDraft { NotesDraft(title: "", overview: "", keyPoints: [], decisions: [], actionItems: []) }
+}
+
+private actor CallCount {
+    private(set) var value = 0
+
+    func increment() { value += 1 }
+}
+
+private let spokenList = "send the invoice, book the room and call Alex"
+private let editedList = "Send the invoice, book the room and call Alex."
+
+private func polished(editor: @escaping @Sendable () async throws -> String, formatter: @escaping @Sendable () async throws -> String,
+                      instructions: String = "", timeout: Duration = .seconds(5)) async -> String? {
+    await TranscriptPolisher.polish(spokenList, request: "", instructions: instructions, editor: ScriptedModel(reply: editor),
+                                    formatter: ScriptedModel(reply: formatter), attempts: 3, timeout: timeout)
+}
+
+@Test func aFailedLayoutKeepsTheEditAndNeverRepeatsIt() async {
+    let replies = ["not json", "Here it is: {\"kind\":\"bullets\",\"items\":[]}", "{\"kind\":\"prose\"}", ""]
+    for reply in replies {
+        let edits = CallCount()
+        let result = await polished(editor: { await edits.increment(); return editedList }, formatter: { reply })
+        #expect(result == editedList)
+        #expect(await edits.value == 1)
+    }
+    #expect(await polished(editor: { editedList }, formatter: { throw URLError(.timedOut) }) == editedList)
+    let stalled = await polished(editor: { editedList }, formatter: {
+        try await Task.sleep(for: .seconds(30))
+        return "{\"kind\":\"prose\",\"items\":[]}"
+    }, timeout: .milliseconds(100))
+    #expect(stalled == editedList)
+}
+
+@Test func aSuccessfulLayoutFormatsTheEdit() async {
+    let result = await polished(editor: { editedList }, formatter: { "{\"kind\":\"bullets\",\"items\":[\"Send the invoice\",\"book the room\",\"call Alex\"]}" })
+    #expect(result == "- Send the invoice\n- book the room\n- call Alex.")
+}
+
+@Test func aFailedOrRejectedEditKeepsTheLightCleanupWithoutALayout() async {
+    let layouts = CallCount()
+    let formatter: @Sendable () async throws -> String = { await layouts.increment(); return "{\"kind\":\"prose\",\"items\":[]}" }
+    #expect(await polished(editor: { throw MeetingNotesError.unavailable("off") }, formatter: formatter) == nil)
+    #expect(await polished(editor: { "You should ask your accountant about quarterly invoices tomorrow morning instead." }, formatter: formatter) == nil)
+    #expect(await layouts.value == 0)
+}
+
+@Test func modeInstructionsSkipTheLayoutThatCouldOverrideThem() async {
+    let layouts = CallCount()
+    let formatter: @Sendable () async throws -> String = { await layouts.increment(); return "{\"kind\":\"bullets\",\"items\":[\"Send the invoice\",\"book the room\",\"call Alex\"]}" }
+    #expect(await polished(editor: { editedList }, formatter: formatter, instructions: "Write one paragraph.") == editedList)
+    #expect(await layouts.value == 0)
+    #expect(await polished(editor: { editedList }, formatter: formatter, instructions: "  ") != editedList)
+    #expect(await layouts.value == 1)
+}
+
+@Test func textWithoutSpacesNeverReachesAModel() async {
+    #expect(await TranscriptPolisher.polish("牛乳とパンと卵を買ってください", settings: AppSettings(), vocabulary: [], context: nil) == nil)
+    #expect(!TranscriptCleaner.isEnglish("牛乳とパンと卵を買ってください", language: nil))
+    #expect(!TranscriptCleaner.isEnglish("Necesito comprar leche, pan y huevos por favor.", language: nil))
+}
+
+@Test func alternativesAndNegationsStayProse() {
+    let cases: [(String, [String])] = [
+        ("Do you want tea, coffee or juice with your breakfast?", ["tea", "coffee", "juice with your breakfast"]),
+        ("Pick up milk or bread or eggs.", ["milk", "bread", "eggs"]),
+        ("I cannot call Sam, email Priya and book the room today.", ["I cannot call Sam", "email Priya", "book the room today"]),
+        ("You can't buy milk and bread here.", ["buy milk", "bread here"]),
+        ("I won’t send the invoice and book the room.", ["send the invoice", "book the room"]),
+    ]
+    for (text, items) in cases {
+        #expect(TranscriptListLayout(kind: .bullets, items: items).render(in: text) == text)
+    }
+    #expect(TranscriptListLayout(kind: .bullets, items: ["Buy milk", "don't buy bread"]).render(in: "Buy milk, don't buy bread.") == "- Buy milk\n- don't buy bread.")
+}
+
+@Test func aLayoutKeepsEveryQuantityAndOrdinalWord() {
+    #expect(TranscriptListLayout(kind: .bullets, items: ["two eggs", "banana", "apple"]).render(in: "We ate two eggs, one banana and one apple.")
+            == "We ate two eggs, one banana and one apple.")
+    #expect(TranscriptListLayout(kind: .bullets, items: ["one", "two", "three"]).render(in: "I want one, two and three.")
+            == "I want:\n\n- one\n- two\n- three.")
+    #expect(TranscriptListLayout(kind: .bullets, items: ["Milk", "bread", "eggs are on the table"]).render(in: "I got here first. Milk, bread and eggs are on the table.")
+            == "I got here first.\n\n- Milk\n- bread\n- eggs are on the table.")
+    #expect(TranscriptListLayout(kind: .bullets, items: ["send the invoice", "call Alex"]).render(in: "One thing, send the invoice. One more thing, call Alex.")
+            == "- send the invoice.\n- call Alex.")
+}
+
+@Test func tonesLeaveListMarkersAlone() {
+    let numbered = "1. Open the app\n2. Sign in\n3. Call Alex"
+    #expect(StyleFormatter.apply(.excited, to: numbered) == numbered)
+    #expect(StyleFormatter.apply(.excited, to: "1. Open the app\n2. Sign in.") == "1. Open the app\n2. Sign in!")
+    #expect(StyleFormatter.apply(.excited, to: "See you at 5.") == "See you at 5!")
+}
+
+@Test func learningAndWordCountsIgnoreListMarkers() {
+    let fixes = CorrectionLearner.corrections(from: "1. Kumr called\n2. Sam left", to: "Kumar called\nSam left")
+    #expect(fixes == [LearnedCorrection(heard: "Kumr", corrected: "Kumar")])
+    #expect(CorrectionLearner.corrections(from: "1. Call Sam\n2. Email Sam", to: "Call Sam. Email Sam.").isEmpty)
+    let transcript = Transcript(text: "1. Call Sam\n- Email Sam", rawText: "call sam email sam", duration: 1, modelName: "test", language: "en")
+    #expect(transcript.wordCount == 4)
 }

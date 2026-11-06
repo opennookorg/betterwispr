@@ -149,9 +149,9 @@ import Testing
 }
 
 @Test func retriesTimeoutsAtOnceAndTransientFailuresWithBackoff() {
-    #expect(TranscriptPolisher.schedule(for: .cli(.claudeCode), words: 50) == (1, .seconds(30)))
-    #expect(TranscriptPolisher.schedule(for: .apple, words: 9) == (3, .seconds(15)))
-    #expect(TranscriptPolisher.schedule(for: .ollama("llama3.1:8b"), words: 300) == (3, .seconds(74)))
+    #expect(TranscriptPolisher.schedule(for: .cli(.claudeCode), words: 50) == (1, .seconds(15)))
+    #expect(TranscriptPolisher.schedule(for: .apple, words: 9) == (3, .seconds(7)))
+    #expect(TranscriptPolisher.schedule(for: .ollama("llama3.1:8b"), words: 300) == (3, .seconds(37)))
 
     #expect(TranscriptPolisher.retryDelay(after: .timedOut, attempt: 1, of: 3) == .zero)
     #expect(TranscriptPolisher.retryDelay(after: .transientFailure, attempt: 1, of: 3) == .seconds(1))

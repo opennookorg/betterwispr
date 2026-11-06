@@ -51,6 +51,7 @@ No Codex subscription or additional model download was used.
 - [ ] With Light/None or a non-English language selected, no model-based list
   inference runs. If the selected cleanup model is unavailable, times out or
   returns an unsafe edit, the app retains Light cleanup without a cloud fallback.
+  If only the layout pass fails, the edit is kept without list formatting.
 
 The structured layout is currently bounded to 20 items. Model output can vary; cleanup may take several seconds because editing and structure inference can require separate model calls. A passing text trial does not establish general
 recognition accuracy or verify microphone, shortcut and paste permissions.
