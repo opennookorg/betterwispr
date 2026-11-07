@@ -148,6 +148,11 @@ final class AppModel {
                 if !phase.isBusy { syncShiftShortcut() }
             }
             if phase.armsCancelShortcut != oldValue.armsCancelShortcut { onBusyChange?(phase.armsCancelShortcut) }
+            switch (oldValue == .recording, phase == .recording) {
+            case (false, true) where settings.muteOtherAppsWhileDictating && meetings.capturingID == nil: mediaPauser.muteOtherApps()
+            case (true, false): mediaPauser.unmuteOtherApps()
+            default: break
+            }
             switch (oldValue.holdsMicrophone, phase.holdsMicrophone) {
             case (false, true) where settings.pauseMediaWhileDictating: mediaPauser.pause()
             case (true, false): mediaPauser.resume()
@@ -282,6 +287,7 @@ final class AppModel {
         }
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
+        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: "Couldn’t mute other apps", $0)) }
         AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {
