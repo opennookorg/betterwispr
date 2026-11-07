@@ -72,11 +72,11 @@ private final class FailingDictation {
     let store: FailedDictationStore
     var recording: DictationRecording?
 
-    init(duration: TimeInterval = 1) throws {
+    init(duration: TimeInterval = 1, mediaPauser: MediaPauser = MediaPauser()) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         audio = folder.appendingPathComponent("betterwispr-test.caf")
         try Data("synthetic audio".utf8).write(to: audio)
-        model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+        model = AppModel(store: LocalStore(directory: folder), startsServices: false, mediaPauser: mediaPauser)
         store = FailedDictationStore(directory: folder.appendingPathComponent("Failed Dictations", isDirectory: true))
         let connection = SpeechConnection(api: .smallest)
         model.settings.soundEffects = false
@@ -572,6 +572,35 @@ private let longDictation = DictationLimits.confirmationDuration + 60
     #expect(dictation.model.phase == .transcribing)
     try await dictation.settle { dictation.model.phase != .transcribing }
     #expect(dictation.model.failure?.title == "Couldn’t finish recording.")
+}
+
+@Test @MainActor func theHardStopUnmutesOtherAppsBeforeTranscribing() async throws {
+    let players = FakeMediaPlayers([:])
+    let dictation = try FailingDictation(mediaPauser: MediaPauser(players: players, otherApps: players, callInProgress: { false }))
+    dictation.model.settings.muteOtherAppsWhileDictating = true
+    dictation.model.phase = .recording
+    await dictation.model.mediaPauser.pending?.value
+    #expect(await players.log == ["mute"])
+    dictation.model.recordingReachedLimit()
+    #expect(dictation.model.phase == .transcribing)
+    await dictation.model.mediaPauser.pending?.value
+    #expect(await players.log == ["mute", "unmute"])
+    try await dictation.settle { dictation.model.phase != .transcribing }
+}
+
+@Test @MainActor func otherAppsAreAudibleWhileTheQuestionCardWaits() async throws {
+    let players = FakeMediaPlayers([:])
+    let dictation = try FailingDictation(duration: longDictation, mediaPauser: MediaPauser(players: players, otherApps: players, callInProgress: { false }))
+    dictation.model.settings.muteOtherAppsWhileDictating = true
+    dictation.model.phase = .recording
+    dictation.model.phase = .transcribing
+    try dictation.start()
+    #expect(dictation.model.phase.isAsking)
+    await dictation.model.mediaPauser.pending?.value
+    #expect(await players.log == ["mute", "unmute"])
+    dictation.model.answerQuestion(false)
+    await dictation.model.mediaPauser.pending?.value
+    #expect(await players.log == ["mute", "unmute"])
 }
 
 @Test @MainActor func remindersNeverInterruptAndFireOncePerHour() throws {
