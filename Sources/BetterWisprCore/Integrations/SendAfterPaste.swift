@@ -23,10 +23,10 @@ public enum SendAfterPaste {
     public static func refusal(of keystroke: SendKeystroke, shortcut: DictationShortcut) -> String? {
         let name = keystroke.displayName
         let keyCode = Int(keystroke.keyCode)
-        if [kVK_Delete, kVK_ForwardDelete].contains(keyCode) { return "\(name) would erase what you dictated." }
+        if [kVK_Delete, kVK_ForwardDelete].contains(keyCode) { return L10n.tr("%@ would erase what you dictated.", name) }
         let quitsOrCloses = [kVK_ANSI_Q, kVK_ANSI_W].contains(keyCode) || ["Q", "W"].contains(keystroke.key.uppercased())
-        if keystroke.modifiers.contains(.command), quitsOrCloses { return "\(name) could quit the app or close its window." }
-        return clashes(keystroke, with: shortcut) ? "\(name) clashes with your dictation shortcut, \(shortcut.displayName)." : nil
+        if keystroke.modifiers.contains(.command), quitsOrCloses { return L10n.tr("%@ could quit the app or close its window.", name) }
+        return clashes(keystroke, with: shortcut) ? L10n.tr("%@ clashes with your dictation shortcut, %@.", name, shortcut.displayName) : nil
     }
 
     /// The hot key also listens with Shift while sending is on, and a posted modifier always comes from its left-hand key.

@@ -152,13 +152,13 @@ struct PermissionRow: View {
         LabeledContent {
             if granted {
                 Label {
-                    Text("Allowed")
+                    Text(L10n.tr("Allowed"))
                 } icon: {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 }
                 .foregroundStyle(.secondary)
             } else {
-                Button("Allow…", action: action)
+                Button(L10n.tr("Allow…"), action: action)
             }
         } label: {
             Text(title)

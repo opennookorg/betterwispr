@@ -84,6 +84,34 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
         self = shortcut
     }
 
-    public var displayName: String { modifiers.isEmpty ? key : modifiers.symbols + " " + key }
-    public var spokenName: String { (modifiers.activeNames.map(\.spoken) + [key]).joined(separator: " ") }
+    public static func localizedKeyName(keyCode: UInt32, fallback: String) -> String {
+        let name: String? = switch Int(keyCode) {
+        case kVK_Control: "Left Control"
+        case kVK_RightControl: "Right Control"
+        case kVK_Option: "Left Option"
+        case kVK_RightOption: "Right Option"
+        case kVK_Shift: "Left Shift"
+        case kVK_RightShift: "Right Shift"
+        case kVK_Command: "Left Command"
+        case kVK_RightCommand: "Right Command"
+        case kVK_Function: "Fn"
+        case kVK_Space: "Space"
+        case kVK_Return: "Return"
+        case kVK_Tab: "Tab"
+        case kVK_Delete: "Delete"
+        case kVK_ForwardDelete: "Forward Delete"
+        case kVK_Escape: "Esc"
+        case kVK_Home: "Home"
+        case kVK_End: "End"
+        case kVK_PageUp: "Page Up"
+        case kVK_PageDown: "Page Down"
+        default: nil
+        }
+        return name.map { L10n.tr($0, table: "ShortcutKey") } ?? fallback
+    }
+
+    private var localizedKey: String { Self.localizedKeyName(keyCode: keyCode, fallback: key) }
+
+    public var displayName: String { modifiers.isEmpty ? localizedKey : modifiers.symbols + " " + localizedKey }
+    public var spokenName: String { (modifiers.activeNames.map { L10n.tr($0.spoken) } + [localizedKey]).joined(separator: " ") }
 }

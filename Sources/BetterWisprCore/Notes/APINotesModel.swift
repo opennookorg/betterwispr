@@ -31,7 +31,7 @@ final class APINotesModel: NotesLanguageModel {
     private func chat(_ prompt: String, json: Bool) async throws -> String {
         try Task.checkCancellation()
         guard connection.api == .openAICompatible else {
-            throw MeetingNotesError.unavailable("Notes require an OpenAI-compatible chat completions endpoint.")
+            throw MeetingNotesError.unavailable(L10n.tr("Notes require an OpenAI-compatible chat completions endpoint."))
         }
         let key = try keys.read(for: connection) ?? ""
         try connection.validateAPIKey(key)
@@ -42,12 +42,12 @@ final class APINotesModel: NotesLanguageModel {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody(prompt, json: json))
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse else { throw MeetingNotesError.unavailable("The notes endpoint returned an invalid response.") }
+        guard let http = response as? HTTPURLResponse else { throw MeetingNotesError.unavailable(L10n.tr("The notes endpoint returned an invalid response.")) }
         guard (200..<300).contains(http.statusCode) else {
             switch http.statusCode {
             case 401, 403, 429: throw SpeechAPIError.http(http.statusCode)
-            case 300..<400: throw MeetingNotesError.unavailable("The notes endpoint redirected. Enter its final URL in Models; transcripts and keys are never forwarded to redirects.")
-            default: throw MeetingNotesError.unavailable("The notes endpoint returned HTTP \(http.statusCode). Check its URL and model ID in Models.")
+            case 300..<400: throw MeetingNotesError.unavailable(L10n.tr("The notes endpoint redirected. Enter its final URL in Models; transcripts and keys are never forwarded to redirects."))
+            default: throw MeetingNotesError.unavailable(L10n.tr("The notes endpoint returned HTTP %@. Check its URL and model ID in Models.", String(http.statusCode)))
             }
         }
         guard let result = try? JSONDecoder().decode(Completion.self, from: data),
@@ -55,7 +55,7 @@ final class APINotesModel: NotesLanguageModel {
               choice.finish_reason == nil || choice.finish_reason == "stop",
               choice.message.refusal == nil,
               let text = choice.message.content?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-            throw MeetingNotesError.unavailable("The notes model returned an empty, incomplete or unsupported response. Try again or choose another model.")
+            throw MeetingNotesError.unavailable(L10n.tr("The notes model returned an empty, incomplete or unsupported response. Try again or choose another model."))
         }
         return text
     }

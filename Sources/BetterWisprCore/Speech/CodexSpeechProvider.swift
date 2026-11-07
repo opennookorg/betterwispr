@@ -146,14 +146,14 @@ enum CodexSpeechError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .signInRequired: "Sign in to your ChatGPT account with codex login in Terminal, then try again."
-        case .accessDenied: "ChatGPT denied transcription access. Check your account access or choose another speech model."
-        case .quotaReached: "ChatGPT's transcription limit was reached. Try later or choose another speech model."
-        case .timedOut: "Codex transcription took too long. Check your connection or try a shorter recording."
-        case .connectionFailed: "Couldn't connect to ChatGPT for transcription. Check your connection and try again."
-        case .invalidResponse: "ChatGPT returned an unsupported transcription response. Try again or choose another speech model."
-        case .invalidLanguage: "Choose a supported language or Auto before transcription."
-        case .http(let status): "ChatGPT transcription failed (HTTP \(status)). Try again or choose another speech model."
+        case .signInRequired: L10n.tr("Sign in to your ChatGPT account with codex login in Terminal, then try again.")
+        case .accessDenied: L10n.tr("ChatGPT denied transcription access. Check your account access or choose another speech model.")
+        case .quotaReached: L10n.tr("ChatGPT's transcription limit was reached. Try later or choose another speech model.")
+        case .timedOut: L10n.tr("Codex transcription took too long. Check your connection or try a shorter recording.")
+        case .connectionFailed: L10n.tr("Couldn't connect to ChatGPT for transcription. Check your connection and try again.")
+        case .invalidResponse: L10n.tr("ChatGPT returned an unsupported transcription response. Try again or choose another speech model.")
+        case .invalidLanguage: L10n.tr("Choose a supported language or Auto before transcription.")
+        case .http(let status): L10n.tr("ChatGPT transcription failed (HTTP %@). Try again or choose another speech model.", String(status))
         }
     }
 }

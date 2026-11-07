@@ -6,16 +6,23 @@ enum AppPage: String, CaseIterable, Identifiable {
 
     static let sections: [(title: String?, pages: [AppPage])] = [
         (nil, [.overview, .insights, .meetings, .transcribe, .history]),
-        ("Personalize", [.models, .vocabulary, .style]),
-        ("App", [.settings, .about]),
+        (L10n.tr("Personalize"), [.models, .vocabulary, .style]),
+        (L10n.tr("App"), [.settings, .about]),
     ]
 
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .overview: "Home"
-        case .meetings: "Notetaker"
-        default: rawValue.capitalized
+        case .overview: L10n.tr("Home")
+        case .meetings: L10n.tr("Notetaker")
+        case .insights: L10n.tr("Insights")
+case .transcribe: L10n.tr("Transcribe")
+case .history: L10n.tr("History")
+case .models: L10n.tr("Models")
+case .vocabulary: L10n.tr("Vocabulary")
+case .style: L10n.tr("Style")
+case .settings: L10n.tr("Settings")
+case .about: L10n.tr("About")
         }
     }
     var symbol: String {
@@ -57,10 +64,10 @@ struct DashboardView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HStack(spacing: 6) {
-                    Text("Version \(AboutView.version)")
+                    Text(L10n.tr("Version %@", String(AboutView.version)))
                         .textSelection(.enabled)
                     Text("·").accessibilityHidden(true)
-                    Link("What’s new", destination: AboutView.changelog)
+                    Link(L10n.tr("What’s new"), destination: AboutView.changelog)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

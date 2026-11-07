@@ -40,6 +40,8 @@ run: build ## Build and launch (debug)
 	@open -n "$(abspath $(APP_DEBUG))"
 
 test: ## Unit tests, evaluator and release script checks
+	@python3 scripts/localization.py check
+	@python3 Tests/localization_tools_check.py
 	@swift build 2>&1 | tail -1
 	@swift test 2>&1 | tail -1
 	@python3 Tests/evaluate_check.py

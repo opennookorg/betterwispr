@@ -1,0 +1,12 @@
+/* Fixed presentation samples, separate from dictation text and model prompts. */
+"um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic." = "um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic.";
+"You say (English example)" = "You say (English example)";
+"BetterWispr types (English example)" = "BetterWispr types (English example)";
+"English example: %@" = "English example: %@";
+"Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”." = "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”.";
+"Light and Medium cleanup only edit English dictation. This French example is left unchanged." = "Light and Medium cleanup only edit English dictation. This French example is left unchanged.";
+"French examples illustrate the presentation. Tones only change English dictation." = "French examples illustrate the presentation. Tones only change English dictation.";
+"Hey, are you around for dinner tonight? Let's do 7 if that works for you." = "Hey, are you around for dinner tonight? Let's do 7 if that works for you.";
+"Hey, when you have a minute, let's go over the launch numbers." = "Hey, when you have a minute, let's go over the launch numbers.";
+"Hi Sam,\n\nThanks for the quick call today. Looking forward to working together.\n\nBest,\nAlex" = "Hi Sam,\n\nThanks for the quick call today. Looking forward to working together.\n\nBest,\nAlex";
+"So far, the new plan is working well.\n\nTomorrow I want to finish the draft, especially the summary." = "So far, the new plan is working well.\n\nTomorrow I want to finish the draft, especially the summary.";

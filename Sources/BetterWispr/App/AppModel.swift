@@ -31,31 +31,31 @@ enum DictationQuestion: Equatable {
 
     var title: String {
         switch self {
-        case .send(let duration, let model): "Send \(Self.length(duration)) of audio to \(model.audioDestination ?? model.name)?"
-        case .paste(let duration, let app): "Paste this \(Self.length(duration)) dictation into \(app ?? "the focused app")?"
+        case .send(let duration, let model): L10n.tr("Send %@ of audio to %@?", String(Self.length(duration)), String(model.audioDestination ?? model.localizedName))
+        case .paste(let duration, let app): L10n.tr("Paste this %@ dictation into %@?", String(Self.length(duration)), String(app ?? L10n.tr("the focused app")))
         }
     }
     var message: String {
         switch self {
-        case .send: "If you don’t send it, the recording stays on your Mac."
-        case .paste: "Copy instead leaves the text on your clipboard."
+        case .send: L10n.tr("If you don’t send it, the recording stays on your Mac.")
+        case .paste: L10n.tr("Copy instead leaves the text on your clipboard.")
         }
     }
     var approval: String {
         switch self {
-        case .send(_, let model): model.recordingAction(onDevice: (title: "Send", help: "")).title
-        case .paste: "Paste"
+        case .send(_, let model): model.recordingAction(onDevice: (title: L10n.tr("Send"), help: "")).title
+        case .paste: L10n.tr("Paste")
         }
     }
     var refusal: String {
         switch self {
-        case .send: "Don’t send"
-        case .paste: "Copy instead"
+        case .send: L10n.tr("Don’t send")
+        case .paste: L10n.tr("Copy instead")
         }
     }
 
     private static func length(_ duration: TimeInterval) -> String {
-        Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes], width: .narrow, maximumUnitCount: 2))
+        Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes], width: .narrow, maximumUnitCount: 2).locale(L10n.locale))
     }
 }
 
@@ -70,10 +70,10 @@ struct DictationFailure: Equatable {
     }
 
     static func releasedEarly(_ shortcut: DictationShortcut) -> DictationFailure {
-        DictationFailure(title: "Keep holding \(shortcut.displayName).", message: "Wait for the bars to move, then speak and release.")
+        DictationFailure(title: L10n.tr("Keep holding %@.", String(shortcut.displayName)), message: L10n.tr("Wait for the bars to move, then speak and release."))
     }
-    static let noSpeech = DictationFailure(title: "No speech heard.", message: "Move closer to your microphone and try again.")
-    static let pasteBlocked = DictationFailure(title: "Copied, not pasted.", message: "Allow Accessibility so text lands at your cursor. Press ⌘V for now.", needsAccessibility: true)
+    static let noSpeech = DictationFailure(title: L10n.tr("No speech heard."), message: L10n.tr("Move closer to your microphone and try again."))
+    static let pasteBlocked = DictationFailure(title: L10n.tr("Copied, not pasted."), message: L10n.tr("Allow Accessibility so text lands at your cursor. Press ⌘V for now."), needsAccessibility: true)
 }
 
 /// Owns temporary audio through transcription and the short cancellation undo window.
@@ -125,7 +125,7 @@ struct ModelInstallation: Equatable {
     var failure: String?
 
     var progressLabel: String {
-        progress < 0.9 ? "Downloading… \(Int(progress / 0.9 * 100))%" : "Setting up on this Mac…"
+        progress < 0.9 ? L10n.tr("Downloading… %@%%", String(Int(progress / 0.9 * 100))) : L10n.tr("Setting up on this Mac…")
     }
 }
 
@@ -283,11 +283,11 @@ final class AppModel {
             vocabulary = state.vocabulary
         } catch {
             storageIsReadable = false
-            statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
+            statusMessage = L10n.tr("Could not read your saved workspace. It has been left untouched: %@", String(error.localizedDescription))
         }
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
-        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: "Couldn’t mute other apps", $0)) }
+        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
         AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {
@@ -313,7 +313,7 @@ final class AppModel {
                 return
             }
             self.discardRecording()
-            self.recordingInterrupted(by: error, title: "Couldn’t continue recording.")
+            self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t continue recording."))
         }
         recorder.onFrameLimit = { [weak self] in self?.recordingReachedLimit() }
         refreshMicrophones()
@@ -365,7 +365,7 @@ final class AppModel {
             try globalShortcut.register(settings.shortcut, withShift: wantsShiftShortcut(for: settings.shortcut))
             if statusMessage == shortcutWarning { statusMessage = "" }
         } catch {
-            statusMessage = "\(error.localizedDescription) Use the menu bar or Record button to dictate, or choose another shortcut in Settings."
+            statusMessage = L10n.tr("%@ Use the menu bar or Record button to dictate, or choose another shortcut in Settings.", String(error.localizedDescription))
             shortcutWarning = statusMessage
         }
     }
@@ -402,14 +402,14 @@ final class AppModel {
         guard !isBusy else { return }
         if shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut {
             registerShortcut()
-            ToastWindow.shared.show(Toast(failure: "Couldn’t use \(shortcut.displayName)", ShortcutError.alreadyAssigned(shortcut)))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), ShortcutError.alreadyAssigned(shortcut)))
             return
         }
         do {
             try globalShortcut.register(shortcut, withShift: wantsShiftShortcut(for: shortcut))
         } catch {
             registerShortcut()
-            ToastWindow.shared.show(Toast(failure: "Couldn’t use \(shortcut.displayName)", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
             return
         }
         if statusMessage == shortcutWarning { statusMessage = "" }
@@ -426,7 +426,7 @@ final class AppModel {
                 try customCancelShortcut.register(shortcut)
                 customCancelShortcut.unregister()
             } catch {
-                ToastWindow.shared.show(Toast(failure: "Couldn’t use \(shortcut.displayName)", error))
+                ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
                 return
             }
         }
@@ -452,8 +452,8 @@ final class AppModel {
 
     private var listeningStatus: String {
         let shortcut = settings.shortcut.displayName
-        let finish = sendKeystroke != nil ? "send" : "finish"
-        return isHeldSession ? "Listening. Release \(shortcut) to \(finish)." : "Listening. Press \(shortcut) or click ✓ to \(finish)."
+        let finish = sendKeystroke != nil ? L10n.tr("send") : L10n.tr("finish")
+        return isHeldSession ? L10n.tr("Listening. Release %@ to %@.", String(shortcut), String(finish)) : L10n.tr("Listening. Press %@ or click ✓ to %@.", String(shortcut), String(finish))
     }
 
     private func cancelOrHoldBack() {
@@ -486,7 +486,7 @@ final class AppModel {
             if self.phase == .sending { self.phase = .idle }
             // A sent prompt leaves the field, so there is no correction to learn.
             guard !sent else { return }
-            if !self.isBusy { self.present(.completed("Pasted, not sent"), for: 1.6) }
+            if !self.isBusy { self.present(.completed(L10n.tr("Pasted, not sent")), for: 1.6) }
             self.playFeedback(.attention)
             notSent()
         }
@@ -506,7 +506,7 @@ final class AppModel {
         let sends = settings.sendsAfterPaste && !(holdingBack ?? (holdsBackReturn || shiftHeld)) ? targetKeystroke : nil
         guard sendKeystroke != sends else { return }
         sendKeystroke = sends
-        if phase == .recording, statusMessage.hasPrefix("Listening.") { statusMessage = listeningStatus }
+        if phase == .recording, statusMessage.hasPrefix(L10n.tr("Listening.")) { statusMessage = listeningStatus }
     }
 
     func changeSelectedTextShortcut(_ shortcut: DictationShortcut?) {
@@ -519,7 +519,7 @@ final class AppModel {
                 try selectedTextShortcut.register(shortcut)
             } catch {
                 registerShortcut()
-                ToastWindow.shared.show(Toast(failure: "Couldn’t use \(shortcut.displayName)", error))
+                ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
                 return
             }
         } else {
@@ -553,7 +553,7 @@ final class AppModel {
         let edited = await TranscriptPolisher.polish(selected.trimmingCharacters(in: .whitespacesAndNewlines), settings: settings,
                                                      vocabulary: VocabularyProcessor.hints(vocabulary), context: nil, formsLists: false)
         guard !Task.isCancelled else { return nil }
-        guard let edited else { return .leftAsIs(model: settings.notesModelName) }
+        guard let edited else { return .leftAsIs(model: settings.localizedNotesModelName) }
         guard let replacement = SelectedTextCleanupOutcome.replacement(keepingWhitespaceOf: selected, ifChangedTo: edited) else { return .alreadyClean }
         let currentSelection = await DictationContext.selection(in: app)
         let stillSelected = selection?.matches(currentSelection) == true
@@ -573,8 +573,8 @@ final class AppModel {
     }
 
     private func showSelectedTextProgress() {
-        ToastWindow.shared.show(Toast(title: "Cleaning up…", message: "With \(settings.cleanupSettings.notesModelName). Keep the text selected.",
-                                      systemImage: "wand.and.stars", action: Toast.Action(title: "Cancel") { [weak self] in
+        ToastWindow.shared.show(Toast(title: L10n.tr("Cleaning up…"), message: L10n.tr("With %@. Keep the text selected.", String(settings.cleanupSettings.localizedNotesModelName)),
+                                      systemImage: "wand.and.stars", action: Toast.Action(title: L10n.tr("Cancel")) { [weak self] in
             self?.selectedTextCleanup?.cancel()
             self?.selectedTextCleanup = nil
         }))
@@ -594,7 +594,7 @@ final class AppModel {
         correctionWatcher.stop()
         guard isModelInstalled(selectedModel) else {
             selectedPage = .models
-            fail(DictationFailure(title: "Download a model first.", message: "Download \(selectedModel.name) in Models before recording."))
+            fail(DictationFailure(title: L10n.tr("Download a model first."), message: L10n.tr("Download %@ in Models before recording.", String(selectedModel.localizedName))))
             return
         }
         if let cleanup = selectedTextCleanup {
@@ -624,7 +624,7 @@ final class AppModel {
         let token = UUID()
         generation = token
         phase = .preparing
-        statusMessage = "Starting microphone…"
+        statusMessage = L10n.tr("Starting microphone…")
         partialTranscript = ""
         liveTranscript = LiveTranscript()
         recordingDuration = 0
@@ -652,7 +652,7 @@ final class AppModel {
                 guard self.generation == token else { return }
                 self.recorder.silenceThreshold = self.settings.silenceThreshold
                 self.recorder.microphone = self.settings.microphone
-                self.statusMessage = "Starting microphone…"
+                self.statusMessage = L10n.tr("Starting microphone…")
                 try await self.recorder.start(onSamples: onSamples)
                 let url = await website?.value
                 try Task.checkCancellation()
@@ -684,7 +684,7 @@ final class AppModel {
                 self.recorder.cancel()
                 self.endLivePreview()
                 self.dictationContext.take()?.cancel()
-                self.fail(DictationFailure(title: "Couldn’t start dictation.", message: error.localizedDescription))
+                self.fail(DictationFailure(title: L10n.tr("Couldn’t start dictation."), message: error.localizedDescription))
             }
         }
     }
@@ -695,8 +695,10 @@ final class AppModel {
         guard hour > remindedHour else { return }
         remindedHour = hour
         guard startsServices, let limit = recorder.maximumDuration else { return }
-        let finish = "\(isHeldSession ? "Release" : "Press") \(settings.shortcut.displayName) to finish."
-        ToastWindow.shared.show(Toast(title: "Still recording", message: "\(hour)h so far. \(finish) It stops by itself at about \(Int(limit / 3600))h.", systemImage: "waveform"))
+        let finish = isHeldSession
+            ? L10n.tr("Release %@ to finish.", settings.shortcut.displayName)
+            : L10n.tr("Press %@ to finish.", settings.shortcut.displayName)
+        ToastWindow.shared.show(Toast(title: L10n.tr("Still recording"), message: hour == 1 ? L10n.tr("1 hour so far. %@ It stops by itself at about %@h.", finish, String(Int(limit / 3600))) : L10n.tr("%@ hours so far. %@ It stops by itself at about %@h.", String(hour), finish, String(Int(limit / 3600))), systemImage: "waveform"))
     }
 
     /// Finishes a recording whose file can't safely grow any longer; what was captured transcribes as usual.
@@ -705,7 +707,7 @@ final class AppModel {
         let limit = recorder.maximumDuration
         finishRecording()
         guard startsServices, let limit else { return }
-        ToastWindow.shared.show(Toast(title: "Recording stopped", message: "It reached the limit of about \(Int(limit / 3600)) hours. Transcribing what was captured.", systemImage: "stop.circle"))
+        ToastWindow.shared.show(Toast(title: L10n.tr("Recording stopped"), message: L10n.tr("It reached the limit of about %@ hours. Transcribing what was captured.", String(Int(limit / 3600))), systemImage: "stop.circle"))
     }
 
     /// Runs preview passes once the warm-up load has finished; it never starts a load itself.
@@ -744,7 +746,7 @@ final class AppModel {
         let context = dictationContext.take()
         let live = live
         phase = .transcribing
-        statusMessage = "Finishing recording…"
+        statusMessage = L10n.tr("Finishing recording…")
         operation = Task { [weak self] in
             guard let self else { return }
             do {
@@ -779,7 +781,7 @@ final class AppModel {
                 }
                 self.recorder.cancel()
                 self.endLivePreview()
-                self.recordingInterrupted(by: error, title: "Couldn’t finish recording.")
+                self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t finish recording."))
             }
         }
     }
@@ -793,7 +795,7 @@ final class AppModel {
                     self.transcribe(recording)
                 } else {
                     self.keepFailedDictation(recording)
-                    self.fail(DictationFailure(title: "Not sent.", message: self.settings.saveHistory ? "The recording stayed on your Mac and is kept in History." : "The recording stayed on your Mac. You can try it again now."))
+                    self.fail(DictationFailure(title: L10n.tr("Not sent."), message: self.settings.saveHistory ? L10n.tr("The recording stayed on your Mac and is kept in History.") : L10n.tr("The recording stayed on your Mac. You can try it again now.")))
                 }
             }
             return
@@ -809,7 +811,7 @@ final class AppModel {
         let spellsScreenNames = self.spellsScreenNames(with: model, language: recording.settings.language)
         let appBundleID = recording.target?.bundleIdentifier
         phase = .transcribing
-        statusMessage = !model.processingLocation.isOnDevice ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
+        statusMessage = !model.processingLocation.isOnDevice ? L10n.tr("Transcribing with %@…", String(model.localizedName)) : L10n.tr("Transcribing on your Mac…")
         operation = Task { [weak self] in
             defer {
                 if self?.generation == token { self?.activeRecording = nil }
@@ -845,7 +847,7 @@ final class AppModel {
                 if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
                 } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
-                    self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
+                    self.statusMessage = L10n.tr("Editing with %@…", String(writingSettings.localizedNotesModelName))
                     let polished = await TranscriptPolisher.polish(spoken, settings: writingSettings, vocabulary: hints,
                                                                    context: sharesContext ? await context?.value(within: .seconds(1)) : nil,
                                                                    instructions: mode?.instructions ?? "")
@@ -907,18 +909,18 @@ final class AppModel {
                         } else {
                             watchCorrections()
                         }
-                    case .copied: self.present(.completed("Copied to clipboard"), for: 1.6)
-                    case nil: self.present(.completed("Transcript ready"), for: 1.6)
+                    case .copied: self.present(.completed(L10n.tr("Copied to clipboard")), for: 1.6)
+                    case nil: self.present(.completed(L10n.tr("Transcript ready")), for: 1.6)
                     case .copiedForManualPaste: break
                     }
                 }
-                if let persistenceWarning { self.statusMessage = "History could not be saved: \(persistenceWarning)" }
+                if let persistenceWarning { self.statusMessage = L10n.tr("History could not be saved: %@", String(persistenceWarning)) }
             } catch {
                 guard self.generation == token else { return }
-                var failure = DictationFailure(title: "Couldn’t transcribe.", message: error.localizedDescription)
+                var failure = DictationFailure(title: L10n.tr("Couldn’t transcribe."), message: error.localizedDescription)
                 if !transcribed {
                     self.keepFailedDictation(recording)
-                    failure.message += " You can try this same recording again."
+                    failure.message += L10n.tr(" You can try this same recording again.")
                 }
                 self.fail(failure)
             }
@@ -953,7 +955,7 @@ final class AppModel {
             let recording = sessionRecording(audio)
             if audio.hasSpeech {
                 keepFailedDictation(recording)
-                failure.message += " You can try this same recording again."
+                failure.message += L10n.tr(" You can try this same recording again.")
             }
         }
         fail(failure)
@@ -1102,7 +1104,7 @@ final class AppModel {
         voiceLevels = VoiceLevels()
         partialTranscript = ""
         phase = .idle
-        statusMessage = "Cancelled."
+        statusMessage = L10n.tr("Cancelled.")
     }
 
     private func prepare(_ model: SpeechModel, language: String? = nil) async throws {
@@ -1215,29 +1217,29 @@ final class AppModel {
         guard !isInstalling, model.requiresModelDownload else { return }
         let installer = model.makeProvider()
         let selection = settings.selectedModelID
-        install(id: model.id, name: model.name) { report in
+        install(id: model.id, name: model.localizedName) { report in
             installer.onProgress = report
             try await installer.prepare(model: model, download: true)
         } completion: { [weak self] in
             guard let self else { return }
             installer.onProgress = nil
             let boosterNote = model.engine == .parakeet && !self.phraseBoosterInstalled
-                ? " The phrase booster didn’t download. Get it in Vocabulary." : ""
+                ? L10n.tr(" The phrase booster didn’t download. Get it in Vocabulary.") : ""
             if self.settings.selectedModelID == selection, !self.isBusy {
                 self.selectModel(model, prepared: installer)
-                self.statusMessage = "\(model.name) is ready for offline dictation.\(boosterNote)"
+                self.statusMessage = L10n.tr("%@ is ready for offline dictation.%@", String(model.localizedName), String(boosterNote))
             } else {
-                self.statusMessage = "\(model.name) is installed. Choose Use in Models to switch to it.\(boosterNote)"
+                self.statusMessage = L10n.tr("%@ is installed. Choose Use in Models to switch to it.%@", String(model.localizedName), String(boosterNote))
             }
         }
     }
 
     func installPhraseBooster() {
         guard !isInstalling else { return }
-        install(id: Self.phraseBoosterID, name: "the phrase booster") { report in
+        install(id: Self.phraseBoosterID, name: L10n.tr("the phrase booster")) { report in
             try await ParakeetProvider.installPhraseBooster { fraction in Task { @MainActor in report(fraction * 0.9) } }
         } completion: { [weak self] in
-            self?.statusMessage = "Parakeet now uses your vocabulary to spell names and terms."
+            self?.statusMessage = L10n.tr("Parakeet now uses your vocabulary to spell names and terms.")
         }
     }
 
@@ -1247,10 +1249,10 @@ final class AppModel {
             return
         }
         speakerDetectionQueued = false
-        install(id: Self.speakerDetectionID, name: "speaker detection") { report in
+        install(id: Self.speakerDetectionID, name: L10n.tr("speaker detection")) { report in
             try await SpeakerDetection.install { fraction in Task { @MainActor in report(fraction * 0.9) } }
         } completion: { [weak self] in
-            self?.statusMessage = "New meetings will tell the speakers on the call apart."
+            self?.statusMessage = L10n.tr("New meetings will tell the speakers on the call apart.")
         }
     }
 
@@ -1263,9 +1265,9 @@ final class AppModel {
             guard let self else { return }
             if self.settings.notesSelection == selection, self.meetings.runs.isEmpty {
                 self.selectNotesModel(.builtIn)
-                self.statusMessage = "\(BuiltInModel.displayName) now writes meeting notes on this Mac."
+                self.statusMessage = L10n.tr("%@ now writes meeting notes on this Mac.", String(BuiltInModel.displayName))
             } else {
-                self.statusMessage = "\(BuiltInModel.displayName) is installed. Choose it as the notes provider in Models."
+                self.statusMessage = L10n.tr("%@ is installed. Choose it as the notes provider in Models.", String(BuiltInModel.displayName))
             }
         }
     }
@@ -1274,7 +1276,7 @@ final class AppModel {
         guard !isInstalling, canEditConnections else { return }
         Task {
             do { try await BuiltInModel.remove() }
-            catch { statusMessage = "Couldn’t remove \(BuiltInModel.displayName): \(error.localizedDescription)" }
+            catch { statusMessage = L10n.tr("Couldn’t remove %@: %@", String(BuiltInModel.displayName), String(error.localizedDescription)) }
             refreshModels()
         }
     }
@@ -1283,7 +1285,7 @@ final class AppModel {
         installTask?.cancel()
         installation = nil
         speakerDetectionQueued = false
-        statusMessage = "Download cancelled."
+        statusMessage = L10n.tr("Download cancelled.")
     }
 
     private func install(
@@ -1293,7 +1295,7 @@ final class AppModel {
     ) {
         let next = ModelInstallation(id: id)
         installation = next
-        statusMessage = "Downloading \(name)…"
+        statusMessage = L10n.tr("Downloading %@…", String(name))
         let report: @MainActor @Sendable (Double) -> Void = { [weak self] progress in
             guard let self, let current = self.installation, current.token == next.token else { return }
             self.installation?.progress = max(current.progress, min(1, progress))
@@ -1318,7 +1320,7 @@ final class AppModel {
                 self.speakerDetectionQueued = false
                 self.refreshModels()
                 self.installation?.failure = error.localizedDescription
-                self.statusMessage = "Couldn’t download \(name): \(error.localizedDescription)"
+                self.statusMessage = L10n.tr("Couldn’t download %@: %@", String(name), String(error.localizedDescription))
             }
         }
     }
@@ -1386,7 +1388,7 @@ final class AppModel {
         }
         if let oldConnection, oldConnection.keychainAccount != connection.keychainAccount {
             do { try keys.save("", for: oldConnection) }
-            catch { statusMessage = "Connection saved, but its previous Keychain entry could not be removed: \(error.localizedDescription)" }
+            catch { statusMessage = L10n.tr("Connection saved, but its previous Keychain entry could not be removed: %@", String(error.localizedDescription)) }
         }
     }
 
@@ -1437,7 +1439,7 @@ final class AppModel {
     func copyText(_ text: String) {
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
-            catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
+            catch { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t copy"), error)) }
         }
     }
 
@@ -1464,13 +1466,13 @@ final class AppModel {
         do {
             let trusted = try saveKeeping(history)
             if !trusted, retention.kept(history).count < history.count {
-                ToastWindow.shared.show(Toast(title: "Keep history saved", message: "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day.",
+                ToastWindow.shared.show(Toast(title: L10n.tr("Keep history saved"), message: L10n.tr("This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day."),
                                               systemImage: "clock"))
             }
             pruneFailedDictations()
         } catch {
             settings.historyRetention = previous
-            ToastWindow.shared.show(Toast(failure: "Couldn’t change history retention", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t change history retention"), error))
         }
     }
 
@@ -1483,7 +1485,7 @@ final class AppModel {
             if history.count < before { ToastWindow.shared.show(Toast(pruned: before - history.count, by: settings.historyRetention)) }
         } catch {
             if settings.historyRetention.kept(history).count < before {
-                ToastWindow.shared.show(Toast(failure: "Couldn’t delete older dictations", error))
+                ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t delete older dictations"), error))
             }
         }
         pruneFailedDictations()
@@ -1507,10 +1509,10 @@ final class AppModel {
         history.removeAll { $0.id == transcript.id }
         do {
             try persist()
-            ToastWindow.shared.show(Toast(title: "Deleted", message: "The dictation was removed from history.", systemImage: "trash"))
+            ToastWindow.shared.show(Toast(title: L10n.tr("Deleted"), message: L10n.tr("The dictation was removed from history."), systemImage: "trash"))
         } catch {
             history = previous
-            ToastWindow.shared.show(Toast(failure: "Couldn’t delete dictation", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t delete dictation"), error))
         }
     }
 
@@ -1521,7 +1523,7 @@ final class AppModel {
         history[index].text = text
         do { try persist() } catch {
             history = previous
-            ToastWindow.shared.show(Toast(failure: "Couldn’t save edit", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t save edit"), error))
             return
         }
         if settings.learnCorrections { learn(from: transcript.text, to: text) }
@@ -1534,7 +1536,7 @@ final class AppModel {
         history[index].text = original
         do { try persist() } catch {
             history = previous
-            ToastWindow.shared.show(Toast(failure: "Couldn’t restore the original", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t restore the original"), error))
         }
     }
 
@@ -1558,16 +1560,16 @@ final class AppModel {
             try persist()
             guard settings.notifyLearnedCorrections else { return }
             let ids = Set(added.map(\.id))
-            ToastWindow.shared.show(Toast(title: "Learned \(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))",
-                                          message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
+            ToastWindow.shared.show(Toast(title: L10n.tr("Learned %@", String(added.map { "“\($0.replacement.isEmpty ? $0.phrase : $0.replacement)”" }.joined(separator: ", "))),
+                                          message: L10n.tr("BetterWispr will spell it this way next time. Manage it in Vocabulary."),
                                           systemImage: "sparkles",
-                                          action: Toast.Action(title: "Undo") { [weak self] in
+                                          action: Toast.Action(title: L10n.tr("Undo")) { [weak self] in
                                               guard let self else { return }
                                               let learned = vocabulary
                                               vocabulary.removeAll { ids.contains($0.id) }
                                               do { try persist() } catch {
                                                   vocabulary = learned
-                                                  ToastWindow.shared.show(Toast(failure: "Couldn’t undo", error))
+                                                  ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t undo"), error))
                                               }
                                           }))
         } catch {
@@ -1579,11 +1581,11 @@ final class AppModel {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         let replacement = replacement.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !phrase.isEmpty, phrase.count <= 100, replacement.count <= 100 else {
-            statusMessage = "Use a phrase and spelling of at most 100 characters."; return
+            statusMessage = L10n.tr("Use a phrase and spelling of at most 100 characters."); return
         }
-        guard vocabulary.count < 200 else { statusMessage = "Keep your vocabulary to 200 entries for focused hints."; return }
+        guard vocabulary.count < 200 else { statusMessage = L10n.tr("Keep your vocabulary to 200 entries for focused hints."); return }
         guard !vocabulary.contains(where: { $0.phrase.caseInsensitiveCompare(phrase) == .orderedSame }) else {
-            statusMessage = "That phrase is already in your vocabulary."; return
+            statusMessage = L10n.tr("That phrase is already in your vocabulary."); return
         }
         vocabulary.append(VocabularyEntry(phrase: phrase, replacement: replacement))
         saveSettings()
@@ -1594,10 +1596,10 @@ final class AppModel {
         vocabulary.removeAll { $0.id == entry.id }
         do {
             try persist()
-            ToastWindow.shared.show(Toast(title: "Deleted", message: "“\(entry.phrase)” was removed from your vocabulary.", systemImage: "trash"))
+            ToastWindow.shared.show(Toast(title: L10n.tr("Deleted"), message: L10n.tr("“%@” was removed from your vocabulary.", String(entry.phrase)), systemImage: "trash"))
         } catch {
             vocabulary = previous
-            ToastWindow.shared.show(Toast(failure: "Couldn’t delete word", error))
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t delete word"), error))
         }
     }
 
@@ -1653,7 +1655,7 @@ final class AppModel {
             if !settings.saveHistory { deleteKeptAudio() }
         } catch {
             settings.launchAtLogin = SMAppService.mainApp.status == .enabled
-            statusMessage = "Could not save settings: \(error.localizedDescription)"
+            statusMessage = L10n.tr("Could not save settings: %@", String(error.localizedDescription))
         }
         applyAppearance()
         if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
@@ -1667,7 +1669,7 @@ final class AppModel {
         guard application.activationPolicy() != policy else { return }
         if !application.setActivationPolicy(policy) {
             settings.showInDock = application.activationPolicy() == .regular
-            statusMessage = "Could not change Dock visibility. Try restarting BetterWispr."
+            statusMessage = L10n.tr("Could not change Dock visibility. Try restarting BetterWispr.")
         }
     }
 
@@ -1682,7 +1684,7 @@ final class AppModel {
     private func persist() throws {
         guard storageIsReadable else {
             throw NSError(domain: "BetterWispr", code: 1, userInfo: [NSLocalizedDescriptionKey:
-                "The existing workspace could not be read, so it will not be overwritten. Back it up in \(store.directory.path) and restart."])
+                L10n.tr("The existing workspace could not be read, so it will not be overwritten. Back it up in %@ and restart.", String(store.directory.path))])
         }
         var state = SavedState()
         state.settings = settings
@@ -1701,8 +1703,8 @@ final class AppModel {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
             try encoder.encode(history).write(to: url, options: .atomic)
-            statusMessage = "History exported."
-        } catch { statusMessage = "Export failed: \(error.localizedDescription)" }
+            statusMessage = L10n.tr("History exported.")
+        } catch { statusMessage = L10n.tr("Export failed: %@", String(error.localizedDescription)) }
     }
 
     func requestMicrophone() {
@@ -1822,7 +1824,7 @@ final class AppModel {
         var failure = failure
         if continuesIn != nil {
             // This dictation took over the send from the one before, which stays pasted.
-            failure.message += " Your earlier dictation was pasted but not sent."
+            failure.message += L10n.tr(" Your earlier dictation was pasted but not sent.")
             continuesIn = nil
         }
         statusMessage = failure.message

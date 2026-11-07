@@ -3,19 +3,21 @@ import SwiftUI
 
 struct NotesModelPicker: View {
     @Bindable var model: AppModel
-    var title = "Notes provider"
+    var title = L10n.tr("Notes provider")
     var overrideSelection: WritableKeyPath<AppSettings, NotesModelSelection?>?
 
     var body: some View {
         Picker(title, selection: Binding(get: { selection }, set: { select($0) })) {
-            if overrideSelection != nil { Text("Same as notes · \(model.settings.notesModelName)").tag(NotesModelSelection?.none) }
-            Text("Apple Intelligence · On this Mac").tag(NotesModelSelection?.some(.apple))
+            if overrideSelection != nil { Text(L10n.tr("Same as notes · %@", String(model.settings.localizedNotesModelName))).tag(NotesModelSelection?.none) }
+            Text(L10n.tr("Apple Intelligence · On this Mac")).tag(NotesModelSelection?.some(.apple))
             if model.meetings.builtInModelInstalled || selection == .builtIn {
-                Text(model.meetings.builtInModelInstalled ? "Built-in · \(BuiltInModel.displayName) · On this Mac" : "Built-in · Not downloaded")
+                Text(model.meetings.builtInModelInstalled ? L10n.tr("Built-in · %@ · On this Mac", String(BuiltInModel.displayName)) : L10n.tr("Built-in · Not downloaded"))
                     .tag(NotesModelSelection?.some(.builtIn))
             }
             ForEach(NotesCLI.allCases, id: \.self) { cli in
-                Text("\(cli.name) · \(overrideSelection == nil && model.settings.allowsAnySignIn(cli) ? "Any sign-in" : "Subscription")").tag(NotesModelSelection?.some(.cli(cli)))
+                Text(overrideSelection == nil && model.settings.allowsAnySignIn(cli)
+                     ? L10n.tr("%@ · Any sign-in", String(cli.name))
+                     : L10n.tr("%@ · Subscription", String(cli.name))).tag(NotesModelSelection?.some(.cli(cli)))
             }
             ForEach(ollamaModels, id: \.self) { name in
                 Text("Ollama · \(name)").tag(NotesModelSelection?.some(.ollama(name)))
@@ -24,16 +26,16 @@ struct NotesModelPicker: View {
                 Text("\(connection.name) · \(connection.modelID)").tag(NotesModelSelection?.some(.connection(connection.id)))
             }
             if case .connection(let id) = selection, !model.settings.notesConnections.contains(where: { $0.id == id }) {
-                Text("Missing notes connection").tag(NotesModelSelection?.some(.connection(id)))
+                Text(L10n.tr("Missing notes connection", table: "NotesModel")).tag(NotesModelSelection?.some(.connection(id)))
             }
         }
         if case .cli(let cli) = selection, overrideSelection == nil || model.settings.notesSelection != .cli(cli) {
             let models = model.notesCLICatalogs[cli]?.models ?? []
-            Picker("\(cli.name) model", selection: Binding(
+            Picker(L10n.tr("%@ model", String(cli.name)), selection: Binding(
                 get: { model.settings.cliModel(cli) },
                 set: { model.settings.setCLIModel($0, for: cli); model.saveNotesSettings() }
             )) {
-                Text("Choose a model").tag("").disabled(true)
+                Text(L10n.tr("Choose a model")).tag("").disabled(true)
                 ForEach(models) { item in
                     Text("\(item.name) · \(item.id)").tag(item.id)
                 }
@@ -75,7 +77,7 @@ struct NotesModelSettings: View {
         NotesModelPicker(model: model)
             .disabled(!model.canEditConnections || testing)
         if case .cli(let cli) = model.settings.notesSelection {
-            TextField("Model ID", text: Binding(
+            TextField(L10n.tr("Model ID"), text: Binding(
                 get: { model.settings.cliModel(cli) },
                 set: {
                     model.settings.setCLIModel($0, for: cli)
@@ -84,7 +86,7 @@ struct NotesModelSettings: View {
             ))
             .disabled(!model.canEditConnections || testing)
             HStack {
-                Button("Refresh \(cli.name) models") { Task { await model.refreshNotesCLIModels(cli) } }
+                Button(L10n.tr("Refresh %@ models", String(cli.name))) { Task { await model.refreshNotesCLIModels(cli) } }
                     .disabled(model.loadingNotesCatalogs.contains(cli) || testing)
                 if model.loadingNotesCatalogs.contains(cli) { ProgressView().controlSize(.small) }
             }
@@ -93,28 +95,30 @@ struct NotesModelSettings: View {
             } else if let item = model.notesCLICatalogs[cli]?.models.first(where: { $0.id == model.settings.cliModel(cli) }) {
                 Text(item.detail).font(.caption).foregroundStyle(.secondary)
             }
-            Text("Install the latest \(cli.name) CLI and run \(cli.loginCommand) in Terminal. BetterWispr uses that sign-in\(model.settings.allowsAnySignIn(cli) ? "" : "; subscription limits apply").")
+            Text(model.settings.allowsAnySignIn(cli)
+                 ? L10n.tr("Install the latest %@ CLI and run %@ in Terminal. BetterWispr uses that sign-in.", String(cli.name), String(cli.loginCommand))
+                 : L10n.tr("Install the latest %@ CLI and run %@ in Terminal. BetterWispr uses that sign-in; subscription limits apply.", String(cli.name), String(cli.loginCommand)))
                 .font(.caption).foregroundStyle(.secondary)
             if cli == .claudeCode { ClaudeCodeAnySignInSettings(model: model, testing: testing) }
         }
         HStack {
-            Button(testing ? "Testing…" : "Test notes model") { result = nil; testing = true }
+            Button(testing ? L10n.tr("Testing…") : L10n.tr("Test notes model")) { result = nil; testing = true }
                 .disabled(testing || !model.canEditConnections || model.meetings.notesAvailability != .available)
             if testing {
                 ProgressView().controlSize(.small)
-                Button("Cancel") { testing = false }
+                Button(L10n.tr("Cancel")) { testing = false }
             }
-            Button("Refresh local models") { Task { await model.meetings.refreshOllamaModels() } }
+            Button(L10n.tr("Refresh local models")) { Task { await model.meetings.refreshOllamaModels() } }
         }
-        Text("Test sends only a short built-in sample to the selected notes model.")
+        Text(L10n.tr("Test sends only a short built-in English sample to the selected notes model."))
             .font(.caption).foregroundStyle(.secondary)
         if let result { Text(result).font(.callout).textSelection(.enabled) }
         if case .unavailable(let reason) = model.meetings.notesAvailability {
             Text(reason).font(.callout).foregroundStyle(.secondary)
         }
-        NotesModelPicker(model: model, title: "Ask provider", overrideSelection: \.askSelection)
+        NotesModelPicker(model: model, title: L10n.tr("Ask provider"), overrideSelection: \.askSelection)
             .disabled(testing)
-        Text("Ask sends the most relevant transcript lines and thoughts from the meetings you ask about to this model.")
+        Text(L10n.tr("Ask sends the most relevant transcript lines and thoughts from the meetings you ask about to this model."))
             .font(.caption).foregroundStyle(.secondary)
         // A view task cancels the request or CLI when this page is closed or Cancel is clicked.
         Color.clear.frame(height: 0)
@@ -127,7 +131,7 @@ struct NotesModelSettings: View {
                         userNotes: "Synthetic test meeting: We agreed to launch on Friday. Alex will send the checklist tomorrow.",
                         settings: settings) { _, _ in }
                     try Task.checkCancellation()
-                    result = "\(notes.summary.modelName ?? settings.notesModelName) is working. Sample summary: \(notes.summary.overview)"
+                    result = L10n.tr("%@ is working. Sample summary: %@", String(notes.summary.modelName ?? settings.localizedNotesModelName), String(notes.summary.overview))
                 } catch {
                     guard !Task.isCancelled else { return }
                     result = error.localizedDescription
@@ -146,7 +150,7 @@ private struct ClaudeCodeAnySignInSettings: View {
     @State private var checks = 0
 
     var body: some View {
-        Toggle("Allow any Claude Code sign-in", isOn: Binding(
+        Toggle(L10n.tr("Allow any Claude Code sign-in"), isOn: Binding(
             get: { model.settings.claudeCodeAnySignIn },
             set: {
                 model.settings.claudeCodeAnySignIn = $0
@@ -155,27 +159,27 @@ private struct ClaudeCodeAnySignInSettings: View {
             }
         ))
         .disabled(!model.canEditConnections || testing)
-        Text("For meeting notes only. Meeting text goes to the destination below, such as an API account, a company cloud account or a gateway. That operator receives the text and its charges apply. Each request stops at about $1, and a long meeting takes several requests. Ask, Medium cleanup and correction review never use this switch.")
+        Text(L10n.tr("For meeting notes only. Meeting text goes to the destination below, such as an API account, a company cloud account or a gateway. That operator receives the text and its charges apply. Each request stops at about $1, and a long meeting takes several requests. Ask, Medium cleanup and correction review never use this switch."))
             .font(.caption).foregroundStyle(.secondary)
         if model.settings.claudeCodeAnySignIn {
-            LabeledContent("Sends to", value: destination?.label ?? (problem == nil ? "Checking…" : "Unknown"))
+            LabeledContent(L10n.tr("Sends to"), value: destination?.label ?? (problem == nil ? L10n.tr("Checking…") : L10n.tr("Unknown")))
             if let problem { Text(problem).font(.caption).foregroundStyle(.secondary) }
             HStack {
                 if let destination {
                     if destination.label == confirmed {
-                        Label("Confirmed", systemImage: "checkmark.circle")
+                        Label(L10n.tr("Confirmed"), systemImage: "checkmark.circle")
                     } else {
-                        Button("Confirm destination") {
+                        Button(L10n.tr("Confirm destination")) {
                             model.settings.claudeCodeConfirmedDestination = destination.label
                             model.saveNotesSettings()
                         }
                         .disabled(!model.canEditConnections || testing)
                     }
                 }
-                Button("Check again") { checks += 1 }
+                Button(L10n.tr("Check again")) { checks += 1 }
             }
             if let destination, let confirmed, destination.label != confirmed {
-                Text("This changed from \(confirmed). Nothing is sent until you confirm.").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.tr("This changed from %@. Nothing is sent until you confirm.", String(confirmed))).font(.caption).foregroundStyle(.secondary)
             }
             Color.clear.frame(height: 0).task(id: checks) { await readDestination() }
         }

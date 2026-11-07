@@ -6,6 +6,7 @@ struct AskQuestion: Identifiable {
     let text: String
     let about: [Meeting]
     var failure: String?
+    var displayText: String?
 }
 
 struct AskPanel: View {
@@ -27,14 +28,14 @@ struct AskPanel: View {
                         .onSubmit(ask)
                         .disabled(unavailable != nil)
                         .accessibilityLabel(placeholder)
-                    Button("Ask", action: ask)
+                    Button(L10n.tr("Ask"), action: ask)
                         .disabled(!canAsk)
                     if !exchanges.isEmpty || asking != nil, !isWaiting {
-                        Button("Clear") {
+                        Button(L10n.tr("Clear")) {
                             asking = nil
                             if !exchanges.isEmpty { confirmsClear = true }
                         }
-                        .help("Clear these questions and answers")
+                        .help(L10n.tr("Clear these questions and answers"))
                     }
                 }
                 if let unavailable {
@@ -44,9 +45,9 @@ struct AskPanel: View {
                     filters
                 }
                 if let recording {
-                    Button("What did I miss?", systemImage: "clock.arrow.circlepath") { catchUp(on: recording) }
+                    Button(L10n.tr("What did I miss?"), systemImage: "clock.arrow.circlepath") { catchUp(on: recording) }
                         .disabled(unavailable != nil || isWaiting)
-                        .help("Answer from the last \(Self.catchUpMinutes) minutes of the transcript")
+                        .help(L10n.tr("Answer from the last %ld minutes of the transcript", Self.catchUpMinutes))
                 }
             }
             if let asking {
@@ -55,10 +56,10 @@ struct AskPanel: View {
             ForEach(exchanges.reversed(), content: row)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .confirmationDialog("Clear these questions and answers?", isPresented: $confirmsClear) {
-            Button("Clear", role: .destructive) { model.meetings.clear(thread) }
+        .confirmationDialog(L10n.tr("Clear these questions and answers?"), isPresented: $confirmsClear) {
+            Button(L10n.tr("Clear"), role: .destructive) { model.meetings.clear(thread) }
         } message: {
-            Text("They’re removed from this Mac. This can’t be undone.")
+            Text(L10n.tr("They’re removed from this Mac. This can’t be undone."))
         }
     }
 
@@ -66,15 +67,15 @@ struct AskPanel: View {
         let attendees = MeetingFilter.attendees(in: model.meetings.meetings)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 16) {
-                Picker("When", selection: $filter.days) {
-                    Text("Any time").tag(Int?.none)
-                    Text("Today").tag(Int?.some(1))
-                    Text("Past 7 days").tag(Int?.some(7))
-                    Text("Past 30 days").tag(Int?.some(30))
+                Picker(L10n.tr("When"), selection: $filter.days) {
+                    Text(L10n.tr("Any time")).tag(Int?.none)
+                    Text(L10n.tr("Today")).tag(Int?.some(1))
+                    Text(L10n.tr("Past 7 days")).tag(Int?.some(7))
+                    Text(L10n.tr("Past 30 days")).tag(Int?.some(30))
                 }
                 if !attendees.isEmpty {
-                    Picker("With", selection: $filter.attendee) {
-                        Text("Anyone").tag(String?.none)
+                    Picker(L10n.tr("With"), selection: $filter.attendee) {
+                        Text(L10n.tr("Anyone")).tag(String?.none)
                         ForEach(attendees, id: \.self) { Text($0).tag(String?.some($0)) }
                     }
                 }
@@ -82,7 +83,7 @@ struct AskPanel: View {
             .pickerStyle(.menu)
             .fixedSize()
             if noMatch {
-                Text("No meetings match these filters.").font(.callout).foregroundStyle(.secondary)
+                Text(L10n.tr("No meetings match these filters.")).font(.callout).foregroundStyle(.secondary)
             }
         }
     }
@@ -128,20 +129,21 @@ struct AskPanel: View {
     private func catchUp(on meeting: Meeting) {
         let recent = MeetingQuestion.catchUp(meeting, at: model.meetings.elapsed)
         asking = AskQuestion(text: MeetingQuestion.catchUpQuestion, about: [recent],
-                             failure: recent.hasContent ? nil : "Nothing was transcribed in the last \(Self.catchUpMinutes) minutes.")
+                             failure: recent.hasContent ? nil : L10n.tr("Nothing was transcribed in the last %ld minutes.", Self.catchUpMinutes),
+                             displayText: MeetingQuestion.localizedCatchUpQuestion)
     }
 
     private func pending(_ question: AskQuestion) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            questionText(question.text)
+            questionText(question.displayText ?? question.text)
             if let failure = question.failure {
                 Text(failure).foregroundStyle(.secondary).textSelection(.enabled)
             } else {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Asking \(settings.notesModelName)…").foregroundStyle(.secondary)
+                    Text(L10n.tr("Asking %@…", String(settings.localizedNotesModelName))).foregroundStyle(.secondary)
                     Spacer(minLength: 8)
-                    Button("Cancel") { asking = nil }
+                    Button(L10n.tr("Cancel")) { asking = nil }
                 }
             }
         }
@@ -162,7 +164,7 @@ struct AskPanel: View {
                     ForEach(answer.citations, id: \.self, content: citation)
                 }
             }
-            Text("Answered with \(answer.modelName)")
+            Text(L10n.tr("Answered with %@", String(answer.modelName)))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -177,10 +179,12 @@ struct AskPanel: View {
 
     private func citation(_ citation: MeetingAnswer.Citation) -> some View {
         let line = citation.line
-        let title = showsMeetingTitles ? model.meetings.meeting(line.meetingID)?.displayTitle : nil
+        let meeting = model.meetings.meeting(line.meetingID)
+        let title = showsMeetingTitles ? meeting?.localizedDisplayTitle : nil
+        let label = line.localizedLabel(in: meeting)
         return Button { onCite(line) } label: {
             HStack(spacing: 6) {
-                Text("[\(citation.number)] \(line.label)").fontWeight(.medium).monospacedDigit().layoutPriority(1)
+                Text("[\(citation.number)] \(label)").fontWeight(.medium).monospacedDigit().layoutPriority(1)
                 if let title { Text(title) }
                 Text(line.text).foregroundStyle(.secondary)
             }
@@ -190,7 +194,7 @@ struct AskPanel: View {
         }
         .buttonStyle(.plain)
         .help(line.text)
-        .accessibilityLabel(["Line \(citation.number)", line.label, title].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel([L10n.tr("Line %@", String(citation.number)), label, title].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint(line.text)
     }
 }

@@ -15,12 +15,12 @@ struct HomeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionHeader(title: "Usage") {
-                        if !model.history.isEmpty { PageLink(title: "Insights") { model.selectedPage = .insights } }
+                    SectionHeader(title: L10n.tr("Usage")) {
+                        if !model.history.isEmpty { PageLink(title: L10n.tr("Insights")) { model.selectedPage = .insights } }
                     }
                     UsageStats(history: model.history)
                     if !model.settings.saveHistory && !model.history.isEmpty {
-                        Text("History is off, so new dictations are not counted.")
+                        Text(L10n.tr("History is off, so new dictations are not counted."))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 4)
@@ -28,14 +28,14 @@ struct HomeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionHeader(title: "Recent") {
-                        if !model.history.isEmpty { PageLink(title: "View all \(model.history.count.formatted())") { model.selectedPage = .history } }
+                    SectionHeader(title: L10n.tr("Recent")) {
+                        if !model.history.isEmpty { PageLink(title: L10n.tr("View all %@", String(model.history.count.formatted()))) { model.selectedPage = .history } }
                     }
                     recent
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionHeader("Setup")
+                    SectionHeader(L10n.tr("Setup"))
                     SetupTiles(model: model)
                 }
             }
@@ -50,8 +50,8 @@ struct HomeView: View {
 
     private var latestDictation: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Latest dictation") {
-                Button("Copy", systemImage: "doc.on.doc", action: model.copyLatestTranscript)
+            SectionHeader(title: L10n.tr("Latest dictation")) {
+                Button(L10n.tr("Copy"), systemImage: "doc.on.doc", action: model.copyLatestTranscript)
                     .buttonStyle(.borderless)
             }
             Card {
@@ -59,7 +59,7 @@ struct HomeView: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text("History is off. Copy these words before starting another dictation.")
+            Text(L10n.tr("History is off. Copy these words before starting another dictation."))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
@@ -73,19 +73,20 @@ struct HomeView: View {
                     Image(systemName: model.settings.saveHistory ? "waveform" : "clock.badge.xmark")
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text(model.settings.saveHistory ? "Nothing here yet" : "History is off")
+                    Text(model.settings.saveHistory ? L10n.tr("Nothing here yet") : L10n.tr("History is off"))
                         .font(.headline)
                     if model.settings.saveHistory {
-                        HStack(spacing: 4) {
-                            Text(model.settings.dictationMode == .hold ? "Hold" : "Press")
-                            KeyCap(shortcut: model.settings.shortcut)
-                            Text("in any app and your words will show up here.")
-                        }
+                        Text(model.settings.dictationMode == .hold
+                            ? L10n.tr("Hold %@ in any app and your words will show up here.", model.settings.shortcut.displayName)
+                            : L10n.tr("Press %@ in any app and your words will show up here.", model.settings.shortcut.displayName))
+                            .accessibilityLabel(model.settings.dictationMode == .hold
+                                ? L10n.tr("Hold %@ in any app and your words will show up here.", model.settings.shortcut.spokenName)
+                                : L10n.tr("Press %@ in any app and your words will show up here.", model.settings.shortcut.spokenName))
                         .foregroundStyle(.secondary)
                     } else {
-                        Text("Turn on Save dictation history to find and reuse what you said.")
+                        Text(L10n.tr("Turn on Save dictation history to find and reuse what you said."))
                             .foregroundStyle(.secondary)
-                        PageLink(title: "Open Settings") { model.selectedPage = .settings }
+                        PageLink(title: L10n.tr("Open Settings")) { model.selectedPage = .settings }
                     }
                 }
                 .multilineTextAlignment(.center)
@@ -148,18 +149,18 @@ private struct DictationPanel: View {
 
     private var headline: String {
         switch model.phase {
-        case .recording: "Listening…"
-        case .preparing: "Getting ready…"
-        case .transcribing: "Transcribing…"
+        case .recording: L10n.tr("Listening…")
+        case .preparing: L10n.tr("Getting ready…")
+        case .transcribing: L10n.tr("Transcribing…")
         case .idle, .failed, .unpasted, .cancelled, .completed, .sending, .asking: greeting
         }
     }
 
     private var greeting: String {
         switch Calendar.current.component(.hour, from: .now) {
-        case 5..<12: "Good morning"
-        case 12..<17: "Good afternoon"
-        default: "Good evening"
+        case 5..<12: L10n.tr("Good morning")
+        case 12..<17: L10n.tr("Good afternoon")
+        default: L10n.tr("Good evening")
         }
     }
 
@@ -185,21 +186,22 @@ private struct DictationPanel: View {
             HStack(spacing: 12) {
                 Waveform(mode: .processing, animated: !reduceMotion, color: .secondary, count: 24)
                     .accessibilityHidden(true)
-                Text("Your words will appear where you were typing.")
+                Text(L10n.tr("Your words will appear where you were typing."))
                     .foregroundStyle(.secondary)
             }
         } else if !model.microphoneGranted {
-            Text("BetterWispr needs your microphone to hear you.")
+            Text(L10n.tr("BetterWispr needs your microphone to hear you."))
                 .foregroundStyle(.secondary)
         } else if modelMissing {
-            Text("Download \(model.selectedModel.name) once, then dictate offline.")
+            Text(L10n.tr("Download %@ once, then dictate offline.", String(model.selectedModel.localizedName)))
                 .foregroundStyle(.secondary)
         } else {
-            HStack(spacing: 5) {
-                Text(model.settings.dictationMode == .hold ? "Hold" : "Press")
-                KeyCap(shortcut: model.settings.shortcut)
-                Text("in any app and start talking.")
-            }
+            Text(model.settings.dictationMode == .hold
+                ? L10n.tr("Hold %@ in any app and start talking.", model.settings.shortcut.displayName)
+                : L10n.tr("Press %@ in any app and start talking.", model.settings.shortcut.displayName))
+                .accessibilityLabel(model.settings.dictationMode == .hold
+                    ? L10n.tr("Hold %@ in any app and start talking.", model.settings.shortcut.spokenName)
+                    : L10n.tr("Press %@ in any app and start talking.", model.settings.shortcut.spokenName))
             .foregroundStyle(.secondary)
         }
     }
@@ -207,21 +209,21 @@ private struct DictationPanel: View {
     @ViewBuilder private var actions: some View {
         HStack(spacing: 8) {
             if model.isBusy {
-                Button("Cancel", action: model.cancelRecording)
+                Button(L10n.tr("Cancel"), action: model.cancelRecording)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
                     .transition(.opacity)
             }
             if recording {
-                ProminentButton(title: "Finish", symbol: "stop.fill", tint: .red, action: model.toggleRecording)
+                ProminentButton(title: L10n.tr("Finish"), symbol: "stop.fill", tint: .red, action: model.toggleRecording)
             } else if working {
                 ProgressView().controlSize(.small).padding(.horizontal, 12)
             } else if !model.microphoneGranted {
-                ProminentButton(title: "Allow Microphone", symbol: "mic.fill", tint: .accentColor, action: model.requestMicrophone)
+                ProminentButton(title: L10n.tr("Allow Microphone"), symbol: "mic.fill", tint: .accentColor, action: model.requestMicrophone)
             } else if modelMissing {
-                ProminentButton(title: "Get Model", symbol: "arrow.down.circle.fill", tint: .accentColor) { model.selectedPage = .models }
+                ProminentButton(title: L10n.tr("Get Model"), symbol: "arrow.down.circle.fill", tint: .accentColor) { model.selectedPage = .models }
             } else {
-                ProminentButton(title: "Start dictating", symbol: "mic.fill", tint: .accentColor, action: model.toggleRecording)
+                ProminentButton(title: L10n.tr("Start dictating"), symbol: "mic.fill", tint: .accentColor, action: model.toggleRecording)
             }
         }
         .fixedSize()
@@ -259,10 +261,10 @@ private struct UsageStats: View {
     var body: some View {
         let insights = UsageInsights(history)
         let tiles = [
-            StatTile(label: "Words dictated", value: insights.current.words.formatted(), unit: nil),
-            StatTile(label: "Speaking time", value: speakingTime, unit: nil),
-            StatTile(label: "Average pace", value: insights.current.wordsPerMinute.formatted(), unit: "wpm"),
-            StatTile(label: "Current streak", value: insights.currentStreak.formatted(), unit: insights.currentStreak == 1 ? "day" : "days"),
+            StatTile(label: L10n.tr("Words dictated"), value: insights.current.words.formatted(), unit: nil),
+            StatTile(label: L10n.tr("Speaking time"), value: speakingTime, unit: nil),
+            StatTile(label: L10n.tr("Average pace"), value: insights.current.wordsPerMinute.formatted(), unit: L10n.tr("wpm")),
+            StatTile(label: L10n.tr("Current streak"), value: insights.currentStreak.formatted(), unit: L10n.tr("Streak day unit", insights.currentStreak)),
         ]
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) { ForEach(tiles, id: \.label) { $0.frame(minWidth: 128, idealWidth: 128) } }
@@ -359,8 +361,8 @@ private struct RecentRow: View {
             .buttonStyle(.borderless)
             .foregroundStyle(copied ? Color.green : .secondary)
             .opacity(hovering || copied ? 1 : 0)
-            .help("Copy dictation")
-            .accessibilityLabel("Copy dictation")
+            .help(L10n.tr("Copy dictation"))
+            .accessibilityLabel(L10n.tr("Copy dictation"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -370,8 +372,8 @@ private struct RecentRow: View {
         .animation(.ui, value: hovering)
         .animation(.ui, value: copied)
         .contextMenu {
-            Button("Copy", action: onCopy)
-            Button("Show in History", action: onOpen)
+            Button(L10n.tr("Copy"), action: onCopy)
+            Button(L10n.tr("Show in History"), action: onOpen)
         }
         .task(id: transcript.appBundleID) {
             guard let id = transcript.appBundleID,
@@ -397,25 +399,25 @@ private struct SetupTiles: View {
         let signInMissing = speech.engine == .codex && !subscriptionSignedIn
         let onOlderParakeet = ["parakeet-v3", "parakeet-v2"].contains(speech.id)
         let speechDetail = if speech.processingLocation.isOnDevice {
-            installed ? (onOlderParakeet ? "Try Parakeet Ultra" : "Runs on this Mac") : "Not downloaded yet"
+            installed ? (onOlderParakeet ? L10n.tr("Try Parakeet Ultra") : L10n.tr("Runs on this Mac")) : L10n.tr("Not downloaded yet")
         } else {
-            signInMissing ? "Sign in with codex login in Terminal" : speech.connection.map { "Sends audio to \($0.endpoint)" } ?? speech.processingLocation.disclosure
+            signInMissing ? L10n.tr("Sign in with codex login in Terminal") : speech.connection.map { L10n.tr("Sends audio to %@", String($0.endpoint)) } ?? speech.processingLocation.disclosure
         }
         let tiles = [
             SetupTile(
-                symbol: speech.processingLocation.isOnDevice ? "cpu" : "network", title: "Speech model", value: speech.name,
+                symbol: speech.processingLocation.isOnDevice ? "cpu" : "network", title: L10n.tr("Speech model"), value: speech.localizedName,
                 detail: speechDetail,
                 ready: installed && !signInMissing
             ) { model.selectedPage = .models },
             SetupTile(
-                symbol: "mic", title: "Microphone", value: microphoneName,
-                detail: model.microphoneGranted ? (model.settings.microphone == nil ? "Follows Sound settings" : "Chosen in Settings") : "Access needed",
+                symbol: "mic", title: L10n.tr("Microphone"), value: microphoneName,
+                detail: model.microphoneGranted ? (model.settings.microphone == nil ? L10n.tr("Follows Sound settings") : L10n.tr("Chosen in Settings")) : L10n.tr("Access needed"),
                 ready: model.microphoneGranted
             ) { model.microphoneGranted ? (model.selectedPage = .settings) : model.requestMicrophone() },
             SetupTile(
-                symbol: "doc.on.clipboard", title: "Delivery",
-                value: model.settings.autoPaste && model.accessibilityGranted ? "Pastes into apps" : "Copies to clipboard",
-                detail: model.accessibilityGranted ? "Accessibility allowed" : "Allow Accessibility to paste",
+                symbol: "doc.on.clipboard", title: L10n.tr("Delivery"),
+                value: model.settings.autoPaste && model.accessibilityGranted ? L10n.tr("Pastes into apps") : L10n.tr("Copies to clipboard"),
+                detail: model.accessibilityGranted ? L10n.tr("Accessibility allowed") : L10n.tr("Allow Accessibility to paste"),
                 ready: model.accessibilityGranted
             ) { model.accessibilityGranted ? (model.selectedPage = .settings) : model.requestAccessibility() },
         ]
@@ -431,7 +433,7 @@ private struct SetupTiles: View {
 
     private var microphoneName: String {
         if let chosen = model.settings.microphone { return chosen.name }
-        return model.automaticMicrophone?.name ?? "Automatic"
+        return model.automaticMicrophone?.name ?? L10n.tr("Automatic")
     }
 }
 
@@ -482,6 +484,6 @@ private struct SetupTile: View {
         .onHover { hovering = $0 }
         .animation(.ui, value: hovering)
         .accessibilityElement(children: .combine)
-        .accessibilityHint(ready ? "Opens settings" : "Fixes this setup step")
+        .accessibilityHint(ready ? L10n.tr("Opens settings") : L10n.tr("Fixes this setup step"))
     }
 }

@@ -6,6 +6,73 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Interface localization
+
+Native Core `.lproj` folders declare interface languages, each with a matching
+permission folder under `Resources`. `L10n` discovers the Core SwiftPM resource
+bundle's languages and resolves the host bundle's preference; unsupported
+languages use English. Explicit-locale tests select resource bundles without
+writing `AppleLanguages` or other user preferences. Normal interpolation uses
+Foundation format arguments; numeric counts use native `.stringsdict` plural
+rules. Contextual tables distinguish keyboard keys, sound names, appearance,
+recording actions and writing contexts that share English source text.
+
+See [Add an interface language](localization.md) for staged templates and the
+paired folder activation step. Run the source and tool checks with:
+
+```sh
+python3 scripts/localization.py check
+python3 Tests/localization_tools_check.py
+```
+
+`LocalizationTests` covers explicit French and English lookup, unsupported
+language fallback, quotes, newlines, literal percent signs, repeated/reordered
+arguments, plural counts 0/1/2, mixed plural/string arguments, contextual labels,
+canonical model metadata and user-provided names. Resource and permission
+coverage follows all declared languages. A tiny fixture bundle exercises new
+language selection without a registration list. Tool tests use temporary
+resource fixtures to exercise initialization, validation and fake packaging.
+English templates and legitimately unchanged translations are accepted;
+plural categories can differ between languages.
+
+After `./scripts/build-app.sh`, run the following read-only inspection against
+the reported app path. It checks that all source languages, table contents,
+permission messages and generated language metadata match the actual bundle:
+
+```sh
+python3 Tests/localization_check.py /path/to/BetterWispr.app
+```
+
+The Core resource bundle belongs in `Contents/Resources`. Localized
+`InfoPlist.strings` files are copied directly into each app language directory
+so macOS can display permission prompts. English base permission descriptions
+remain in `Info.plist` for fallback. The build does not install or launch the
+app or change its preferences.
+
+Manual validation remains separate from automated lookup and packaging checks:
+
+- [ ] With each translated app language selected, inspect onboarding, the menu
+  bar, Home, Settings, Models, Vocabulary, Style, History, Insights, Meetings,
+  meeting details, Ask, Transcribe and About. Check clipping and accessibility
+  labels at the normal window size and with larger text.
+- [ ] With English selected and with an unsupported app language, verify the
+  English fallback and that resource keys or printf placeholders are not shown.
+- [ ] Inspect each language's singular/plural counters, including zero and
+  dynamic keyboard labels. Keep custom connection/model/participant names
+  exactly as entered.
+- [ ] In a separate authorized permission trial, verify the translated
+  microphone, speech recognition, system audio, Calendar and Apple Events
+  descriptions.
+- [ ] Verify local-only selection, cancellation, shortcut, paste and clipboard
+  behavior with the existing checklists. Localization tests do not exercise
+  these macOS interactions or validate recognition quality.
+
+`StylePreview` shows French presentation samples while preserving the existing
+English-only cleanup behavior. Interface resources do not add dictation
+languages, cleanup rules or voice commands.
+No app launch, installation, permission prompt, model download or live Claude
+interaction is part of this source-only localization validation.
+
 ## Semantic spoken lists: local trial
 
 Use English (or Auto with English speech), Style → Auto cleanup → Medium,

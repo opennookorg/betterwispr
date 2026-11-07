@@ -162,7 +162,7 @@ public final class WhisperKitProvider: SpeechProvider {
         guard let audio = pipeline.audioProcessor.padOrTrim(fromArray: samples, startAt: 0, toLength: window),
               let features = try await pipeline.featureExtractor.logMelSpectrogram(fromAudio: audio),
               let encoded = try await pipeline.audioEncoder.encodeFeatures(features)
-        else { throw WhisperError.transcriptionFailed("Language detection failed") }
+        else { throw WhisperError.transcriptionFailed(L10n.tr("Language detection failed")) }
         let inputs = try pipeline.textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
         let result = try await pipeline.textDecoder.detectLanguage(
             from: encoded, using: inputs, sampler: AllowedLanguageSampler(languageTokens: languageTokens),

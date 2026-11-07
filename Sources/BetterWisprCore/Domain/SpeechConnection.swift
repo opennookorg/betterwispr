@@ -57,7 +57,7 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 100,
               !modelID.isEmpty, modelID.count <= 200,
               !modelID.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw SpeechAPIError.configuration("Enter a name and a model ID (up to 100 and 200 characters).")
+            throw SpeechAPIError.configuration(L10n.tr("Enter a name and a model ID (up to 100 and 200 characters)."))
         }
         guard endpoint.count <= 2048,
               let parts = URLComponents(string: endpoint), let url = parts.url,
@@ -66,7 +66,7 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
               parts.port.map({ (1...65535).contains($0) }) ?? true,
               parts.scheme == "https" || (parts.scheme == "http" && Self.isLoopback(host)),
               api == .openAICompatible || endpoint == api.endpoint else {
-            throw SpeechAPIError.configuration("Use a full HTTPS endpoint URL without credentials, query parameters or fragments. HTTP is allowed only for localhost, 127.0.0.1 or [::1].")
+            throw SpeechAPIError.configuration(L10n.tr("Use a full HTTPS endpoint URL without credentials, query parameters or fragments. HTTP is allowed only for localhost, 127.0.0.1 or [::1]."))
         }
         return url
     }
@@ -78,7 +78,7 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
     public func validateAPIKey(_ key: String) throws {
         guard api == .openAICompatible || !key.isEmpty else { throw SpeechAPIError.missingKey }
         guard key.utf8.count <= 8192, key.utf8.allSatisfy({ (33...126).contains($0) }) else {
-            throw SpeechAPIError.configuration("The API key contains spaces or unsupported characters. Paste only the key.")
+            throw SpeechAPIError.configuration(L10n.tr("The API key contains spaces or unsupported characters. Paste only the key."))
         }
     }
 
@@ -87,20 +87,20 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
         let code = SpeechModel.engineLanguage(language)
         if api == .smallest {
             guard let code else {
-                throw SpeechAPIError.configuration("Smallest AI needs a specific spoken language. Open Settings and change Spoken language from Detect automatically to English, Hindi or another language.")
+                throw SpeechAPIError.configuration(L10n.tr("Smallest AI needs a specific spoken language. Open Settings and change Spoken language from Detect automatically to English, Hindi or another language."))
             }
             let supported = ["en", "hi", "zh", "ko", "ja", "yue", "ms", "id", "tl", "it", "es", "pt", "de", "fr", "uk", "ru", "pl", "cs", "sk", "nl", "lv", "et", "ro", "fi", "sv", "bg", "hu", "da", "lt", "mt", "kn", "ml", "mr", "gu", "te", "or", "bn", "pa", "ta"]
             guard supported.contains(code) else {
-                throw SpeechAPIError.configuration("Smallest AI does not support the selected language. Open Settings and choose a supported Spoken language.")
+                throw SpeechAPIError.configuration(L10n.tr("Smallest AI does not support the selected language. Open Settings and choose a supported Spoken language."))
             }
             if modelID == "pulse-pro", code != "en" {
-                throw SpeechAPIError.configuration("Pulse Pro requires English. Choose English in Settings or use the pulse model.")
+                throw SpeechAPIError.configuration(L10n.tr("Pulse Pro requires English. Choose English in Settings or use the pulse model."))
             }
         }
         if api == .sarvam, let code {
             let supported = ["en", "hi", "bn", "kn", "ml", "mr", "od", "pa", "ta", "te", "gu", "as", "ur", "ne", "kok", "ks", "sd", "sa", "sat", "mni", "brx", "mai", "doi"]
             guard supported.contains(code) else {
-                throw SpeechAPIError.configuration("Sarvam does not support the selected language. Choose a supported language or Detect automatically in Settings.")
+                throw SpeechAPIError.configuration(L10n.tr("Sarvam does not support the selected language. Choose a supported language or Detect automatically in Settings."))
             }
         }
     }
@@ -112,13 +112,13 @@ public enum SpeechAPIError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .configuration(let message): message
-        case .missingKey: "Add your API key in Models → Bring your own model."
-        case .keychain(let status): "Couldn’t access the API key in macOS Keychain (\(status)). Unlock your login keychain and try again."
-        case .http(401), .http(403): "The provider rejected your API key. Check the key and its permissions in Models."
-        case .http(429): "The provider’s rate limit or account quota was reached. Check your account and try again later."
-        case .http(300..<400): "The endpoint redirected the request. Enter its final URL in Models; audio and keys are never forwarded to redirects."
-        case .http(let code): "The speech endpoint returned HTTP \(code). Check the endpoint, model and selected language."
-        case .invalidResponse: "The endpoint did not return a supported transcription response. Check its API format and model."
+        case .missingKey: L10n.tr("Add your API key in Models → Bring your own model.")
+        case .keychain(let status): L10n.tr("Couldn’t access the API key in macOS Keychain (%@). Unlock your login keychain and try again.", String(status))
+        case .http(401), .http(403): L10n.tr("The provider rejected your API key. Check the key and its permissions in Models.")
+        case .http(429): L10n.tr("The provider’s rate limit or account quota was reached. Check your account and try again later.")
+        case .http(300..<400): L10n.tr("The endpoint redirected the request. Enter its final URL in Models; audio and keys are never forwarded to redirects.")
+        case .http(let code): L10n.tr("The speech endpoint returned HTTP %@. Check the endpoint, model and selected language.", String(code))
+        case .invalidResponse: L10n.tr("The endpoint did not return a supported transcription response. Check its API format and model.")
         }
     }
 }

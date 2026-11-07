@@ -30,32 +30,32 @@ enum SelectedTextCleanupOutcome: Equatable {
     func toast(allowingAccessibility allow: @escaping @MainActor () -> Void) -> Toast {
         switch self {
         case .busy:
-            Toast(title: "Finish dictating first", message: "Then press the shortcut again.", systemImage: "waveform", isError: true)
+            Toast(title: L10n.tr("Finish dictating first"), message: L10n.tr("Then press the shortcut again."), systemImage: "waveform", isError: true)
         case .needsAccessibility:
-            Toast(title: "Allow Accessibility", message: "BetterWispr needs it to read and replace the selected text.", systemImage: "lock.shield",
-                  isError: true, action: Toast.Action(title: "Allow", perform: allow))
+            Toast(title: L10n.tr("Allow Accessibility"), message: L10n.tr("BetterWispr needs it to read and replace the selected text."), systemImage: "lock.shield",
+                  isError: true, action: Toast.Action(title: L10n.tr("Allow"), perform: allow))
         case .noOtherApp:
-            Toast(title: "Select text in another app", message: "Then press the shortcut to clean it up.", systemImage: "text.cursor", isError: true)
+            Toast(title: L10n.tr("Select text in another app"), message: L10n.tr("Then press the shortcut to clean it up."), systemImage: "text.cursor", isError: true)
         case .secureInput:
-            Toast(title: "Can’t read the selection", message: "Secure input is on, as in a password field.", systemImage: "lock", isError: true)
+            Toast(title: L10n.tr("Can’t read the selection"), message: L10n.tr("Secure input is on, as in a password field."), systemImage: "lock", isError: true)
         case .noSelection:
-            Toast(title: "No selected text found", message: "Select text and press again. Some apps don’t share their selection.", systemImage: "text.cursor", isError: true)
+            Toast(title: L10n.tr("No selected text found"), message: L10n.tr("Select text and press again. Some apps don’t share their selection."), systemImage: "text.cursor", isError: true)
         case .tooShort:
-            Toast(title: "Select at least \(TranscriptPolisher.minimumWords) words", message: "Shorter text is left as is.", systemImage: "text.cursor", isError: true)
+            Toast(title: L10n.tr("Select at least %@ words", String(TranscriptPolisher.minimumWords)), message: L10n.tr("Shorter text is left as is."), systemImage: "text.cursor", isError: true)
         case .notEnglish:
-            Toast(title: "English only", message: "Cleanup edits English text, like Medium dictation.", systemImage: "character.bubble", isError: true)
+            Toast(title: L10n.tr("English only"), message: L10n.tr("Cleanup edits English text, like Medium dictation."), systemImage: "character.bubble", isError: true)
         case .unavailable(let reason):
-            Toast(title: "Cleanup provider isn’t ready", message: reason, systemImage: "exclamationmark.triangle.fill", isError: true)
+            Toast(title: L10n.tr("Cleanup provider isn’t ready"), message: reason, systemImage: "exclamationmark.triangle.fill", isError: true)
         case .leftAsIs(let model):
-            Toast(title: "Left as is", message: "\(model) didn’t return a usable edit.", systemImage: "exclamationmark.triangle.fill", isError: true)
+            Toast(title: L10n.tr("Left as is"), message: L10n.tr("%@ didn’t return a usable edit.", String(model)), systemImage: "exclamationmark.triangle.fill", isError: true)
         case .alreadyClean:
-            Toast(title: "Already clean", message: "The cleanup provider found nothing to change.", systemImage: "checkmark")
+            Toast(title: L10n.tr("Already clean"), message: L10n.tr("The cleanup provider found nothing to change."), systemImage: "checkmark")
         case .copied:
-            Toast(title: "Copied, not pasted", message: "The app or selection changed. Paste the cleaned text with ⌘V.", systemImage: "doc.on.clipboard")
+            Toast(title: L10n.tr("Copied, not pasted"), message: L10n.tr("The app or selection changed. Paste the cleaned text with ⌘V."), systemImage: "doc.on.clipboard")
         case .replaced(let app):
-            Toast(title: "Cleaned up", message: "Replaced the selection in \(app).", systemImage: "wand.and.stars")
+            Toast(title: L10n.tr("Cleaned up"), message: L10n.tr("Replaced the selection in %@.", String(app)), systemImage: "wand.and.stars")
         case .failed(let reason):
-            Toast(title: "Couldn’t clean up", message: reason, systemImage: "exclamationmark.triangle.fill", isError: true)
+            Toast(title: L10n.tr("Couldn’t clean up"), message: reason, systemImage: "exclamationmark.triangle.fill", isError: true)
         }
     }
 }

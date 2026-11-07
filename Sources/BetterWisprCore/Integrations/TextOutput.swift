@@ -74,7 +74,7 @@ public struct FocusedAppIntegration: TextOutputIntegration {
                 }
             })
         }
-        return .pasted(into: target.localizedName ?? "your app")
+        return .pasted(into: target.localizedName ?? L10n.tr("your app"))
     }
 
     /// Posts `keystroke` to `target` only while it is still the frontmost app with the field the dictation started in.
@@ -216,5 +216,5 @@ public struct FocusedAppIntegration: TextOutputIntegration {
 
 public enum OutputError: LocalizedError {
     case clipboard
-    public var errorDescription: String? { "Could not write to the clipboard. Your transcript is still available in BetterWispr." }
+    public var errorDescription: String? { L10n.tr("Could not write to the clipboard. Your transcript is still available in BetterWispr.") }
 }

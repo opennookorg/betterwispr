@@ -10,7 +10,7 @@ public enum MeetingPlatform: String, CaseIterable, Sendable {
         case .zoom: "Zoom"
         case .googleMeet: "Google Meet"
         case .teams: "Microsoft Teams"
-        case .slack: "Slack huddle"
+        case .slack: L10n.tr("Slack huddle")
         case .webex: "Webex"
         case .faceTime: "FaceTime"
         case .discord: "Discord"

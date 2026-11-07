@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%@, %ld words, %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$@, %2$#@count@, %3$@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld word</string>
+			<key>other</key>
+			<string>%ld words</string>
+		</dict>
+	</dict>
+	<key>%@: %ld words</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$@: %2$#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld word</string>
+			<key>other</key>
+			<string>%ld words</string>
+		</dict>
+	</dict>
+	<key>%ld apps</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld app</string>
+			<key>other</key>
+			<string>%ld apps</string>
+		</dict>
+	</dict>
+	<key>%ld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld day</string>
+			<key>other</key>
+			<string>%ld days</string>
+		</dict>
+	</dict>
+	<key>%ld dictations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld dictation</string>
+			<key>other</key>
+			<string>%ld dictations</string>
+		</dict>
+	</dict>
+	<key>%ld dictations will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld dictation will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.</string>
+			<key>other</key>
+			<string>%ld dictations will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.</string>
+		</dict>
+	</dict>
+	<key>%ld entries</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld entry</string>
+			<key>other</key>
+			<string>%ld entries</string>
+		</dict>
+	</dict>
+	<key>%ld languages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld language</string>
+			<key>other</key>
+			<string>%ld languages</string>
+		</dict>
+	</dict>
+	<key>%ld seconds</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld second</string>
+			<key>other</key>
+			<string>%ld seconds</string>
+		</dict>
+	</dict>
+	<key>%ld words</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld word</string>
+			<key>other</key>
+			<string>%ld words</string>
+		</dict>
+	</dict>
+	<key>About %ld words each</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>About %ld word each</string>
+			<key>other</key>
+			<string>About %ld words each</string>
+		</dict>
+	</dict>
+	<key>Answer from the last %ld minutes of the transcript</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>Answer from the last minute of the transcript</string>
+			<key>other</key>
+			<string>Answer from the last %ld minutes of the transcript</string>
+		</dict>
+	</dict>
+	<key>Longest: %ld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>Longest: %ld day</string>
+			<key>other</key>
+			<string>Longest: %ld days</string>
+		</dict>
+	</dict>
+	<key>Nothing was transcribed in the last %ld minutes.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>Nothing was transcribed in the last minute.</string>
+			<key>other</key>
+			<string>Nothing was transcribed in the last %ld minutes.</string>
+		</dict>
+	</dict>
+	<key>Streak day unit</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>day</string>
+			<key>other</key>
+			<string>days</string>
+		</dict>
+	</dict>
+	<key>Removed word unit</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>word removed</string>
+			<key>other</key>
+			<string>words removed</string>
+		</dict>
+	</dict>
+	<key>Consecutive day unit</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>day in a row</string>
+			<key>other</key>
+			<string>days in a row</string>
+		</dict>
+	</dict>
+	<key>%@ %ld words with BetterWispr at %@ words per minute, about %@ faster than typing.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$@ %2$#@count@ with BetterWispr at %3$@ words per minute, about %4$@ faster than typing.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld word</string>
+			<key>other</key>
+			<string>%ld words</string>
+		</dict>
+	</dict>
+	<key>Busiest %@: %@, %ld words</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Busiest %1$@: %2$@, %3$#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>%ld word</string>
+			<key>other</key>
+			<string>%ld words</string>
+		</dict>
+	</dict>
+	<key>Not counted: %ld dictations with no app recorded.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>Not counted: %ld dictation with no app recorded.</string>
+			<key>other</key>
+			<string>Not counted: %ld dictations with no app recorded.</string>
+		</dict>
+	</dict>
+	<key>Deleted %ld dictations %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@count@ %2$@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>ld</string>
+			<key>one</key>
+			<string>Deleted %ld dictation</string>
+			<key>other</key>
+			<string>Deleted %ld dictations</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

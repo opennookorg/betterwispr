@@ -7,10 +7,10 @@ public struct ClaudeCodeDestination: Equatable, Sendable {
 
     init(status: String, settingsFiles: [Data?]) throws {
         guard let auth = try? JSONDecoder().decode(Auth.self, from: Data(status.utf8)), auth.loggedIn else {
-            throw MeetingNotesError.unavailable("Sign in to Claude Code with claude auth login in Terminal.")
+            throw MeetingNotesError.unavailable(L10n.tr("Sign in to Claude Code with claude auth login in Terminal."))
         }
         guard let method = auth.authMethod, !method.isEmpty, method != "none" else {
-            throw MeetingNotesError.unavailable("Claude Code didn’t say how it is signed in, so nothing was sent. Update it, then try again.")
+            throw MeetingNotesError.unavailable(L10n.tr("Claude Code didn’t say how it is signed in, so nothing was sent. Update it, then try again."))
         }
         let urls = try Self.customURLs(in: settingsFiles)
         let place = urls.isEmpty ? [Self.providerNames[auth.apiProvider ?? "firstParty"] ?? auth.apiProvider ?? ""] : urls
@@ -21,13 +21,13 @@ public struct ClaudeCodeDestination: Equatable, Sendable {
     /// Runs only `claude auth status`, with no meeting text, so Models can show the destination.
     @MainActor public static func current() async throws -> ClaudeCodeDestination {
         guard let executable = await NotesCLI.claudeCode.locateExecutable() else {
-            throw MeetingNotesError.unavailable("Install Claude Code, then sign in with claude auth login in Terminal.")
+            throw MeetingNotesError.unavailable(L10n.tr("Install Claude Code, then sign in with claude auth login in Terminal."))
         }
         let status: String
         do {
             status = try await CLINotesModel.run(executable, arguments: ["auth", "status"], input: "", cli: .claudeCode, timeout: .seconds(30))
         } catch is MeetingNotesError {
-            throw MeetingNotesError.unavailable("Couldn’t read Claude Code’s sign-in. Update it and sign in with claude auth login in Terminal.")
+            throw MeetingNotesError.unavailable(L10n.tr("Couldn’t read Claude Code’s sign-in. Update it and sign in with claude auth login in Terminal."))
         }
         return try ClaudeCodeDestination(status: status, settingsFiles: installedSettingsFiles())
     }
@@ -44,7 +44,7 @@ public struct ClaudeCodeDestination: Equatable, Sendable {
     }
 
     private static func customURLs(in settingsFiles: [Data?]) throws -> [String] {
-        let unreadable = MeetingNotesError.unavailable("Couldn’t read Claude Code’s settings files, so nothing was sent. Fix them, then try again.")
+        let unreadable = MeetingNotesError.unavailable(L10n.tr("Couldn’t read Claude Code’s settings files, so nothing was sent. Fix them, then try again."))
         var urls: Set<String> = []
         for file in settingsFiles {
             guard let file, let settings = (try? JSONSerialization.jsonObject(with: file)) as? [String: Any] else { throw unreadable }

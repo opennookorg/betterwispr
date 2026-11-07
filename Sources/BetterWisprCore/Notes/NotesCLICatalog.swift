@@ -65,7 +65,7 @@ public struct NotesCLICatalog: Sendable {
     }
 
     static func unavailable(_ cli: NotesCLI) -> MeetingNotesError {
-        .unavailable("Couldn’t list \(cli.name) models. Update the CLI and sign in with \(cli.loginCommand), then refresh. You can also enter an exact model ID.")
+        .unavailable(L10n.tr("Couldn’t list %@ models. Update the CLI and sign in with %@, then refresh. You can also enter an exact model ID.", String(cli.name), String(cli.loginCommand)))
     }
 
     private struct ClaudeEnvelope: Decodable {

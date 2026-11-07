@@ -11,10 +11,10 @@ extension DictationSound {
 
     var title: String {
         switch self {
-        case .started: "Start"
-        case .finished: "Finish"
-        case .cancelled: "Cancel"
-        case .attention: "Needs attention"
+        case .started: L10n.tr("Start")
+        case .finished: L10n.tr("Finish", table: "Sounds")
+        case .cancelled: L10n.tr("Cancel")
+        case .attention: L10n.tr("Needs attention")
         }
     }
 

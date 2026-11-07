@@ -204,7 +204,7 @@ public final class MeetingRecorder {
 
     private func startSystemAudio(session id: UUID, threshold: Float) async {
         guard #available(macOS 14.2, *) else {
-            systemAudioIssue = "System audio needs macOS 14.2 or later."
+            systemAudioIssue = L10n.tr("System audio needs macOS 14.2 or later.")
             return
         }
         let tap = SystemAudioTap()
@@ -227,7 +227,7 @@ public final class MeetingRecorder {
         } catch {
             tap.stop()
             writer?.cancel()
-            if session == id { systemAudioIssue = "Recording your microphone only. \(error.localizedDescription)" }
+            if session == id { systemAudioIssue = L10n.tr("Recording your microphone only. %@", String(error.localizedDescription)) }
         }
     }
 

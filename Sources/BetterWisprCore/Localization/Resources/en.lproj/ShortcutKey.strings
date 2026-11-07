@@ -1,0 +1,20 @@
+/* Native presentation strings. English source keys; preserve format arguments. */
+"Delete" = "Delete";
+"End" = "End";
+"Esc" = "Esc";
+"Fn" = "Fn";
+"Forward Delete" = "Forward Delete";
+"Home" = "Home";
+"Left Command" = "Left Command";
+"Left Control" = "Left Control";
+"Left Option" = "Left Option";
+"Left Shift" = "Left Shift";
+"Page Down" = "Page Down";
+"Page Up" = "Page Up";
+"Return" = "Return";
+"Right Command" = "Right Command";
+"Right Control" = "Right Control";
+"Right Option" = "Right Option";
+"Right Shift" = "Right Shift";
+"Space" = "Space";
+"Tab" = "Tab";
