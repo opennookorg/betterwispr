@@ -112,6 +112,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
     public var pauseMediaWhileDictating: Bool = false
+    /// Silences other apps while a dictation records, unless a known call app or a browser is using the microphone.
+    public var muteOtherAppsWhileDictating: Bool = false
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
     /// Names a meeting note after the Calendar event under way when recording starts and lists its invitees.
@@ -254,6 +256,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
+        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         useCalendar = try container.decodeIfPresent(Bool.self, forKey: .useCalendar) ?? false
         excludedCalendarIDs = try container.decodeIfPresent(Set<String>.self, forKey: .excludedCalendarIDs) ?? []

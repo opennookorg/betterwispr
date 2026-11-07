@@ -169,6 +169,59 @@ running process so a closed app is never launched, and never prompt during
 dictation; consent is asked once when the setting turns on. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
 
+"Mute other apps while dictating" (`AppSettings.muteOtherAppsWhileDictating`, off
+by default, shown on macOS 14.2 and later) is a separate setting. Browsers and
+other players can't be asked whether they play without private MediaRemote APIs,
+which macOS 15.4 closed to other apps, and a play/pause media key could start
+something the user had paused. So `MediaPauser` starts `SystemAudioMute`, a
+private Core Audio process tap with `muteBehavior = .mutedWhenTapped` that excludes
+BetterWispr's own process, and its private aggregate device reads and discards
+what it hears. Every other app keeps playing silently and the capsule sounds stay
+audible. The output device's volume and mute are never read or changed, so a user
+who muted their Mac stays muted.
+
+The mute starts only when the phase enters recording, so other apps stay audible
+during a long model load, and ends when the phase leaves recording for any reason:
+stop, the hard stop, cancel, failure, discard or quit. The long dictation question card comes
+after recording, so nothing is muted while it waits. A dictation that fails while
+preparing, such as a denied permission or a model that won't load, never mutes. A
+mute runs on the `MediaPauser` queue, not in the recording path, so a failure can't
+stop the dictation: it is logged and shown as a toast, and other apps stay audible.
+
+The aggregate device sets `kAudioAggregateDeviceTapAutoStartKey`, and Apple's header
+says `AudioDeviceStart` then waits until a tapped app receives its first audio. With
+nothing playing that can last the whole dictation and beyond, so the mute path runs
+it off the main actor (`SystemAudioTap.startInBackground`) and `SystemAudioMute.mute`
+returns without waiting. The `MediaPauser` queue, resuming Music and quitting never
+wait for a start. An unmute that arrives mid-start only clears `wanted`, and the tap
+is stopped as soon as the start returns, so no Core Audio teardown runs against a
+device that is still starting. Until then nothing is playing and nothing is muted.
+The first sound after that wakes the tap, so it may be withheld for a moment before
+the tap stops. The next dictation reuses a start still in progress, so at most one is
+ever waiting. Meeting notes still use the synchronous `start`.
+macOS may report no error when System Audio Recording is denied, in which case
+nothing is muted and nothing is shown. That case is not exercised.
+
+Muting is skipped while meeting notes record, or when `MicrophoneActivity` reports
+a known call app or a browser using the microphone as the recording starts.
+Browsers count without a window title check, so a browser using the microphone for
+something else also stays audible. The check runs once and has limits: a call in an
+app `MeetingPlatform` doesn't know, a call where the app has released the
+microphone, and a call that starts during the dictation all go silent until the
+recording stops. `MeetingDetector.meeting` isn't used because it only holds the
+prompt on offer, which clears on dismissal and expiry.
+
+Turning the setting on starts an unmuted system audio tap once, so macOS asks for
+System Audio Recording then rather than during a dictation.
+
+If BetterWispr crashes or is force quit while muting, it can't remove the tap, and
+Apple doesn't document that Core Audio does. `.mutedWhenTapped` is chosen because
+Apple's header says audio is withheld only for the duration of read activity on the
+tap, and reads stop with the process, so other apps should become audible without
+a relaunch. This is not verified: see the crash check in `docs/testing.md`. Nothing
+is persisted or restored at the next launch, because BetterWispr changes no saved
+system state and a new process can't see the private tap of the old one.
+
 With "Send to Claude" on (`AppSettings.sendToClaude`, off by default), a pasted
 dictation is followed by a Return key press when `ClaudePrompt` recognizes the
 focused field as a Claude prompt. Anything it does not recognize is only pasted,
