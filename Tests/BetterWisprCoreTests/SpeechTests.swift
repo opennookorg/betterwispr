@@ -230,6 +230,16 @@ func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) thr
     } catch AudioRecordingError.inputStalled {}
 }
 
+@Test func stopBoundaryArrivesFromTheCaptureThreadWithoutTheMainActor() async throws {
+    let progress = AudioCaptureProgress()
+    let capture = progress.begin()
+    let finishing = Task.detached { try await progress.wait(through: 2) }
+    DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(40)) {
+        progress.receive(through: 2, generation: capture)
+    }
+    try await finishing.value
+}
+
 @Test(arguments: [0.02, 0.1, 0.5])
 func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSeconds: Double) throws {
     let rate = 48_000.0

@@ -139,9 +139,9 @@ public final class MeetingRecorder {
             try await input.start { @Sendable [weak self] buffer, time in
                 let end = AudioCaptureProgress.endTime(time, frames: buffer.frameLength, sampleRate: sampleRate)
                 let level = writer.write(buffer, at: time.isHostTimeValid ? AVAudioTime.seconds(forHostTime: time.hostTime) - origin : nil)
+                progress.receive(through: end, generation: capture)
                 Task { @MainActor [weak self] in
                     guard let self, self.session == id, progress.generation == capture else { return }
-                    progress.receive(through: end, generation: capture)
                     self.receive(level, from: .me, session: id)
                 }
             }
