@@ -79,6 +79,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var notesCLI: NotesCLI?
     public var claudeNotesModel: String = ""
     public var codexNotesModel: String = ""
+    /// Lets Claude Code write meeting notes with any sign-in, such as an API key or a gateway; Ask, cleanup and review always need a Claude subscription.
+    public var claudeCodeAnySignIn: Bool = false
+    /// The Claude Code destination the user confirmed; meeting notes stop and ask again when it no longer matches.
+    public var claudeCodeConfirmedDestination: String?
     public var language: String = "auto"
     /// Nil keeps Chinese in the script the speech model wrote.
     public var chineseScript: ChineseScript?
@@ -210,6 +214,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         if cli == .claudeCode { claudeNotesModel = model } else { codexNotesModel = model }
     }
 
+    public func allowsAnySignIn(_ cli: NotesCLI) -> Bool { cli == .claudeCode && claudeCodeAnySignIn }
+
     public var notesModelName: String {
         switch notesSelection {
         case .apple: "Apple Intelligence"
@@ -229,6 +235,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         notesCLI = try container.decodeIfPresent(NotesCLI.self, forKey: .notesCLI)
         claudeNotesModel = try container.decodeIfPresent(String.self, forKey: .claudeNotesModel) ?? ""
         codexNotesModel = try container.decodeIfPresent(String.self, forKey: .codexNotesModel) ?? ""
+        claudeCodeAnySignIn = try container.decodeIfPresent(Bool.self, forKey: .claudeCodeAnySignIn) ?? false
+        claudeCodeConfirmedDestination = try? container.decodeIfPresent(String.self, forKey: .claudeCodeConfirmedDestination)
         language = try container.decode(String.self, forKey: .language)
         chineseScript = try container.decodeIfPresent(ChineseScript.self, forKey: .chineseScript)
         dictationLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .dictationLanguages) ?? []

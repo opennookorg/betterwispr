@@ -630,10 +630,26 @@ no request and clears a typed key. Anthropic's OpenAI compatibility ignores
 `response_format`, so notes from it rely on the prompt alone for JSON.
 
 Claude Code uses `claude --print` and its existing Claude subscription sign-in;
-Codex uses `codex exec` with ChatGPT authentication required. BetterWispr does not
-extract OAuth tokens. These CLI routes strip inherited provider/key environment
-variables, run in a private temporary directory, disable tools/customizations as
-supported by each CLI, and disable session persistence. Codex also uses read-only
+Codex uses `codex exec` with ChatGPT authentication required. Claude Code must
+report a `claude.ai` sign-in from `claude auth status`, with no custom base URL in
+its settings files. Models' "Allow any Claude Code sign-in"
+(`AppSettings.claudeCodeAnySignIn`, off by default) relaxes that for meeting notes
+only: `MeetingNotesGenerator.meetingNotesModel` is the one route that sets it, and
+`languageModel`, used by Ask, cleanup and correction review, never does.
+`ClaudeCodeDestination` builds the destination from `authMethod`, `apiProvider` and
+any `ANTHROPIC_*BASE_URL` in the `env` of Claude Code's user and managed settings
+files. Text is sent only when that label equals
+`AppSettings.claudeCodeConfirmedDestination`, checked before every request. A missing
+or corrupt stored value, an unreadable settings file or a missing `authMethod` asks
+again or refuses. Remotely managed settings and managed preferences aren't read, so
+the label is what Claude Code and those files report, not a verified destination, and
+the HTTPS and loopback rule of `SpeechConnection.validatedURL` doesn't apply to it.
+This route passes `--max-budget-usd 1.00` per request and names the destination in
+`MeetingSummary.modelName`. A long meeting takes several requests. BetterWispr
+does not extract OAuth tokens. These CLI routes strip inherited provider/key
+environment variables, though not Claude Code's own settings files, run in a private
+temporary directory, disable tools/customizations as supported by each CLI, and
+disable session persistence. Codex also uses read-only
 sandboxing. A timeout or cancellation terminates the child and removes temporary
 input/output files. Install/update and sign in to the CLIs separately. Subscription
 limits and model access remain the provider's responsibility. Models discovers
