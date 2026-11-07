@@ -59,7 +59,7 @@ public enum MeetingNotesGenerator {
         guard !spoken.isEmpty || !notes.isEmpty else { throw MeetingNotesError.nothingToSummarize }
         if case .unavailable(let message) = availability(settings: settings) { throw MeetingNotesError.unavailable(message) }
         return try await NotesWriter.write(parts: TranscriptChunker.chunks(spoken, names: names, budget: budget), notes: notes, invite: invite,
-                                           model: try languageModel(settings), onStep: onStep)
+                                           model: try meetingNotesModel(settings), onStep: onStep)
     }
 
     private static var appleAvailability: NotesAvailability {
@@ -75,6 +75,15 @@ public enum MeetingNotesGenerator {
         }
         #endif
         return .unavailable("Apple Intelligence needs macOS 26. Choose the built-in model, Claude Code, Codex, Ollama or an API connection in Models.")
+    }
+
+    /// The only route that may use Claude Code's non-subscription sign-ins; every other caller stays on `languageModel`.
+    static func meetingNotesModel(_ settings: AppSettings) throws -> any NotesLanguageModel {
+        let model = try languageModel(settings)
+        guard var route = model as? CLINotesModel else { return model }
+        route.anySignIn = settings.allowsAnySignIn(route.cli)
+        route.confirmedDestination = settings.claudeCodeConfirmedDestination
+        return route
     }
 
     /// `lowLatency` asks API and CLI models for minimal reasoning and runs the built-in model on its interactive lane; meeting notes keep the defaults.
