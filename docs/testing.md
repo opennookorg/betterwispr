@@ -121,6 +121,41 @@ verify real event delivery or terminal consent.
 - [ ] Find the shortest wait that sends a long paste in full in each app, and
   record it here.
 
+## Send keys check
+
+Per-app send keys post a recorded keystroke after pasting. Builds and tests cover
+the event sequence but not real delivery, so these need a live run.
+
+- [ ] Add an app under Settings > Send keys. Its row shows Return, and Wait before
+  sending appears even with Send to Claude off.
+- [ ] Record each kind of key and check the row's label and the capsule glyph:
+  a bare Return (↵), ⌘Return, Tab and an F-key (keyboard glyph, with the tooltip
+  naming the key). Press a modifier on its own: it beeps and nothing is recorded.
+  Press Esc: recording stops with the previous key kept.
+- [ ] With only a throwaway app focused, press ⌘Q, ⌘W, Delete, Forward Delete and
+  the dictation shortcut while recording. Each beeps, leaves recording on, keeps the
+  previous key and says why in the row, and nothing quits or closes.
+- [ ] Start recording in one row, then click another row's key or a shortcut under
+  Settings > Shortcut: the first stops and only the second captures.
+- [ ] Settings > Send keys > Add App… doesn't list Terminal or iTerm2 while they are
+  open. Send to Claude still sends to Claude Code in them.
+- [ ] Change the dictation shortcut to a rule's key: the row says it clashes, and a
+  dictation into that app is pasted, not sent.
+- [ ] Dictate into that app. The text is pasted and the recorded key arrives, with
+  no stray modifier: a bare Return must not land as ⇧Return or ⌥Return, including
+  when the shortcut's Option is still held after the paste.
+- [ ] Turn the rule's switch off and dictate again: pasted, not sent. Turn it back
+  on without re-recording: the key is still there.
+- [ ] Remove the rule during the countdown: nothing is sent.
+- [ ] Add a rule for an Electron app, quit and reopen it, then dictate into it
+  first. The text is pasted and sent, not copied.
+- [ ] Add a rule for an app that also matches Send to Claude (VS Code) with a
+  different key. The rule's key is used, and it fires outside the Claude Code
+  panel too, as the footer warns. Remove it and the built-in detection is back.
+- [ ] Hold Shift as you dictate into a rule's app: pasted, not sent.
+- [ ] Uninstall or rename a rule's app: the row shows the bundle identifier and
+  says it isn't installed, and nothing is sent there.
+
 ## Combined 0.1.6 checks, 2026-10-20
 
 After combining the Codex subscription changes with the dictation and Ask fixes,

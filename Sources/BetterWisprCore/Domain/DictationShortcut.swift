@@ -22,6 +22,7 @@ public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     }
 
     public var symbols: String { activeNames.map(\.symbol).joined() }
+    public var spokenNames: [String] { activeNames.map(\.spoken) }
 }
 
 public struct DictationShortcut: Codable, Equatable, Sendable {

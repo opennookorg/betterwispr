@@ -124,8 +124,8 @@ import Testing
     model.settings.showNoSpeechNotice = false
     defer { model.discardRecording() }
 
-    model.pressReturn(in: .current, after: .seconds(1), using: FocusedAppIntegration(keepsCopy: false),
-                      otherwise: {}, acceptsPrompt: { _ in false })
+    model.pressSendKey(in: .current, after: .seconds(1), using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: {}, resolving: { _, _ in nil })
     model.toggleRecording()
     #expect(model.phase == .preparing)
 
@@ -372,10 +372,10 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
     var checkStarted = false
     var releaseCheck: CheckedContinuation<Bool, Never>?
     var notSent = 0
-    model.pressReturn(in: .current, after: delay, using: FocusedAppIntegration(keepsCopy: false),
-                      otherwise: { notSent += 1 }, acceptsPrompt: { _ in
+    model.pressSendKey(in: .current, after: delay, using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: { notSent += 1 }, resolving: { _, _ in
         checkStarted = true
-        return await withCheckedContinuation { releaseCheck = $0 }
+        return await withCheckedContinuation { releaseCheck = $0 } ? .return : nil
     })
     #expect(model.phase == .sending && model.phase.armsCancelShortcut)
     let deadline = ContinuousClock.now + .seconds(2)
@@ -398,9 +398,9 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
     model.settings.sendToClaude = true
     var releaseCheck: CheckedContinuation<Bool, Never>?
     var notSent = 0
-    model.pressReturn(in: .current, after: .zero, using: FocusedAppIntegration(keepsCopy: false),
-                      otherwise: { notSent += 1 }, acceptsPrompt: { _ in
-        await withCheckedContinuation { releaseCheck = $0 }
+    model.pressSendKey(in: .current, after: .zero, using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: { notSent += 1 }, resolving: { _, _ in
+        await withCheckedContinuation { releaseCheck = $0 } ? .return : nil
     })
     let deadline = ContinuousClock.now + .seconds(2)
     while releaseCheck == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
@@ -419,10 +419,28 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
     model.settings.sendToClaude = true
     var notSent = 0
-    model.pressReturn(in: .current, after: .seconds(1), using: FocusedAppIntegration(keepsCopy: false),
-                      otherwise: { notSent += 1 }, acceptsPrompt: { _ in false })
+    model.pressSendKey(in: .current, after: .seconds(1), using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: { notSent += 1 }, resolving: { _, _ in nil })
     model.cleanUpSelectedText()
     #expect(model.phase == .idle && notSent == 1)
     // Keep the cleanup task from reading the user's actual selection in this test.
     model.phase = .preparing
+}
+
+@Test @MainActor func discardingADictationCancelsItsPendingSendBeforeItResolves() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    model.settings.soundEffects = false
+    model.settings.sendToClaude = true
+    var resolved = false
+    var notSent = 0
+    model.pressSendKey(in: .current, after: .milliseconds(50), using: FocusedAppIntegration(keepsCopy: false),
+                       otherwise: { notSent += 1 }, resolving: { _, _ in
+        resolved = true
+        return .return
+    })
+    model.discardRecording()
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(!resolved && notSent == 0)
 }

@@ -242,18 +242,53 @@ question it is asking, such as a permission prompt; the setting's caption says
 so. VS Code and Claude Desktop expose these fields only after BetterWispr sets
 `AXManualAccessibility`, which can make VS Code offer its screen reader mode.
 
-The field is checked when recording starts, at most once a second while it
-continues, so the capsule shows ↵ only when the dictation will be sent, and
-again when it ends. Shift held at either end, or Shift with the dictation
-shortcut (a second Carbon hot key registered only while the setting is on),
-pastes without sending. After the paste the phase becomes `.sending` for the
-chosen wait (one second by default), during which Escape or Don't send holds the
-Return back, and starting another dictation takes over the send: its text is
-pasted after the first with a space (`TextJoin`) and its own Return sends both.
-Return is pressed only if the field is still a Claude prompt and the target app
-and focused element are unchanged, as a bare key press with modifier flags
-cleared. Otherwise the capsule says "Pasted, not sent". Sleep, quitting and
-turning the setting off cancel a pending Return. Starting selected-text cleanup also holds back a pending Return. An explicit cancel or cleanup shortcut takes priority over the optional Shift variant of the dictation shortcut.
+Send keys (`AppSettings.sendRules`, empty by default) cover the apps
+`ClaudePrompt` cannot recognize. A rule pairs a bundle identifier with a
+`SendKeystroke` the user records in Settings > Send keys, and
+`SendAfterPaste.keystroke(for:settings:)` resolves what a pasted dictation gets:
+an enabled rule for the frontmost app, else Return when `ClaudePrompt` recognizes
+the field, else nothing. A rule wins over the built-in detection because it names
+its app, and unlike that detection it fires wherever the cursor is in the app:
+the setting's footer says so, since the user is trading the shell safeguard for
+reach. Rules also get the `AXManualAccessibility` nudge, without which an
+Electron target exposes no focused field to record. A rule still sends when no
+field was recorded, so only the frontmost-app check protects it then; Send to
+Claude sends only when the recorded field is still focused.
+
+A `SendKeystroke` takes a bare Return or Tab, because it is never registered as a
+hot key: only a modifier on its own and Fn fail to decode. `SendAfterPaste.refusal`
+names the keys a rule may not use: ⌘Q and ⌘W with any other modifiers, since they
+could quit the app or close its window, Delete and Forward Delete with any
+modifiers, since they would erase the dictation, and the dictation shortcut,
+including its Shift variant. For a modifier-only shortcut only the left-hand key
+clashes, because a posted modifier always comes from that key. Rules also never
+apply to `ClaudePrompt.scriptableTerminals`, where a key could run a shell
+command. The recorder and the picker enforce these, and
+`SendAfterPaste.rule(for:settings:)` enforces them again before sending, because a
+saved rule can be edited by hand or clash with a shortcut changed later. Such a
+rule stays saved, its row says why it does nothing, and the app falls through to
+Send to Claude. `AppModel.beginKeyCapture` lets one recorder capture at a time, and
+a recorder that lost the capture leaves the shortcuts suspended for its successor.
+`FocusedAppIntegration.keystrokeEvents(for:)` posts it the way a keyboard does:
+one `.flagsChanged` event per modifier with the left-hand key's device-dependent
+bit, the key down and up, then the modifiers released, every event carrying
+explicit flags so modifiers still held from the dictation shortcut cannot change
+it. For ⌘V this is exactly `pasteKeystroke`, which a test asserts.
+
+The target is checked when recording starts, at most once a second while it
+continues, so the capsule shows ↵ (or a keyboard glyph for a recorded keystroke)
+only when the dictation will be sent, and again when it ends. Shift held at
+either end, or Shift with the dictation shortcut (a second Carbon hot key
+registered only while something would send), pastes without sending. After the
+paste the phase becomes `.sending` for the chosen wait (one second by default),
+during which Escape or Don't send holds the send back, and starting another
+dictation takes over the send: its text is pasted after the first with a space
+(`TextJoin`) and its own keystroke sends both. The keystroke is posted only if
+the target still asks for one and the target app and focused element are
+unchanged; focus is matched on the same terms as the paste, so an app that
+exposed no element to record still gets its send. Otherwise the capsule says
+"Pasted, not sent". Sleep, quitting, removing the rule and turning the setting
+off cancel a pending send. Starting selected-text cleanup also holds back a pending send. An explicit cancel or cleanup shortcut takes priority over the optional Shift variant of the dictation shortcut.
 
 The optional Clean up selected text shortcut (`AppSettings.selectedTextShortcut`,
 `GlobalShortcut` id 4) edits text outside a dictation and is refused while one
