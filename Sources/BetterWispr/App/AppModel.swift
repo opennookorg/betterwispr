@@ -1285,10 +1285,7 @@ final class AppModel {
             let settings = self.settings.applying(self.writingMode).cleanupSettings
             guard settings.cleanup == .medium, settings.language == "auto" || settings.language.hasPrefix("en"),
                   MeetingNotesGenerator.availability(settings: settings) == .available else { return }
-            let context = self.settings.sharesContext(startedIn: self.writingMode, trigger: nil) ? self.dictationContext : nil
-            await TranscriptPolisher.warmUp(settings: settings, vocabulary: VocabularyProcessor.hints(self.vocabulary),
-                                            context: await context?.value(within: .seconds(2), cancellingOnTimeout: false),
-                                            instructions: self.writingMode?.instructions ?? "")
+            await MeetingNotesGenerator.warmUp(settings: settings)
         }
     }
 

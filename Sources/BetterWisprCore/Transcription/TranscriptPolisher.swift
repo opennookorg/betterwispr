@@ -129,12 +129,6 @@ public enum TranscriptPolisher {
 
     public static let minimumWords = 4
 
-    /// Loads the model for the editing prompts a dictation will use, so the first edit doesn't wait for the load.
-    public static func warmUp(settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "") async {
-        let system = exchange("", for: settings.notesSelection, vocabulary: vocabulary, context: context, instructions: extra).instructions
-        await MeetingNotesGenerator.warmUp(settings: settings, instructions: [system, TranscriptListFormatter.instructions])
-    }
-
     /// Edits English text with the model that settings selects; nil means keep the light cleanup.
     /// `laysOutLists: false` edits a dictation without the list layout, for a piece whose whole is laid out later with `layOutList`.
     public static func polish(_ text: String, settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "",

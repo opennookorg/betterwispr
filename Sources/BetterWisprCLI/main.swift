@@ -322,7 +322,7 @@ func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocab
     let encoder = JSONEncoder()
     encoder.outputFormatting = .withoutEscapingSlashes
     let clock = ContinuousClock()
-    await TranscriptPolisher.warmUp(settings: settings, vocabulary: vocabulary, context: nil)
+    await MeetingNotesGenerator.warmUp(settings: settings)
     for line in try String(contentsOf: manifest, encoding: .utf8).split(whereSeparator: \.isNewline) {
         let clip = try JSONDecoder().decode(BenchClip.self, from: Data(line.utf8))
         let spoken = (language ?? clip.language) == "auto" ? nil : language ?? clip.language

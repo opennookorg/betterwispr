@@ -108,15 +108,14 @@ public enum MeetingNotesGenerator {
     }
 
     /// Loads the selected on-device model into memory; sends no text.
-    /// `instructions` are the system prompts about to be used; the on-device Apple model keeps a session loaded for each.
-    public static func warmUp(settings: AppSettings, instructions: [String]) async {
+    public static func warmUp(settings: AppSettings) async {
         switch settings.notesSelection {
         case .builtIn: await LlamaEngine.shared.warmUp()
         case .ollama(let name): _ = try? await Ollama.send("chat", ["model": name, "messages": [], "options": ["num_ctx": Ollama.contextLength]], timeout: 60)
         case .apple:
             #if canImport(FoundationModels)
             if #available(macOS 26.0, *), appleAvailability == .available {
-                for text in instructions { await PrewarmedSessions.prewarm(text) }
+                LanguageModelSession(instructions: TranscriptPolisher.instructions).prewarm()
             }
             #endif
         case .connection, .cli: break
@@ -261,42 +260,17 @@ struct GeneratedNotes {
     var closing: String
 }
 
-/// Sessions loaded ahead of use, one per system prompt. Each is used once, since a session keeps its conversation.
-@available(macOS 26.0, *)
-@MainActor
-enum PrewarmedSessions {
-    private static var ready: [(instructions: String, session: LanguageModelSession)] = []
-    // ponytail: keeps the four most recent prompts; dictations rarely switch between more.
-    private static let limit = 4
-
-    static func prewarm(_ instructions: String) {
-        guard !ready.contains(where: { $0.instructions == instructions }) else { return }
-        let session = LanguageModelSession(instructions: instructions)
-        session.prewarm()
-        ready.append((instructions, session))
-        if ready.count > limit { ready.removeFirst() }
-    }
-
-    /// A loaded session when one is ready for `instructions`, loading another in its place for the next call; otherwise a new session.
-    static func take(_ instructions: String) -> LanguageModelSession {
-        guard let index = ready.firstIndex(where: { $0.instructions == instructions }) else { return LanguageModelSession(instructions: instructions) }
-        let session = ready.remove(at: index).session
-        prewarm(instructions)
-        return session
-    }
-}
-
 @available(macOS 26.0, *)
 struct AppleNotesModel: NotesLanguageModel {
     var instructions = NotesWriter.instructions
     private static let options = GenerationOptions(temperature: 0.3)
 
     func respond(to prompt: String) async throws -> String {
-        try await PrewarmedSessions.take(instructions).respond(to: prompt, options: Self.options).content
+        try await LanguageModelSession(instructions: instructions).respond(to: prompt, options: Self.options).content
     }
 
     func layout(_ prompt: String) async throws -> TranscriptListLayout {
-        let result = try await PrewarmedSessions.take(instructions)
+        let result = try await LanguageModelSession(instructions: instructions)
             .respond(to: prompt, generating: GeneratedTranscriptLayout.self,
                      options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 1024)).content
         let kind: TranscriptListLayout.Kind
