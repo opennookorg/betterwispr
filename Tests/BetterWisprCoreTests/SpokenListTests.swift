@@ -233,6 +233,8 @@ private func polished(editor: @escaping @Sendable () async throws -> String, for
     "Call Sam next Tuesday about the renewal.",
     "Do you want tea, coffee or juice with your breakfast?",
     "We processed 20,000 records in 35 files and stopped.",
+    "Quick update on the rollout, the new pricing page went live this morning and so far the numbers look good, we had about 40 sign-ups in the first two hours.",
+    "We moved the old jobs and the old queue and the old cache to the new cluster and the team is happy.",
 ])
 func proseMakesNoLayoutCall(_ text: String) async {
     #expect(!TranscriptListFormatter.isLikelyList(text))

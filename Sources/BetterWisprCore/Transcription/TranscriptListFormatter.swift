@@ -102,12 +102,18 @@ enum TranscriptListFormatter {
         text.contains(/(?is)(?:\A|[.!?,;:]\s+|\n)(?:first(?:ly)?(?:\s+of\s+all)?|(?:number|step|point|item)\s+(?:one|1))\b.*?(?:[.!?,;:]\s+|\n|\band\s+)(?:second(?:ly)?(?:\s+of\s+all)?|(?:number|step|point|item)\s+(?:two|2))\b/)
     }
 
-    /// Whether an edit is worth a layout call: explicit order, a sentence with three or more parts, or phrasing repeated three times.
+    /// Whether an edit is worth a layout call: explicit order, a sentence of three or more parts whose items after the lead-in are short, or a three-word phrase repeated three times.
+    /// Each layout call waits for the on-device model, so run-on prose with long clauses must not trigger one.
+    // ponytail: "short" is five words or fewer; short-clause prose ("went in, sat down and left") still makes a call, which the layout answers as prose.
     static func isLikelyList(_ text: String) -> Bool {
         if hasExplicitOrder(text) { return true }
-        if text.split(separator: /[.!?]\s+/).contains(where: { $0.matches(of: /(?i),(?!\d)(?:\s*(?:and|then)\b)?|;|\band\s+then\b|\b(?:and|then)\b/).count >= 2 }) { return true }
+        if text.split(separator: /[.!?]\s+/).contains(where: { sentence in
+            let parts = sentence.split(separator: /(?i),(?!\d)(?:\s*(?:and|then)\b)?|;|\band\s+then\b|\b(?:and|then)\b/).map { $0.split(whereSeparator: \.isWhitespace) }.filter { !$0.isEmpty }
+            return parts.count >= 3 && parts.dropFirst().allSatisfy { $0.count <= 5 }
+        }) { return true }
         let words = CorrectionLearner.tokenize(text).map { $0.lowercased() }
-        return Dictionary(grouping: zip(words, words.dropFirst()).map { "\($0) \($1)" }, by: { $0 }).values.contains { $0.count >= 3 }
+        let phrases = words.indices.dropLast(2).map { words[$0...$0 + 2].joined(separator: " ") }
+        return Dictionary(grouping: phrases, by: { $0 }).values.contains { $0.count >= 3 }
     }
 
     static func format(_ text: String, using model: any NotesLanguageModel) async throws -> String {
