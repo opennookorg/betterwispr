@@ -187,7 +187,10 @@ private final class PassLog {
     #expect(result.text == "[Send the report! THEN BOOK THE ROOM.]")
     #expect(result.reused == 1)
     #expect(polished == ["Then book the room."])
-    let failed = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: [:],
+    let failed = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: ["One two three.": Task { nil }],
                                               editingPiece: { _ in nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
     #expect(failed.text == nil)
+    let noneAhead = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: [:],
+                                                 editingPiece: { _ in Issue.record("edited a piece"); return nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
+    #expect(noneAhead.text == "whole" && noneAhead.reused == 0)
 }

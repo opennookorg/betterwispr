@@ -170,12 +170,13 @@ public enum StreamedDictation {
     }
 
     /// Edits `whole` piece by piece when `editsSeparately` allows, reusing edits started while recording, then lays the joined edit out once;
-    /// otherwise edits it in one call. Piece edits must skip list layout, since a list may span pieces. Nil when no edit succeeded.
+    /// otherwise edits it in one call. With no edit started ahead, splitting only adds calls, since the on-device model answers one request at a time.
+    /// Piece edits must skip list layout, since a list may span pieces. Nil when no edit succeeded.
     @MainActor
     public static func edit(_ whole: String, pieces: [String], ahead: [String: Task<String?, Never>],
                             editingPiece: (String) async -> String?, editingWhole: (String) async -> String?,
                             layingOut: (String) async -> String) async -> (text: String?, reused: Int) {
-        guard editsSeparately(pieces, whole: whole) else { return (await editingWhole(whole), 0) }
+        guard pieces.contains(where: { ahead[$0] != nil }), editsSeparately(pieces, whole: whole) else { return (await editingWhole(whole), 0) }
         var parts: [String] = []
         var reused = 0
         var succeeded = false
