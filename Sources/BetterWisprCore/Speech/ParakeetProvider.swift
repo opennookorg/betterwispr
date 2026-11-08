@@ -11,7 +11,7 @@ public final class ParakeetProvider: SpeechProvider {
     private var manager: AsrManager?
     private var loadedModelID: String?
     private var preparing = false
-    private var transcriptionTask: Task<String, any Error>?
+    private var transcriptionTask: Task<(text: String, vocabularyFixes: Int), any Error>?
     private var livePass: Task<LivePass, any Error>?
     private var loadedVersion: AsrModelVersion?
     private var phraseBooster: CtcModels?
@@ -220,28 +220,48 @@ public final class ParakeetProvider: SpeechProvider {
     }
 
     public func transcribe(audioURL: URL, language: String?, vocabulary: [String], screenTerms: [String]) async throws -> String {
+        guard audioURL.isFileURL, FileManager.default.fileExists(atPath: audioURL.path) else { throw SpeechError.audioUnavailable }
+        vocabularyFixes = 0
+        let result = try await transcribe(samples: nil, of: audioURL, language: language, vocabulary: vocabulary, screenTerms: screenTerms)
+        vocabularyFixes = result.vocabularyFixes
+        return result.text
+    }
+
+    /// Recognizes 16 kHz mono samples with the same vocabulary boosting as a file; used for pieces of a dictation recognized while it is still recording.
+    public func transcribe(samples: [Float], language: String?, vocabulary: [String], screenTerms: [String]) async throws -> (text: String, vocabularyFixes: Int) {
+        try await transcribe(samples: samples, of: nil, language: language, vocabulary: vocabulary, screenTerms: screenTerms)
+    }
+
+    private func transcribe(samples: [Float]?, of audioURL: URL?, language: String?, vocabulary: [String], screenTerms: [String]) async throws -> (text: String, vocabularyFixes: Int) {
         guard let manager, !preparing else { throw SpeechError.notPrepared }
         if let livePass { _ = try? await livePass.value }
         guard transcriptionTask == nil else { throw SpeechError.busy }
-        guard audioURL.isFileURL, FileManager.default.fileExists(atPath: audioURL.path) else { throw SpeechError.audioUnavailable }
         try Task.checkCancellation()
         let hint = Self.hint(for: language)
         let terms = loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary + screenTerms) : []
-        vocabularyFixes = 0
-        let task = Task {
+        let task = Task { () async throws -> (text: String, vocabularyFixes: Int) in
+            let samples = try await Self.resampled(samples, of: audioURL)
             let text: String
+            var fixes = 0
             if let session = await self.boostingSession(for: terms) {
-                (text, self.vocabularyFixes) = try await Self.boostedTranscript(of: audioURL, language: hint, manager: manager, session: session, vocabulary: vocabulary)
+                (text, fixes) = try await Self.boostedTranscript(of: samples, language: hint, manager: manager, session: session, vocabulary: vocabulary)
             } else {
                 var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-                text = try await manager.transcribe(audioURL, decoderState: &state, language: hint).text
+                text = try await manager.transcribe(samples, decoderState: &state, language: hint).text
             }
             try Task.checkCancellation()
-            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (text.trimmingCharacters(in: .whitespacesAndNewlines), fixes)
         }
         transcriptionTask = task
         defer { transcriptionTask = nil }
         return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+    }
+
+    @concurrent
+    private nonisolated static func resampled(_ samples: [Float]?, of audioURL: URL?) async throws -> [Float] {
+        if let samples { return samples }
+        guard let audioURL else { throw SpeechError.audioUnavailable }
+        return try AudioConverter().resampleAudioFile(audioURL)
     }
 
     /// One recognizer pass for the live preview; word timings are relative to `samples`.
@@ -283,10 +303,8 @@ public final class ParakeetProvider: SpeechProvider {
 
     @concurrent
     private nonisolated static func boostedTranscript(
-        of audioURL: URL, language: Language?, manager: AsrManager, session: VocabularyBoostingSession, vocabulary: [String]
+        of samples: [Float], language: Language?, manager: AsrManager, session: VocabularyBoostingSession, vocabulary: [String]
     ) async throws -> (text: String, fixes: Int) {
-        let samples = try AudioConverter().resampleAudioFile(audioURL)
-        try Task.checkCancellation()
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         let result = try await manager.transcribe(samples, decoderState: &state, language: language)
         try Task.checkCancellation()

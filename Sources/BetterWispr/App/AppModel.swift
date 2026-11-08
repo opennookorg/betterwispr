@@ -96,6 +96,10 @@ final class DictationRecording {
     let holdsBackReturn: Bool
     /// The app whose pending Return this dictation took over; its text follows the text pasted there just before.
     let continuesIn: pid_t?
+    /// Pieces recognized, and edits started, while recording.
+    var streamed: StreamedPieces?
+    /// When recording stopped, for timing logs.
+    var stoppedAt = ContinuousClock.now
 
     init(audio: RecordedAudio, model: SpeechModel, settings: AppSettings, vocabulary: [VocabularyEntry],
          target: NSRunningApplication?, targetElement: AXUIElement? = nil, mode: WritingMode? = nil, context: Task<DictationContext, Never>? = nil,
@@ -116,6 +120,19 @@ final class DictationRecording {
         context?.cancel()
         try? FileManager.default.removeItem(at: audio.url)
     }
+}
+
+/// What a Parakeet dictation recognized and began editing while it was still recording.
+struct StreamedPieces {
+    let modelID: String
+    let language: String
+    let pieces: [String]
+    let segmentedSamples: Int
+    let receivedSamples: Int
+    let vocabularyFixes: Int
+    /// Edits of prepared pieces, keyed by the prepared text, started with `editSettings`.
+    let edits: [String: Task<String?, Never>]
+    let editSettings: AppSettings
 }
 
 struct ModelInstallation: Equatable {
@@ -228,6 +245,8 @@ final class AppModel {
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var live: LiveTranscriber?
+    @ObservationIgnored private var pieceFixes = 0
+    @ObservationIgnored private var pieceEdits: (settings: AppSettings, tasks: [String: Task<String?, Never>])?
     @ObservationIgnored private var cardDismissal: Task<Void, Never>?
     @ObservationIgnored private var shortcutPressedAt: Date?
     @ObservationIgnored private var generation = UUID()
@@ -630,11 +649,16 @@ final class AppModel {
         recordingDuration = 0
         remindedHour = 0
         let model = selectedModel
-        let live = model.engine == .parakeet && settings.showLiveText && !settings.hideCapsuleWhileDictating ? LiveTranscriber() : nil
-        live?.onUpdate = { [weak self] transcript in
-            guard let self, self.generation == token else { return }
-            self.liveTranscript = transcript
+        let live = model.engine == .parakeet ? LiveTranscriber() : nil
+        if settings.showLiveText && !settings.hideCapsuleWhileDictating {
+            live?.onUpdate = { [weak self] transcript in
+                guard let self, self.generation == token else { return }
+                self.liveTranscript = transcript
+            }
         }
+        pieceEdits?.tasks.values.forEach { $0.cancel() }
+        pieceEdits = nil
+        pieceFixes = 0
         live?.beginBuffering()
         self.live = live
         var onSamples: (@Sendable ([Float]) -> Void)?
@@ -716,8 +740,43 @@ final class AppModel {
             if let loading = self?.loading, loading.id == model.id { _ = try? await loading.task.value }
             guard let self, self.generation == token, self.preparedModelID == model.id,
                   let parakeet = self.provider as? ParakeetProvider else { return }
-            live.start { try await parakeet.liveTranscribe($0, language: language) }
+            let hints = VocabularyProcessor.hints(self.vocabulary)
+            let spellsScreenNames = self.spellsScreenNames(with: model, language: self.settings.language)
+            live.onSegment = { [weak self] in self?.editAhead($0, token: token) }
+            live.start(pass: { try await parakeet.liveTranscribe($0, language: language) }, segment: { [weak self] samples in
+                let context = self?.dictationContext
+                let screenTerms = spellsScreenNames ? await context?.value(within: .milliseconds(300), cancellingOnTimeout: false)?.spellingTerms() ?? [] : []
+                let result = try await parakeet.transcribe(samples: samples, language: language, vocabulary: hints, screenTerms: screenTerms)
+                self?.pieceFixes += result.vocabularyFixes
+                return result.text
+            })
         }
+    }
+
+    /// The text the editor receives for recognized speech when cleanup is on and no mode was triggered by voice; matches `transcribe`.
+    private static func prepared(_ raw: String, settings: AppSettings, entries: [VocabularyEntry], language: String?) -> String {
+        let recognized = settings.chineseScript?.convert(raw, language: language) ?? raw
+        let heard = VocabularyProcessor.correctedCommands(entries, in: TranscriptCleaner.clean(recognized, language: language))
+        return language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
+    }
+
+    /// Starts Medium cleanup of a piece recognized while recording, so stopping only waits for the edit of the last piece.
+    private func editAhead(_ recognized: String, token: UUID) {
+        guard generation == token, phase == .recording else { return }
+        let language = settings.language == "auto" ? nil : settings.language
+        let editSettings = settings.applying(writingMode).cleanupSettings
+        guard editSettings.cleanup == .medium, MeetingNotesGenerator.availability(settings: editSettings) == .available else { return }
+        let spoken = Self.prepared(recognized, settings: settings, entries: vocabulary, language: language)
+        guard TranscriptCleaner.isEnglish(spoken, language: language), pieceEdits?.tasks[spoken] == nil else { return }
+        let hints = VocabularyProcessor.hints(vocabulary)
+        let context = settings.sharesContext(startedIn: writingMode, trigger: nil) ? dictationContext : nil
+        let instructions = writingMode?.instructions ?? ""
+        var edits = pieceEdits ?? (editSettings, [:])
+        edits.tasks[spoken] = Task {
+            await TranscriptPolisher.polish(spoken, settings: editSettings, vocabulary: hints,
+                                            context: await context?.value(within: .seconds(1), cancellingOnTimeout: false), instructions: instructions, laysOutLists: false)
+        }
+        pieceEdits = edits
     }
 
     private func endLivePreview() {
@@ -743,14 +802,24 @@ final class AppModel {
         updateSendKeystroke(holdingBack: shiftHoldsBack)
         let context = dictationContext.take()
         let live = live
+        let stoppedAt = ContinuousClock.now
         phase = .transcribing
         statusMessage = "Finishing recording…"
         operation = Task { [weak self] in
             guard let self else { return }
             do {
                 let audio = try await self.recorder.finish()
+                let finishedAt = ContinuousClock.now
                 await live?.stop()
                 if self.live === live { self.live = nil }
+                Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recording stopped: finish=\(String(describing: stoppedAt.duration(to: finishedAt)), privacy: .public) liveStop=\(String(describing: finishedAt.duration(to: .now)), privacy: .public) pieces=\(live?.segments.count ?? 0) duration=\(audio.duration)")
+                let edits = self.pieceEdits
+                self.pieceEdits = nil
+                let streamed = live.flatMap { live in
+                    live.segments.isEmpty ? nil : StreamedPieces(
+                        modelID: model.id, language: settings.language, pieces: live.segments, segmentedSamples: live.segmentedSamples,
+                        receivedSamples: live.receivedSamples, vocabularyFixes: self.pieceFixes, edits: edits?.tasks ?? [:], editSettings: edits?.settings ?? settings)
+                }
                 guard self.generation == token, !Task.isCancelled else {
                     try? FileManager.default.removeItem(at: audio.url)
                     return
@@ -769,9 +838,12 @@ final class AppModel {
                     guard self.generation == token else { return }
                     self.updateSendKeystroke(holdingBack: holdsBackReturn)
                 }
-                self.transcribe(DictationRecording(audio: audio, model: model, settings: settings,
-                                                  vocabulary: entries, target: target, targetElement: targetElement, mode: mode, context: context,
-                                                  holdsBackReturn: holdsBackReturn, continuesIn: continuesIn))
+                let recording = DictationRecording(audio: audio, model: model, settings: settings,
+                                                   vocabulary: entries, target: target, targetElement: targetElement, mode: mode, context: context,
+                                                   holdsBackReturn: holdsBackReturn, continuesIn: continuesIn)
+                recording.streamed = streamed
+                recording.stoppedAt = stoppedAt
+                self.transcribe(recording)
             } catch {
                 guard self.generation == token else {
                     (error as? RecordingInterruption)?.discardAudio()
@@ -824,8 +896,24 @@ final class AppModel {
                 guard self.generation == token, let provider = self.provider else { return }
                 (provider as? WhisperKitProvider)?.detectionLanguages = recording.settings.dictationLanguages
                 let recognitionStarted = ContinuousClock.now
-                let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints, screenTerms: screenTerms)
-                Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recognition completed: elapsed=\(String(describing: recognitionStarted.duration(to: .now)), privacy: .public) empty=\(raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
+                var pieces: [String] = []
+                var recognitionFixes = 0
+                if let streamed = recording.streamed, streamed.modelID == model.id, streamed.language == recording.settings.language,
+                   let parakeet = provider as? ParakeetProvider,
+                   let rest = StreamedDictation.remainder(of: try await Task.detached { try ParakeetProvider.samples(of: audio.url) }.value,
+                                                          segmentedSamples: streamed.segmentedSamples, receivedSamples: streamed.receivedSamples) {
+                    let last = try await parakeet.transcribe(samples: rest, language: language, vocabulary: hints, screenTerms: screenTerms)
+                    pieces = (streamed.pieces + [last.text]).filter { !$0.isEmpty }
+                    recognitionFixes = streamed.vocabularyFixes + last.vocabularyFixes
+                }
+                let raw: String
+                if pieces.isEmpty {
+                    raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints, screenTerms: screenTerms)
+                    recognitionFixes = provider.vocabularyFixes
+                } else {
+                    raw = pieces.joined(separator: " ")
+                }
+                Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recognition completed: elapsed=\(String(describing: recognitionStarted.duration(to: .now)), privacy: .public) pieces=\(pieces.count) empty=\(raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
                 let recognized = recording.settings.chineseScript?.convert(raw, language: language) ?? raw
@@ -846,9 +934,19 @@ final class AppModel {
                     spoken = email
                 } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
-                    let polished = await TranscriptPolisher.polish(spoken, settings: writingSettings, vocabulary: hints,
-                                                                   context: sharesContext ? await context?.value(within: .seconds(1)) : nil,
-                                                                   instructions: mode?.instructions ?? "")
+                    let editStarted = ContinuousClock.now
+                    let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
+                    let prepared = trigger == nil ? pieces.map { Self.prepared($0, settings: recording.settings, entries: entries, language: language) } : []
+                    let ahead = recording.streamed.flatMap { $0.editSettings == writingSettings ? $0.edits : nil } ?? [:]
+                    let instructions = mode?.instructions ?? ""
+                    let (polished, reused) = await StreamedDictation.edit(spoken, pieces: prepared, ahead: ahead, editingPiece: {
+                        await TranscriptPolisher.polish($0, settings: writingSettings, vocabulary: hints, context: editContext, instructions: instructions, laysOutLists: false)
+                    }, editingWhole: {
+                        await TranscriptPolisher.polish($0, settings: writingSettings, vocabulary: hints, context: editContext, instructions: instructions)
+                    }, layingOut: {
+                        await TranscriptPolisher.layOutList($0, of: spoken, settings: writingSettings, instructions: instructions)
+                    })
+                    Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Editing completed: elapsed=\(String(describing: editStarted.duration(to: .now)), privacy: .public) pieces=\(prepared.count) reused=\(reused) accepted=\(polished != nil)")
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
                     spoken = StyleFormatter.apply(tone, to: polished ?? spoken)
@@ -862,7 +960,7 @@ final class AppModel {
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
-                                            appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
+                                            appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + recognitionFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
                     do { try self.addToHistory(transcript) } catch { persistenceWarning = error.localizedDescription }
@@ -887,6 +985,7 @@ final class AppModel {
                     self.phase = .transcribing
                 }
                 let result = approved ? try await integration?.deliver(delivered, to: recording.target) : OutputResult.copied
+                Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Dictation delivered: sinceStop=\(String(describing: recording.stoppedAt.duration(to: .now)), privacy: .public)")
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
@@ -1186,7 +1285,10 @@ final class AppModel {
             let settings = self.settings.applying(self.writingMode).cleanupSettings
             guard settings.cleanup == .medium, settings.language == "auto" || settings.language.hasPrefix("en"),
                   MeetingNotesGenerator.availability(settings: settings) == .available else { return }
-            await MeetingNotesGenerator.warmUp(settings: settings)
+            let context = self.settings.sharesContext(startedIn: self.writingMode, trigger: nil) ? self.dictationContext : nil
+            await TranscriptPolisher.warmUp(settings: settings, vocabulary: VocabularyProcessor.hints(self.vocabulary),
+                                            context: await context?.value(within: .seconds(2), cancellingOnTimeout: false),
+                                            instructions: self.writingMode?.instructions ?? "")
         }
     }
 

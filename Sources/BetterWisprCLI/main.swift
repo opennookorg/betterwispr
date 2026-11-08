@@ -38,6 +38,9 @@ func run() async throws {
           --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
             Each manifest line is {"id", "language", "audio", "reference"}. Prints one JSON line per clip
             with the hypothesis and recognition seconds. Without --language, each clip uses its own language.
+          --latency MANIFEST.jsonl [--model PARAKEET_MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
+            Plays each clip into the live preview in real time as a dictation, recognizing and editing pieces while it
+            plays, and prints one JSON line per clip with the seconds from stopping to the final text.
             --screen-terms passes names as if read from the screen, which Parakeet uses only to respell misspelled words.
             --cleanup adds the app's cleanup of English text; medium edits with Apple's on-device model,
             the built-in model or the named Ollama model.
@@ -82,15 +85,15 @@ func run() async throws {
     var index = 0
     while index < arguments.count {
         let option = arguments[index]
-        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--notes-model"].contains(option),
+        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--latency", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--notes-model"].contains(option),
               index + 1 < arguments.count, !arguments[index + 1].hasPrefix("--"), options[option] == nil else {
             throw CLIError.usage("Invalid or repeated argument: \(option). Run --help for usage.")
         }
         options[option] = arguments[index + 1]
         index += 2
     }
-    guard options["--download-model"] != nil || options["--transcribe-file"] != nil || options["--live-file"] != nil || options["--bench"] != nil || options["--meeting"] != nil || options["--media"] != nil else {
-        throw CLIError.usage("Choose --download-model, --transcribe-file, --live-file, --bench, --meeting or --media.")
+    guard options["--download-model"] != nil || options["--transcribe-file"] != nil || options["--live-file"] != nil || options["--bench"] != nil || options["--latency"] != nil || options["--meeting"] != nil || options["--media"] != nil else {
+        throw CLIError.usage("Choose --download-model, --transcribe-file, --live-file, --bench, --latency, --meeting or --media.")
     }
     if let downloadID = options["--download-model"], let modelID = options["--model"], downloadID != modelID {
         throw CLIError.usage("Download and transcription must select the same model.")
@@ -132,6 +135,13 @@ func run() async throws {
         settings.notesSelection = notesSelection
         try await bench(manifest: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), provider: provider,
                         language: options["--language"], vocabulary: vocabulary, screenTerms: screenTerms, settings: settings)
+    } else if let path = options["--latency"] {
+        guard let parakeet = provider as? ParakeetProvider else { throw CLIError.usage("--latency needs a Parakeet model.") }
+        var settings = AppSettings()
+        settings.cleanup = CleanupLevel(rawValue: options["--cleanup"] ?? "none") ?? .none
+        settings.notesSelection = notesSelection
+        try await latency(manifest: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), provider: parakeet,
+                          language: options["--language"], vocabulary: vocabulary, settings: settings)
     } else if let path = options["--meeting"] {
         var settings = AppSettings()
         settings.notesSelection = notesSelection
@@ -303,6 +313,70 @@ func live(_ url: URL, provider: ParakeetProvider, language: String?) async throw
     await transcriber.stop()
     print("live:  \(transcriber.transcript.confirmed) | \(transcriber.transcript.hypothesis)")
     print("batch: \(try await provider.transcribe(audioURL: url, language: language, vocabulary: []))")
+}
+
+/// Plays each manifest clip into the live preview in real time as the app records it, recognizing and editing pieces as they are confirmed,
+/// then prints how long stopping takes to reach the final text.
+@MainActor
+func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocabulary: [String], settings: AppSettings) async throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .withoutEscapingSlashes
+    let clock = ContinuousClock()
+    await TranscriptPolisher.warmUp(settings: settings, vocabulary: vocabulary, context: nil)
+    for line in try String(contentsOf: manifest, encoding: .utf8).split(whereSeparator: \.isNewline) {
+        let clip = try JSONDecoder().decode(BenchClip.self, from: Data(line.utf8))
+        let spoken = (language ?? clip.language) == "auto" ? nil : language ?? clip.language
+        func prepared(_ raw: String) -> String {
+            let cleaned = TranscriptCleaner.clean(raw, language: spoken)
+            return settings.cleanup == .medium && TranscriptCleaner.isEnglish(cleaned, language: spoken) ? VoiceCommands.apply(cleaned) : cleaned
+        }
+        func polish(_ text: String, laysOutLists: Bool = true) async -> String? {
+            guard settings.cleanup == .medium, TranscriptCleaner.isEnglish(text, language: spoken) else { return nil }
+            return await TranscriptPolisher.polish(text, settings: settings, vocabulary: vocabulary, context: nil, laysOutLists: laysOutLists)
+        }
+        let samples = try ParakeetProvider.samples(of: URL(fileURLWithPath: clip.audio))
+        let transcriber = LiveTranscriber()
+        var ahead: [String: Task<String?, Never>] = [:]
+        transcriber.onSegment = { piece in
+            let text = prepared(piece)
+            ahead[text] = Task { await polish(text, laysOutLists: false) }
+        }
+        transcriber.beginBuffering()
+        transcriber.start(pass: { try await provider.liveTranscribe($0, language: spoken) }) {
+            try await provider.transcribe(samples: $0, language: spoken, vocabulary: vocabulary, screenTerms: []).text
+        }
+        let chunk = LiveTranscriber.sampleRate / 10
+        for start in stride(from: 0, to: samples.count, by: chunk) {
+            transcriber.append(Array(samples[start..<min(start + chunk, samples.count)]))
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let stopped = clock.now
+        await transcriber.stop()
+        let stopSeconds = seconds(stopped.duration(to: clock.now))
+        var pieces = [String]()
+        if let rest = StreamedDictation.remainder(of: samples, segmentedSamples: transcriber.segmentedSamples, receivedSamples: transcriber.receivedSamples) {
+            pieces = transcriber.segments + [try await provider.transcribe(samples: rest, language: spoken, vocabulary: vocabulary, screenTerms: []).text]
+        } else {
+            pieces = [try await provider.transcribe(audioURL: URL(fileURLWithPath: clip.audio), language: spoken, vocabulary: vocabulary)]
+        }
+        pieces = pieces.filter { !$0.isEmpty }
+        let raw = pieces.joined(separator: " ")
+        let recognized = clock.now
+        let whole = prepared(raw)
+        let (edited, reused) = settings.cleanup == .medium
+            ? await StreamedDictation.edit(whole, pieces: pieces.map(prepared), ahead: ahead, editingPiece: { await polish($0, laysOutLists: false) },
+                                           editingWhole: { await polish($0) }, layingOut: { await TranscriptPolisher.layOutList($0, of: whole, settings: settings) })
+            : (nil, 0)
+        let result: [String: String] = [
+            "id": clip.id, "pieces": "\(pieces.count)", "reused": "\(reused)",
+            "liveStop": String(format: "%.2f", stopSeconds),
+            "recognition": String(format: "%.2f", seconds(stopped.duration(to: recognized))),
+            "total": String(format: "%.2f", seconds(stopped.duration(to: clock.now))),
+            "hypothesis": raw, "cleaned": edited ?? whole,
+        ]
+        print(String(decoding: try encoder.encode(result), as: UTF8.self))
+        for task in ahead.values { task.cancel() }
+    }
 }
 
 func seconds(_ duration: Duration) -> Double {

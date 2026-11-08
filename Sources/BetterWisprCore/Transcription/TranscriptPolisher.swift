@@ -129,19 +129,36 @@ public enum TranscriptPolisher {
 
     public static let minimumWords = 4
 
+    /// Loads the model for the editing prompts a dictation will use, so the first edit doesn't wait for the load.
+    public static func warmUp(settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "") async {
+        let system = exchange("", for: settings.notesSelection, vocabulary: vocabulary, context: context, instructions: extra).instructions
+        await MeetingNotesGenerator.warmUp(settings: settings, instructions: [system, TranscriptListFormatter.instructions])
+    }
+
     /// Edits English text with the model that settings selects; nil means keep the light cleanup.
-    public static func polish(_ text: String, settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "", formsLists: Bool = true) async -> String? {
+    /// `laysOutLists: false` edits a dictation without the list layout, for a piece whose whole is laid out later with `layOutList`.
+    public static func polish(_ text: String, settings: AppSettings, vocabulary: [String], context: DictationContext?, instructions extra: String = "",
+                              formsLists: Bool = true, laysOutLists: Bool = true) async -> String? {
         let words = text.split(whereSeparator: \.isWhitespace).count
         let (system, request) = exchange(text, for: settings.notesSelection, vocabulary: vocabulary, context: context, instructions: extra,
                                          fixed: formsLists ? instructions : selectionInstructions)
         guard words >= minimumWords, let editor = try? MeetingNotesGenerator.languageModel(settings, instructions: system, lowLatency: true) else { return nil }
         var formatter: (any NotesLanguageModel)?
-        if formsLists {
+        if formsLists && laysOutLists {
             guard let model = try? MeetingNotesGenerator.languageModel(settings, instructions: TranscriptListFormatter.instructions, lowLatency: true) else { return nil }
             formatter = model
         }
         let (attempts, timeout) = schedule(for: settings.notesSelection, words: words)
         return await polish(text, request: request, instructions: extra, editor: editor, formatter: formatter, attempts: attempts, timeout: timeout)
+    }
+
+    /// Lays out a dictation edited in pieces as a list when it looks like one, as `polish` does after editing a whole dictation.
+    public static func layOutList(_ edited: String, of text: String, settings: AppSettings, instructions extra: String = "") async -> String {
+        guard extra.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !text.contains(where: \.isNewline), TranscriptListFormatter.isLikelyList(edited),
+              let formatter = try? MeetingNotesGenerator.languageModel(settings, instructions: TranscriptListFormatter.instructions, lowLatency: true) else { return edited }
+        let timeout = schedule(for: settings.notesSelection, words: text.split(whereSeparator: \.isWhitespace).count).timeout
+        guard case .reply(let listed) = await respond(within: timeout, operation: { try await TranscriptListFormatter.format(edited, using: formatter) }) else { return edited }
+        return accepted(listed, for: text) ?? edited
     }
 
     /// Edits with retries, then keeps a selection's list markers (no formatter) or a dictation's line breaks, or lays out a likely list once; a failed layout keeps the edit.

@@ -159,3 +159,35 @@ private final class PassLog {
     transcriber.beginBuffering()
     #expect(transcriber.state == .stopped)
 }
+
+@Test func streamedRemainderStartsAtTheLastCutOnlyWhenTheFileMatchesTheLiveSamples() {
+    let rate = LiveTranscriber.sampleRate
+    let file = (0..<(10 * rate)).map(Float.init)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 6 * rate, receivedSamples: file.count)?.first == Float(6 * rate))
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 6 * rate, receivedSamples: 9 * rate) == nil)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 0, receivedSamples: file.count) == nil)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: file.count, receivedSamples: file.count)?.count == LiveTranscriber.minimumSamples)
+}
+
+@Test func piecesAreEditedSeparatelyUnlessTheyDifferFromTheWholeOrCorrectAnEarlierPiece() {
+    #expect(StreamedDictation.editsSeparately(["Send the report.", "Then book the room."], whole: "Send the report. Then book the room."))
+    #expect(!StreamedDictation.editsSeparately(["Send the report."], whole: "Send the report."))
+    #expect(!StreamedDictation.editsSeparately(["Send it to Tom.", "Actually, send it to Ann."], whole: "Send it to Tom. Actually, send it to Ann."))
+    #expect(!StreamedDictation.editsSeparately(["Send the report.", "Then book it."], whole: "Send the report. Then book the room."))
+}
+
+@MainActor
+@Test func streamedEditReusesEditsStartedWhileRecordingAndLaysOutTheWholeOnce() async {
+    let ahead = ["Send the report.": Task<String?, Never> { "Send the report!" }]
+    var polished: [String] = []
+    let result = await StreamedDictation.edit("Send the report. Then book the room.", pieces: ["Send the report.", "Then book the room."], ahead: ahead,
+                                              editingPiece: { polished.append($0); return $0.uppercased() },
+                                              editingWhole: { _ in Issue.record("edited whole"); return nil },
+                                              layingOut: { "[\($0)]" })
+    #expect(result.text == "[Send the report! THEN BOOK THE ROOM.]")
+    #expect(result.reused == 1)
+    #expect(polished == ["Then book the room."])
+    let failed = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: [:],
+                                              editingPiece: { _ in nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
+    #expect(failed.text == nil)
+}
