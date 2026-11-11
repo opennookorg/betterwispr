@@ -240,13 +240,18 @@ struct MeetingDetailView: View {
             MicrophonePicker(model: model) { Text("Microphone") }
                 .pickerStyle(.inline)
         } label: {
-            Image(systemName: meetings.microphone == nil ? "mic.slash" : "mic")
+            Image(systemName: meetings.microphoneMuted ? "mic.slash.fill" : meetings.microphone == nil ? "mic.slash" : "mic")
+                .foregroundStyle(meetings.microphoneMuted ? Color.red : Color.primary)
+        } primaryAction: {
+            meetings.microphoneMuted.toggle()
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help(meetings.microphone.map { "Microphone: \($0.name)" } ?? "Choose the microphone for this meeting")
+        .help(meetings.microphoneMuted ? "Muted: only other apps are recorded. Click to unmute."
+              : "Click to mute your microphone. Use the arrow to choose \(meetings.microphone.map { "another microphone than \($0.name)" } ?? "a microphone").")
         .accessibilityLabel("Microphone")
-        .accessibilityValue(meetings.microphone?.name ?? "None")
+        .accessibilityValue(meetings.microphoneMuted ? "Muted" : meetings.microphone?.name ?? "None")
+        .accessibilityHint("Mutes or unmutes your microphone")
     }
 
     private func progress(_ title: String) -> some View {

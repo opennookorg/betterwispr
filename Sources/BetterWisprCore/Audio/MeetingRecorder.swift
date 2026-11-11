@@ -48,6 +48,14 @@ public final class MeetingRecorder {
     private var stopSystemAudio: (() -> Void)?
     private var meters: [Speaker: VoiceLevelMeter] = [:]
     private var levels: (me: Float, them: Float) = (0, 0)
+    /// Drops the microphone's audio so only other apps (Them) reach the transcript.
+    public var microphoneMuted = false {
+        didSet {
+            guard let writer = writers[.me] else { return }
+            writer.setMuted(microphoneMuted)
+            hand(writer.takeReady())
+        }
+    }
 
     public init(policy: ChunkPolicy = ChunkPolicy()) {
         self.policy = policy
@@ -156,6 +164,7 @@ public final class MeetingRecorder {
             throw CancellationError()
         }
         self.input = input
+        writer.setMuted(microphoneMuted)
         writers[.me] = writer
         recoveryAttempts = 0
         microphone = input.device
@@ -297,6 +306,7 @@ public final class MeetingRecorder {
         onLevels?(levels)
         microphone = nil
         onMicrophone?(nil)
+        microphoneMuted = false
     }
 }
 
@@ -316,6 +326,7 @@ final class MeetingChunkWriter: @unchecked Sendable {
     private var silentFrames: AVAudioFramePosition = 0
     private var capturedThrough: TimeInterval?
     private var recentLevels: [Float] = []
+    private var muted = false
     private var ready: [MeetingAudioChunk] = []
     private var error: (any Error)?
 
@@ -338,6 +349,7 @@ final class MeetingChunkWriter: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let count = AVAudioFramePosition(buffer.frameLength)
+        guard !muted else { return (0, seconds(count)) }
         if let time, isLate(time) { rotate() }
         guard let file, count > 0 else { return (0, seconds(count)) }
         if frames == 0 { chunkStart = time ?? nextStart }
@@ -372,6 +384,15 @@ final class MeetingChunkWriter: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if isLate(time) { rotate() }
+    }
+
+    /// Muting closes the open chunk so what was said before it still gets transcribed.
+    func setMuted(_ muted: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard muted != self.muted else { return }
+        self.muted = muted
+        if muted { rotate() }
     }
 
     func finish() {

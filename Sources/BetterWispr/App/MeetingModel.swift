@@ -53,6 +53,9 @@ final class MeetingModel {
     var voicesMessage: String?
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
+    var microphoneMuted = false {
+        didSet { recorder.microphoneMuted = microphoneMuted }
+    }
     var showsCallAudioHint = false
     var notesSettings = AppSettings()
     var ollamaModels: [String] = []
@@ -130,6 +133,7 @@ final class MeetingModel {
         systemAudioIssue = nil
         showsCallAudioHint = false
         heard = (false, false)
+        microphoneMuted = false
         run.voices = SpeakerDetection.isInstalled() ? try? SpeakerRecording() : nil
         run.separatesRoomVoices = separateRoomVoices
         elapsed = 0
