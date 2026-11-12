@@ -1182,6 +1182,8 @@ final class AppModel {
         shortcutPressedAt = nil
         correctionWatcher.stop()
         dictationContext.take()?.cancel()
+        pieceEdits?.tasks.values.forEach { $0.cancel() }
+        pieceEdits = nil
         operation?.cancel()
         operation = nil
         ticker?.cancel()
