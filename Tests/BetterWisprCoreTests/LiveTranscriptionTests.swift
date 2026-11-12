@@ -11,15 +11,15 @@ private func words(_ text: String, confidence: Float = 1, from start: TimeInterv
 
 private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven twelve"
 
-@Test func firstPassIsHypothesisAndThreeAgreeingPassesConfirmThroughTheThirdLastSentence() {
+@Test func firstPassIsHypothesisAndThreeAgreeingPassesConfirmThroughTheLastFinishedSentence() {
     var engine = WordAgreementEngine()
     #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "", hypothesis: spoken))
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.seekTime == 0)
-    #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "One two three four five six.", hypothesis: "Seven eight. Nine ten. Eleven twelve"))
-    #expect(engine.seekTime == 6)
-    #expect(engine.process(words("Seven eight. Nine ten. Eleven twelve.", from: 6)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "One two three four five six. Seven eight. Nine ten.", hypothesis: "Eleven twelve"))
+    #expect(engine.seekTime == 10)
+    #expect(engine.process(words("Eleven twelve.", from: 10)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func lowConfidencePassShowsAsHypothesisAndRestartsTheCount() {
@@ -29,7 +29,7 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     #expect(engine.process(words(spoken), passConfidence: 0.1) == LiveTranscript(confirmed: "", hypothesis: spoken))
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func disagreeingPassRestartsTheCount() {
@@ -40,7 +40,7 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func punctuationNeverBreaksAgreementButAMovedSentenceEndBlocksConfirmation() {
@@ -50,20 +50,20 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     _ = engine.process(words(spoken))
     let moved = "One two three four five six Seven eight. Nine ten. Eleven twelve."
     #expect(engine.process(words(moved)).confirmed == "")
-    #expect(engine.process(words(moved)).confirmed == "One two three four five six Seven eight.")
+    #expect(engine.process(words(moved)).confirmed == "One two three four five six Seven eight. Nine ten.")
 }
 
 @Test func lowConfidenceWordsAtTheBoundaryBlockConfirmation() {
     var engine = WordAgreementEngine()
     for _ in 0..<3 { _ = engine.process(words(spoken, confidence: 0.5)) }
     #expect(engine.process(words(spoken, confidence: 0.5)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func fragmentsShorterThanFiveWordsAreNeverConfirmed() {
     var engine = WordAgreementEngine()
     for _ in 0..<5 {
-        #expect(engine.process(words("One two. Three four. Five six. Seven eight.")).confirmed == "")
+        #expect(engine.process(words("One two. Three four. Five")).confirmed == "")
     }
 }
 

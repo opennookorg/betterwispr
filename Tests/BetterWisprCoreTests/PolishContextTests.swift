@@ -200,7 +200,7 @@ import Testing
     #expect(TranscriptPolisher.needsEdit("Meet on Thursday. Actually, Friday works better."))
     #expect(TranscriptPolisher.needsEdit("Send it to Sam, no, to Alex."))
     #expect(TranscriptPolisher.needsEdit("can you send me the file by tomorrow"))
-    #expect(TranscriptPolisher.needsEdit("We need milk, bread, eggs and flour."))
+    #expect(!TranscriptPolisher.needsEdit("We need milk, bread, eggs and flour."), "a clean list only waits for layOutList")
     #expect(TranscriptPolisher.needsEdit("One. Two. Three. Four."))
     #expect(TranscriptPolisher.needsEdit(Array(repeating: "word", count: 41).joined(separator: " ") + "."))
 }

@@ -81,7 +81,7 @@ public struct WordAgreementEngine: Sendable {
         }
         agreements += 1
         guard agreements >= Self.confirmationsNeeded,
-              let cut = Self.sentenceCut(words.prefix(prefix)),
+              let cut = Self.sentenceCut(words.prefix(min(prefix, words.count - 1))),
               words.prefix(cut).map(\.sentenceEnder) == earlier.prefix(cut).map(\.sentenceEnder),
               words.prefix(cut).suffix(3).allSatisfy({ $0.confidence >= Self.minimumWordConfidence })
         else { return transcript(hypothesis: words) }
@@ -95,12 +95,11 @@ public struct WordAgreementEngine: Sendable {
         return transcript(hypothesis: hypothesis)
     }
 
-    /// Words to confirm: through the third-last sentence ender, so the latest two sentences stay provisional.
+    /// Words to confirm: through the last sentence ender among agreed words that more speech follows, so only the sentence still being spoken stays provisional
+    /// and a piece can be recognized and edited while the next sentence is spoken. The pass's final word is excluded, since the end of the audio looks like a sentence end.
     private static func sentenceCut(_ words: ArraySlice<TimedWord>) -> Int? {
-        let enders = words.indices.filter { words[$0].sentenceEnder != nil }
-        guard enders.count >= 3 else { return nil }
-        let count = enders[enders.count - 3] + 1
-        return count >= minimumWords ? count : nil
+        guard let last = words.indices.last(where: { words[$0].sentenceEnder != nil }) else { return nil }
+        return last + 1 >= minimumWords ? last + 1 : nil
     }
 
     private func transcript(hypothesis: [TimedWord]) -> LiveTranscript {

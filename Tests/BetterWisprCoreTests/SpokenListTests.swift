@@ -235,6 +235,7 @@ private func polished(editor: @escaping @Sendable () async throws -> String, for
     "We processed 20,000 records in 35 files and stopped.",
     "Quick update on the rollout, the new pricing page went live this morning and so far the numbers look good, we had about 40 sign-ups in the first two hours.",
     "We moved the old jobs and the old queue and the old cache to the new cluster and the team is happy.",
+    "First, the migration finished overnight and every account moved across without errors, which took far longer than we planned. Second, support saw fewer tickets.",
 ])
 func proseMakesNoLayoutCall(_ text: String) async {
     #expect(!TranscriptListFormatter.isLikelyList(text))

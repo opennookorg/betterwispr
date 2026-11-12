@@ -951,6 +951,12 @@ final class AppModel {
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
                     spoken = StyleFormatter.apply(tone, to: polished ?? spoken)
+                } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
+                    // A clean dictation skips the edit; a likely list still gets its one layout call, anything else returns at once.
+                    let listed = await TranscriptPolisher.layOutList(spoken, of: spoken, settings: writingSettings, instructions: mode?.instructions ?? "")
+                    try Task.checkCancellation()
+                    guard self.generation == token else { return }
+                    spoken = StyleFormatter.apply(tone, to: listed)
                 } else if english {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }

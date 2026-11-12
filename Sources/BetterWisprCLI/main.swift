@@ -366,7 +366,7 @@ func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocab
         let (edited, reused) = settings.cleanup == .medium && TranscriptPolisher.needsEdit(whole)
             ? await StreamedDictation.edit(whole, pieces: pieces.map(prepared), ahead: ahead, editingPiece: { await polish($0, laysOutLists: false) },
                                            editingWhole: { await polish($0) }, layingOut: { await TranscriptPolisher.layOutList($0, of: whole, settings: settings) })
-            : (nil, 0)
+            : (settings.cleanup == .medium ? await TranscriptPolisher.layOutList(whole, of: whole, settings: settings) : nil, 0)
         let result: [String: String] = [
             "id": clip.id, "pieces": "\(pieces.count)", "reused": "\(reused)",
             "liveStop": String(format: "%.2f", stopSeconds),

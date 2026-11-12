@@ -129,8 +129,9 @@ public enum TranscriptPolisher {
 
     public static let minimumWords = 4
 
-    /// Whether a lightly cleaned dictation still needs the model: mode instructions, a spoken correction, a likely list, text past one paragraph, or unpunctuated text.
-    /// The light cleanup already removes fillers, stutters and simple repairs, and applies spoken numbers and punctuation, so a short clean sentence is pasted without waiting for the model.
+    /// Whether a lightly cleaned dictation still needs the model's edit: mode instructions, a spoken correction, text past one paragraph, or unpunctuated text.
+    /// The light cleanup already removes fillers, stutters and simple repairs, and applies spoken numbers and punctuation, so a short clean sentence is pasted without waiting
+    /// for the model, and a short clean list only waits for `layOutList`.
     // ponytail: skipped dictations lose the model's grammar, ASR-guess and context-vocabulary fixes; make this a setting if those matter more than speed.
     public static func needsEdit(_ text: String, instructions extra: String = "") -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -138,7 +139,7 @@ public enum TranscriptPolisher {
         if trimmed.split(whereSeparator: \.isWhitespace).count > 40 || trimmed.matches(of: /[.!?](?:\s|$)/).count > 3 { return true }
         if trimmed.contains(/(?i)\b(?:wait|actually|sorry|oops|i\s+mean|scratch\s+that|rather|correction)\b|\bno,/) { return true }
         guard let first = trimmed.first, first.isUppercase || first.isNumber, let last = trimmed.last, ".!?".contains(last) else { return true }
-        return TranscriptListFormatter.isLikelyList(trimmed)
+        return false
     }
 
     /// Edits English text with the model that settings selects; nil means keep the light cleanup.
