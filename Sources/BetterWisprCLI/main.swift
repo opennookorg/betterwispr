@@ -363,7 +363,7 @@ func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocab
         let raw = pieces.joined(separator: " ")
         let recognized = clock.now
         let whole = prepared(raw)
-        let (edited, reused) = settings.cleanup == .medium
+        let (edited, reused) = settings.cleanup == .medium && TranscriptPolisher.needsEdit(whole)
             ? await StreamedDictation.edit(whole, pieces: pieces.map(prepared), ahead: ahead, editingPiece: { await polish($0, laysOutLists: false) },
                                            editingWhole: { await polish($0) }, layingOut: { await TranscriptPolisher.layOutList($0, of: whole, settings: settings) })
             : (nil, 0)

@@ -932,7 +932,8 @@ final class AppModel {
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
-                } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
+                } else if english, cleanup == .medium, TranscriptPolisher.needsEdit(spoken, instructions: mode?.instructions ?? ""),
+                          MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
                     let editStarted = ContinuousClock.now
                     let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
