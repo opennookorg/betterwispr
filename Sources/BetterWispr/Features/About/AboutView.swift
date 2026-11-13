@@ -4,7 +4,7 @@ import SwiftUI
 struct AboutView: View {
     @Bindable var updater: AppUpdater
     let shortcut: DictationShortcut
-    static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
+    static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? L10n.tr("Development")
     static let changelog = URL(string: "https://betterwispr.com/changelog")!
     private let repository = URL(string: "https://github.com/opennookorg/betterwispr")!
 
@@ -14,10 +14,10 @@ struct AboutView: View {
                 VStack(spacing: 10) {
                     BrandMark(size: 72)
                     Text("BetterWispr").font(.title.weight(.semibold))
-                    Text("Version \(Self.version)")
+                    Text(L10n.tr("Version %@", String(Self.version)))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    Text("Dictation for your Mac. Press \(shortcut.displayName) in any app, speak, and your words appear where you’re typing. Speech runs on this Mac by default. Choosing an API connection or Codex subscription transcription sends audio to that provider.")
+                    Text(L10n.tr("Dictation for your Mac. Press %@ in any app, speak, and your words appear where you’re typing. Speech runs on this Mac by default. Choosing an API connection or Codex subscription transcription sends audio to that provider.", String(shortcut.displayName)))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: 480)
@@ -28,60 +28,64 @@ struct AboutView: View {
 
             Section {
                 Toggle(isOn: $updater.automaticallyChecksForUpdates) {
-                    Text("Check for updates automatically")
-                    Text("Looks for a new release on GitHub once a day.")
+                    Text(L10n.tr("Check for updates automatically"))
+                    Text(L10n.tr("Looks for a new release on GitHub once a day."))
                 }
                 Toggle(isOn: $updater.automaticallyDownloadsUpdates) {
-                    Text("Download and install automatically")
-                    Text("New versions install the next time BetterWispr quits.")
+                    Text(L10n.tr("Download and install automatically"))
+                    Text(L10n.tr("New versions install the next time BetterWispr quits."))
                 }
                 .disabled(!updater.automaticallyChecksForUpdates)
-                Button("Check for Updates…", action: updater.checkForUpdates)
+                Button(L10n.tr("Check for Updates…"), action: updater.checkForUpdates)
                     .disabled(!updater.canCheckForUpdates)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } header: {
-                Text("Updates")
+                Text(L10n.tr("Updates"))
             } footer: {
-                Text("Update checks contact GitHub only. They never include your audio or text.")
+                Text(L10n.tr("Update checks contact GitHub only. They never include your audio or text."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 LabeledContent {
-                    Link("View on GitHub", destination: repository)
+                    Link(L10n.tr("View on GitHub"), destination: repository)
                 } label: {
-                    Text("Source code")
-                    Text("Browse the code and every release.")
+                    Text(L10n.tr("Source code"))
+                    Text(L10n.tr("Browse the code and every release."))
                 }
                 LabeledContent {
-                    Link("Open an Issue", destination: repository.appending(path: "issues"))
+                    Link(L10n.tr("Open an Issue"), destination: repository.appending(path: "issues"))
                 } label: {
-                    Text("Feedback")
-                    Text("Report a bug or suggest a feature.")
+                    Text(L10n.tr("Feedback"))
+                    Text(L10n.tr("Report a bug or suggest a feature."))
                 }
                 LabeledContent {
-                    Link("What’s New", destination: Self.changelog)
+                    Link(L10n.tr("What’s New"), destination: Self.changelog)
                 } label: {
-                    Text("Changelog")
-                    Text("See what changed in each release.")
+                    Text(L10n.tr("Changelog"))
+                    Text(L10n.tr("See what changed in each release."))
                 }
                 LabeledContent {
-                    Link("Buy Me a Coffee", destination: URL(string: "https://buymeacoffee.com/code_kartik")!)
+                    Link(L10n.tr("Buy Me a Coffee"), destination: URL(string: "https://buymeacoffee.com/code_kartik")!)
                 } label: {
-                    Text("Support")
-                    Text("Help fund BetterWispr’s development.")
+                    Text(L10n.tr("Support"))
+                    Text(L10n.tr("Help fund BetterWispr’s development."))
                 }
             } header: {
-                Text("Open Source")
+                Text(L10n.tr("Open Source"))
             } footer: {
-                Text("BetterWispr is free and open source under the Apache 2.0 license. If it saves you some typing, a star on GitHub helps others find it.")
+                Text(L10n.tr("BetterWispr is free and open source under the Apache 2.0 license. If it saves you some typing, a star on GitHub helps others find it."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Credits") {
-                LabeledContent("Created by", value: "Kartik Labhshetwar")
-                LabeledContent("Follow along") {
-                    Link("@code_kartik on X", destination: URL(string: "https://x.com/code_kartik")!)
+            Section(L10n.tr("Credits")) {
+                LabeledContent(L10n.tr("Created by"), value: "Kartik Labhshetwar")
+                LabeledContent(L10n.tr("Follow along")) {
+                    Link(L10n.tr("@code_kartik on X"), destination: URL(string: "https://x.com/code_kartik")!)
                 }
             }
         }

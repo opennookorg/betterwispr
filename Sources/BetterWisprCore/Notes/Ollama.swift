@@ -24,12 +24,12 @@ public enum Ollama {
         let data: Data, response: URLResponse
         do { (data, response) = try await URLSession.shared.data(for: request) }
         catch let error as URLError where error.code == .cannotConnectToHost {
-            throw MeetingNotesError.unavailable("Ollama isn’t running. Open Ollama and try again, or choose Apple Intelligence in Notetaker settings.")
+            throw MeetingNotesError.unavailable(L10n.tr("Ollama isn’t running. Open Ollama and try again, or choose Apple Intelligence in Notetaker settings."))
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
             let reason = (try? JSONDecoder().decode(Failure.self, from: data))?.error ?? HTTPURLResponse.localizedString(forStatusCode: status)
-            throw MeetingNotesError.unavailable("Ollama couldn’t write notes. \(reason)")
+            throw MeetingNotesError.unavailable(L10n.tr("Ollama couldn’t write notes. %@", String(reason)))
         }
         return data
     }

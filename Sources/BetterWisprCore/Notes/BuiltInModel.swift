@@ -90,7 +90,7 @@ public enum BuiltInModelError: LocalizedError {
     case integrity
 
     public var errorDescription: String? {
-        "The download didn’t match the built-in model’s size and checksum. Try again."
+        L10n.tr("The download didn’t match the built-in model’s size and checksum. Try again.")
     }
 }
 

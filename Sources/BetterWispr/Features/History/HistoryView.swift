@@ -11,10 +11,10 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        Form {
+        List {
             if query.isEmpty, !model.failedDictations.isEmpty {
                 Section {
-                    let action = model.transcriptionModel.recordingAction(onDevice: ("Transcribe", "Transcribe this recording on the Transcribe page"))
+                    let action = model.transcriptionModel.recordingAction(onDevice: (L10n.tr("Transcribe"), L10n.tr("Transcribe this recording on the Transcribe page")))
                     ForEach(model.failedDictations) { item in
                         HStack(spacing: 6) {
                             Text(item.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
@@ -22,18 +22,17 @@ struct HistoryView: View {
                             Button(action.title) { model.transcribeFailedDictation(item) }
                                 .help(action.help)
                             Button { model.revealFailedDictation(item) } label: { Image(systemName: "folder") }
-                                .help("Show in Finder")
-                                .accessibilityLabel("Show in Finder")
+                                .help(L10n.tr("Show in Finder"))
+                                .accessibilityLabel(L10n.tr("Show in Finder"))
                             Button { model.deleteFailedDictation(item) } label: { Image(systemName: "trash") }
-                                .help("Delete recording")
-                                .accessibilityLabel("Delete recording")
+                                .help(L10n.tr("Delete recording"))
+                                .accessibilityLabel(L10n.tr("Delete recording"))
                         }
                         .buttonStyle(.borderless)
                     }
+                    footnote(L10n.tr("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups."))
                 } header: {
-                    Text("Not transcribed")
-                } footer: {
-                    Text("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups.")
+                    Text(L10n.tr("Not transcribed"))
                 }
             }
             if !filteredHistory.isEmpty {
@@ -48,44 +47,50 @@ struct HistoryView: View {
                             expanded: true
                         )
                     }
-                } header: {
-                    Text("^[\(filteredHistory.count) dictation](inflect: true)")
-                } footer: {
                     if model.settings.learnCorrections {
-                        Text("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time.")
+                        footnote(L10n.tr("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time."))
                     }
+                } header: {
+                    Text(L10n.tr("%ld dictations", filteredHistory.count))
                 }
             }
         }
-        .formStyle(.grouped)
+        .listStyle(.inset)
         .overlay {
             if filteredHistory.isEmpty {
                 if query.isEmpty, !model.failedDictations.isEmpty {
                     EmptyView()
                 } else if query.isEmpty {
                     ContentUnavailableView(
-                        "No Dictations",
+                        L10n.tr("No Dictations"),
                         systemImage: "clock",
-                        description: Text("Your saved dictations will appear here. Start speaking with \(model.settings.shortcut.displayName).")
+                        description: Text(L10n.tr("Your saved dictations will appear here. Start speaking with %@.", String(model.settings.shortcut.displayName)))
                     )
                 } else {
                     ContentUnavailableView.search(text: query)
                 }
             }
         }
-        .searchable(text: $query, prompt: "Search dictations")
-        .alert("Delete this dictation?", isPresented: Binding(
+        .searchable(text: $query, prompt: L10n.tr("Search dictations"))
+        .alert(L10n.tr("Delete this dictation?"), isPresented: Binding(
             get: { transcriptToDelete != nil },
             set: { if !$0 { transcriptToDelete = nil } }
         )) {
-            Button("Cancel", role: .cancel) { transcriptToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(L10n.tr("Cancel"), role: .cancel) { transcriptToDelete = nil }
+            Button(L10n.tr("Delete"), role: .destructive) {
                 if let transcriptToDelete { model.deleteTranscript(transcriptToDelete) }
                 transcriptToDelete = nil
             }
         } message: {
-            Text("This removes the saved text from this Mac. It cannot be undone.")
+            Text(L10n.tr("This removes the saved text from this Mac. It cannot be undone."))
         }
+    }
+
+    /// List gives a section footer one line, so explanations go in a last row that can wrap.
+    private func footnote(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 
@@ -97,6 +102,7 @@ struct TranscriptRow: View {
     var onRestore: (() -> Void)?
     var expanded = false
     @State private var draft: String?
+    @State private var showsOriginal = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -108,21 +114,21 @@ struct TranscriptRow: View {
                     Text("·")
                     Text(transcript.modelName)
                     Text("·")
-                    Text(transcript.language == "auto" ? "Auto language" : transcript.language.uppercased())
+                    Text(transcript.language == "auto" ? L10n.tr("Auto language") : transcript.language.uppercased())
                 }
                 Spacer()
                 Button(action: onCopy) { Image(systemName: "doc.on.doc") }
-                    .help("Copy dictation")
-                    .accessibilityLabel("Copy dictation")
+                    .help(L10n.tr("Copy dictation"))
+                    .accessibilityLabel(L10n.tr("Copy dictation"))
                 if onEdit != nil, draft == nil {
                     Button { draft = transcript.text } label: { Image(systemName: "pencil") }
-                        .help("Fix dictation")
-                        .accessibilityLabel("Fix dictation")
+                        .help(L10n.tr("Fix dictation"))
+                        .accessibilityLabel(L10n.tr("Fix dictation"))
                 }
                 if let onDelete {
                     Button(action: onDelete) { Image(systemName: "trash") }
-                        .help("Delete dictation")
-                        .accessibilityLabel("Delete dictation")
+                        .help(L10n.tr("Delete dictation"))
+                        .accessibilityLabel(L10n.tr("Delete dictation"))
                 }
             }
             .font(.caption)
@@ -133,12 +139,12 @@ struct TranscriptRow: View {
                     .font(.body)
                     .scrollContentBackground(.visible)
                     .frame(minHeight: 60)
-                    .accessibilityLabel("Dictation text")
+                    .accessibilityLabel(L10n.tr("Dictation text"))
                 HStack {
                     Spacer()
-                    Button("Cancel") { draft = nil }
+                    Button(L10n.tr("Cancel")) { draft = nil }
                         .keyboardShortcut(.cancelAction)
-                    Button("Save") {
+                    Button(L10n.tr("Save")) {
                         onEdit(text.wrappedValue)
                         draft = nil
                     }
@@ -153,13 +159,26 @@ struct TranscriptRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if expanded && transcript.text != transcript.rawText {
-                DisclosureGroup("Original transcription") {
-                    Text(transcript.rawText)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if let onRestore, transcript.text != transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines) {
-                        Button("Use Original", action: onRestore)
-                            .help("Replace the cleaned-up text with exactly what was transcribed")
+                VStack(alignment: .leading, spacing: 6) {
+                    Button { showsOriginal.toggle() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.right")
+                                .imageScale(.small)
+                                .rotationEffect(.degrees(showsOriginal ? 90 : 0))
+                            Text(L10n.tr("Original transcription"))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityValue(showsOriginal ? L10n.tr("Expanded") : L10n.tr("Collapsed"))
+                    if showsOriginal {
+                        Text(transcript.rawText)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let onRestore, transcript.text != transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines) {
+                            Button(L10n.tr("Use Original"), action: onRestore)
+                                .help(L10n.tr("Replace the cleaned-up text with exactly what was transcribed"))
+                        }
                     }
                 }
                 .font(.caption)

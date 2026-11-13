@@ -6,7 +6,7 @@ struct SystemAudioError: LocalizedError {
     let step: String
     let status: OSStatus
 
-    var errorDescription: String? { "Couldn’t \(step) (Core Audio error \(status))." }
+    var errorDescription: String? { L10n.tr("Couldn’t %@ (Core Audio error %@).", String(step), String(status)) }
 }
 
 /// Captures every other app's output through a private process tap on a private aggregate device.
@@ -28,7 +28,7 @@ final class SystemAudioTap {
         description.name = "BetterWispr Meeting Tap"
         description.isPrivate = true
         description.muteBehavior = muteBehavior
-        try check(AudioHardwareCreateProcessTap(description, &tapID), tapID, "create the system audio tap")
+        try check(AudioHardwareCreateProcessTap(description, &tapID), tapID, L10n.tr("create the system audio tap"))
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "BetterWispr Meeting Audio",
             kAudioAggregateDeviceUIDKey: "org.betterwispr.meeting-tap.\(UUID().uuidString)",
@@ -36,17 +36,17 @@ final class SystemAudioTap {
             kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: description.uuid.uuidString, kAudioSubTapDriftCompensationKey: true]],
             kAudioAggregateDeviceTapAutoStartKey: true,
         ]
-        try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID), aggregateID, "create the system audio device")
+        try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID), aggregateID, L10n.tr("create the system audio device"))
         var stream = try await streamDescription()
         guard let format = AVAudioFormat(streamDescription: &stream) else {
-            throw SystemAudioError(step: "read the system audio format", status: kAudioHardwareUnsupportedOperationError)
+            throw SystemAudioError(step: L10n.tr("read the system audio format"), status: kAudioHardwareUnsupportedOperationError)
         }
         return format
     }
 
     func start(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>, UnsafePointer<AudioTimeStamp>) -> Void) throws {
         try listen(receive)
-        try check(AudioDeviceStart(aggregateID, procID), aggregateID, "start system audio")
+        try check(AudioDeviceStart(aggregateID, procID), aggregateID, L10n.tr("start system audio"))
     }
 
     /// Starts off the main actor, because `kAudioAggregateDeviceTapAutoStartKey` makes `AudioDeviceStart` wait for the first audio from a tapped app; `stop()` must wait for this to return.
@@ -57,7 +57,7 @@ final class SystemAudioTap {
         let status = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: AudioDeviceStart(device, proc)) }
         }
-        try check(status, device, "start system audio")
+        try check(status, device, L10n.tr("start system audio"))
     }
 
     func stop() {
@@ -76,7 +76,7 @@ final class SystemAudioTap {
 
     private func listen(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>, UnsafePointer<AudioTimeStamp>) -> Void) throws {
         let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { @Sendable _, input, inputTime, _, _ in receive(input, inputTime) }
-        guard status == noErr, procID != nil else { throw SystemAudioError(step: "listen to system audio", status: status) }
+        guard status == noErr, procID != nil else { throw SystemAudioError(step: L10n.tr("listen to system audio"), status: status) }
     }
 
     private func streamDescription() async throws -> AudioStreamBasicDescription {
@@ -90,7 +90,7 @@ final class SystemAudioTap {
             if status == noErr, format.mSampleRate > 0, format.mChannelsPerFrame > 0 { return format }
             try await Task.sleep(for: .milliseconds(50))
         }
-        throw SystemAudioError(step: "read the system audio format", status: status)
+        throw SystemAudioError(step: L10n.tr("read the system audio format"), status: status)
     }
 
     private func check(_ status: OSStatus, _ object: AudioObjectID, _ step: String) throws {

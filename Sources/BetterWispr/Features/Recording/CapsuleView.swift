@@ -12,7 +12,7 @@ struct CapsuleView: View {
     private var isMeetingRecording: Bool { model.meetings.capturing?.phase == .recording }
     private var failure: DictationFailure? {
         model.failure ?? (model.phase != .idle ? nil : model.meetings.message.map {
-            DictationFailure(title: "Notetaker needs attention", message: $0)
+            DictationFailure(title: L10n.tr("Notetaker needs attention"), message: $0)
         })
     }
     private var meetingPrompt: DetectedMeeting? { model.meetingPrompt }
@@ -65,19 +65,22 @@ struct CapsuleView: View {
         }
         .onChange(of: meetingPrompt) {
             guard let meetingPrompt else { return }
-            let closing = model.meetingDetector.deadline.map { " It closes in \(Int($0.timeIntervalSinceNow.rounded())) seconds." } ?? ""
-            AccessibilityNotification.Announcement("\(meetingPrompt.platform.name) meeting detected. You can start the notetaker from the capsule.\(closing)").post()
+            let platform = String(meetingPrompt.platform.name)
+            let announcement = model.meetingDetector.deadline.map {
+                L10n.tr("%@ meeting detected. You can start the notetaker from the capsule. It closes in %@ seconds.", platform, String(Int($0.timeIntervalSinceNow.rounded())))
+            } ?? L10n.tr("%@ meeting detected. You can start the notetaker from the capsule.", platform)
+            AccessibilityNotification.Announcement(announcement).post()
         }
         .onChange(of: model.unpasted) {
             guard model.unpasted != nil else { return }
-            AccessibilityNotification.Announcement("Copied, not pasted. Press Command V to paste it.").post()
+            AccessibilityNotification.Announcement(L10n.tr("Copied, not pasted. Press Command V to paste it.")).post()
         }
         .onChange(of: model.phase) {
             switch model.phase {
             case .cancelled:
-                AccessibilityNotification.Announcement(model.canUndoCancellation ? "Transcript cancelled. Undo is available for five seconds." : "Transcript cancelled.").post()
+                AccessibilityNotification.Announcement(model.canUndoCancellation ? L10n.tr("Transcript cancelled. Undo is available for five seconds.") : L10n.tr("Transcript cancelled.")).post()
             case .completed(let message): AccessibilityNotification.Announcement(message).post()
-            case .sending: AccessibilityNotification.Announcement("Sending. Dictate again to add more first.").post()
+            case .sending: AccessibilityNotification.Announcement(L10n.tr("Sending. Dictate again to add more first.")).post()
             case .asking(let question): AccessibilityNotification.Announcement("\(question.title) \(question.message)").post()
             default: break
             }
@@ -149,7 +152,7 @@ struct CapsuleView: View {
                 Text(model.settings.shortcut.displayName).fontWeight(.semibold)
             }
             if target == .dictation {
-                Text("Esc to cancel").foregroundStyle(.secondary)
+                Text(L10n.tr("Esc to cancel")).foregroundStyle(.secondary)
             }
         }
         .font(.system(size: 11, weight: .medium))
@@ -164,15 +167,15 @@ struct CapsuleView: View {
 
     private func tooltipTitle(for target: CapsuleHover.Target) -> String {
         switch target {
-        case .microphone: "Dictate"
+        case .microphone: L10n.tr("Dictate")
         case .notetaker:
-            isMeetingCapturing ? "Stop notetaker" : "Start notetaker"
-        case .meetingNotes: "Open meeting notes"
+            isMeetingCapturing ? L10n.tr("Stop notetaker") : L10n.tr("Start notetaker")
+        case .meetingNotes: L10n.tr("Open meeting notes")
         case .dictation:
             switch model.phase {
-            case .recording: model.isHeldSession ? "Release \(model.settings.shortcut.displayName) to finish" : "Finish dictation"
-            case .transcribing: "Transcribing…"
-            default: "Starting microphone…"
+            case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.settings.shortcut.displayName)) : L10n.tr("Finish dictation")
+            case .transcribing: L10n.tr("Transcribing…")
+            default: L10n.tr("Starting microphone…")
             }
         case .surface: ""
         }
@@ -200,8 +203,8 @@ struct CapsuleView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("Dismiss error")
-                .accessibilityLabel("Dismiss error")
+                .help(L10n.tr("Dismiss error"))
+                .accessibilityLabel(L10n.tr("Dismiss error"))
             }
             Text(failure.message)
                 .font(.system(size: 13))
@@ -209,21 +212,21 @@ struct CapsuleView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .lineLimit(model.failure == nil ? nil : 4)
             if failure.needsAccessibility {
-                Button("Allow Accessibility") {
+                Button(L10n.tr("Allow Accessibility")) {
                     model.requestAccessibility()
                     model.dismissCard()
                 }
                 .buttonStyle(.bordered)
             } else if model.failure != nil {
                 let retry = model.canRetryFailure
-                    ? model.selectedModel.recordingAction(onDevice: (title: "Try again", help: "Transcribe this recording again"))
-                    : (title: "Try again", help: "Start a new dictation")
+                    ? model.selectedModel.recordingAction(onDevice: (title: L10n.tr("Try again"), help: L10n.tr("Transcribe this recording again")))
+                    : (title: L10n.tr("Try again"), help: L10n.tr("Start a new dictation"))
                 Button(retry.title, action: model.retryFailure)
                     .help(retry.help)
                     .buttonStyle(.bordered)
             }
             if isMeetingCapturing {
-                Button("Stop notetaker", action: model.meetings.stop)
+                Button(L10n.tr("Stop notetaker"), action: model.meetings.stop)
                     .buttonStyle(.bordered)
             }
         }
@@ -238,7 +241,7 @@ struct CapsuleView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
                     .accessibilityHidden(true)
-                Text("Copied, not pasted.")
+                Text(L10n.tr("Copied, not pasted."))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                 Spacer(minLength: 4)
@@ -255,8 +258,8 @@ struct CapsuleView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("Copy text")
-                .accessibilityLabel("Copy text")
+                .help(L10n.tr("Copy text"))
+                .accessibilityLabel(L10n.tr("Copy text"))
             }
             Text(text)
                 .font(.system(size: 13))
@@ -270,20 +273,20 @@ struct CapsuleView: View {
 
     private var cancellationCard: some View {
         HStack(spacing: 16) {
-            Text("Transcript cancelled")
+            Text(L10n.tr("Transcript cancelled"))
                 .font(.system(size: 14, weight: .medium))
             Spacer(minLength: 0)
             if model.canUndoCancellation {
-                Button("Undo", action: model.undoCancellation)
-                    .help("Transcribe the audio you just cancelled")
+                Button(L10n.tr("Undo", table: "Recording"), action: model.undoCancellation)
+                    .help(L10n.tr("Transcribe the audio you just cancelled"))
             } else {
-                Button("Dismiss", action: model.dismissCard)
+                Button(L10n.tr("Dismiss"), action: model.dismissCard)
             }
         }
         .foregroundStyle(.white)
         .buttonStyle(CapsuleCardButtonStyle())
         .padding(.horizontal, 18)
-        .frame(width: 320, height: 56)
+        .frame(width: 400, height: 64)
     }
 
     private var sendingCard: some View {
@@ -293,15 +296,15 @@ struct CapsuleView: View {
                 .foregroundStyle(Color(red: 0.55, green: 0.9, blue: 0.7))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sending…")
+                Text(L10n.tr("Sending…"))
                     .font(.system(size: 14, weight: .medium))
-                Text("\(model.settings.shortcut.displayName) to add more")
+                Text(L10n.tr("%@ to add more", String(model.settings.shortcut.displayName)))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
             }
             Spacer(minLength: 0)
-            Button("Don’t send", action: model.holdBackReturn)
-                .help("Leave the text pasted without sending it")
+            Button(L10n.tr("Don’t send"), action: model.holdBackReturn)
+                .help(L10n.tr("Leave the text pasted without sending it"))
         }
         .foregroundStyle(.white)
         .buttonStyle(CapsuleCardButtonStyle())
@@ -352,7 +355,7 @@ struct CapsuleView: View {
                 .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Meeting detected")
+                Text(L10n.tr("Meeting detected"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                 HStack(spacing: 5) {
@@ -376,7 +379,7 @@ struct CapsuleView: View {
                     model.meetingDetector.dismiss()
                     model.startNotetaker()
                 } label: {
-                    Text("Start notetaker")
+                    Text(L10n.tr("Start notetaker"))
                         .font(.system(size: 12, weight: .semibold))
                         .lineLimit(1)
                         .fixedSize()
@@ -389,8 +392,8 @@ struct CapsuleView: View {
                     .fill(.white.opacity(0.18))
                     .frame(width: 1, height: 14)
                 Menu {
-                    Button("Not now", action: model.meetingDetector.dismiss)
-                    Button("Turn off meeting detection") {
+                    Button(L10n.tr("Not now"), action: model.meetingDetector.dismiss)
+                    Button(L10n.tr("Turn off meeting detection")) {
                         model.settings.detectMeetings = false
                         model.saveSettings()
                     }
@@ -403,8 +406,8 @@ struct CapsuleView: View {
                 .menuStyle(.button)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help("More options")
-                .accessibilityLabel("More options")
+                .help(L10n.tr("More options"))
+                .accessibilityLabel(L10n.tr("More options"))
             }
             .foregroundStyle(.white)
             .buttonStyle(.plain)
@@ -420,8 +423,8 @@ struct CapsuleView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .help("Dismiss")
-            .accessibilityLabel("Dismiss meeting prompt")
+            .help(L10n.tr("Dismiss"))
+            .accessibilityLabel(L10n.tr("Dismiss meeting prompt"))
         }
         .padding(.leading, 10)
         .padding(.trailing, 12)
@@ -444,7 +447,7 @@ struct CapsuleView: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Start dictation")
+            .accessibilityLabel(L10n.tr("Start dictation"))
             .background { CapsuleGlass(cornerRadius: 14) }
             .capsuleRegion(.microphone)
             meetingButton
@@ -470,7 +473,7 @@ struct CapsuleView: View {
             .allowsHitTesting(false)
             .transition(swap)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Live preview")
+            .accessibilityLabel(L10n.tr("Live preview"))
             .accessibilityValue(live.confirmed + separator + live.hypothesis)
     }
 
@@ -484,14 +487,14 @@ struct CapsuleView: View {
                         .frame(width: 24, height: 24)
                         .contentShape(Circle())
                 }
-                .help("Cancel dictation")
-                .accessibilityLabel("Cancel dictation")
+                .help(L10n.tr("Cancel dictation"))
+                .accessibilityLabel(L10n.tr("Cancel dictation"))
             }
             if model.phase == .transcribing {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity)
-                    .accessibilityLabel("Transcribing")
+                    .accessibilityLabel(L10n.tr("Transcribing"))
             } else {
                 CapsuleWaveform(model: model, isNotetaking: isNotetaking, animated: !reduceMotion, count: model.isHeldSession ? 13 : 9)
                     .frame(maxWidth: .infinity)
@@ -501,8 +504,8 @@ struct CapsuleView: View {
                 Image(systemName: keystroke == .return ? "return" : "keyboard")
                     .foregroundStyle(.white.opacity(0.75))
                     .frame(width: 14, height: 24)
-                    .help("Presses \(keystroke.displayName) after pasting. Hold Shift to paste only.")
-                    .accessibilityLabel("Presses \(keystroke.spokenName) after pasting")
+                    .help(L10n.tr("Presses %@ after pasting. Hold Shift to paste only.", String(keystroke.displayName)))
+                    .accessibilityLabel(L10n.tr("Presses %@ after pasting", String(keystroke.spokenName)))
                     .transition(.opacity)
             }
             if !model.isHeldSession {
@@ -515,8 +518,8 @@ struct CapsuleView: View {
                         .contentShape(Circle())
                 }
                 .disabled(!isRecording)
-                .help("Finish dictation")
-                .accessibilityLabel("Finish dictation")
+                .help(L10n.tr("Finish dictation"))
+                .accessibilityLabel(L10n.tr("Finish dictation"))
             }
         }
         .font(.system(size: 10, weight: .semibold))
@@ -526,8 +529,8 @@ struct CapsuleView: View {
         .frame(width: (model.isHeldSession ? 96 : 108) + (model.sendKeystroke == nil ? 0 : 18), height: 28)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: model.sendKeystroke)
         .contentShape(Capsule())
-        .contextMenu { Button("Cancel dictation", action: model.cancelRecording) }
-        .accessibilityActions { Button("Cancel dictation", action: model.cancelRecording) }
+        .contextMenu { Button(L10n.tr("Cancel dictation"), action: model.cancelRecording) }
+        .accessibilityActions { Button(L10n.tr("Cancel dictation"), action: model.cancelRecording) }
         .capsuleRegion(.dictation)
     }
 
@@ -542,7 +545,7 @@ struct CapsuleView: View {
                 .frame(width: 18, height: 18)
                 .background(.white.opacity(0.16), in: Circle())
                 .frame(width: 24, height: 24)
-                .accessibilityLabel("Stop notetaker")
+                .accessibilityLabel(L10n.tr("Stop notetaker"))
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { model.meetings.stop() }
         }
@@ -552,10 +555,10 @@ struct CapsuleView: View {
         .contentShape(Capsule())
         .onTapGesture { if isMeetingRecording { model.meetings.stop() } }
         .contextMenu {
-            Button("Stop notetaker", action: model.meetings.stop)
+            Button(L10n.tr("Stop notetaker"), action: model.meetings.stop)
         }
         .accessibilityActions {
-            Button("Stop notetaker", action: model.meetings.stop)
+            Button(L10n.tr("Stop notetaker"), action: model.meetings.stop)
         }
         .capsuleRegion(.notetaker)
     }
@@ -570,7 +573,7 @@ struct CapsuleView: View {
                     .background(.white.opacity(hover.target == .notetaker ? 0.12 : 0), in: Circle())
                     .contentShape(Circle())
             }
-            .accessibilityLabel("Start notetaker")
+            .accessibilityLabel(L10n.tr("Start notetaker"))
             .capsuleRegion(.notetaker)
             Button {
                 if let id = model.meetings.activeMeetingID {
@@ -586,7 +589,7 @@ struct CapsuleView: View {
                     .frame(width: 22, height: 28)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("Open meeting notes")
+            .accessibilityLabel(L10n.tr("Open meeting notes"))
             .capsuleRegion(.meetingNotes)
         }
         .buttonStyle(.plain)
@@ -594,10 +597,10 @@ struct CapsuleView: View {
     }
 
     private var waveformLabel: String {
-        if isNotetaking { return isMeetingRecording ? "Meeting audio level" : "Starting notetaker" }
+        if isNotetaking { return isMeetingRecording ? L10n.tr("Meeting audio level") : L10n.tr("Starting notetaker") }
         switch model.phase {
-        case .recording: return "Microphone input level"
-        default: return "Starting microphone"
+        case .recording: return L10n.tr("Microphone input level")
+        default: return L10n.tr("Starting microphone")
         }
     }
 }
@@ -640,14 +643,14 @@ private struct MeetingPromptCountdown: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let seconds = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
-            Text("\(seconds)s")
+            Text(verbatim: "\(seconds)s")
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.6))
                 .contentTransition(reduceMotion ? .identity : .numericText(countsDown: true))
                 .animation(reduceMotion ? nil : .default, value: seconds)
                 .fixedSize()
-                .help("Closes without recording when this reaches zero")
-                .accessibilityLabel("Closes in \(seconds) seconds without recording")
+                .help(L10n.tr("Closes without recording when this reaches zero"))
+                .accessibilityLabel(L10n.tr("Closes in %@ seconds without recording", String(seconds)))
         }
     }
 }

@@ -138,12 +138,12 @@ enum ShortcutError: LocalizedError {
     case cancelsDictation
     var errorDescription: String? {
         switch self {
-        case .unavailable(let shortcut): "\(shortcut.displayName) is used by another app."
-        case .accessibilityRequired: "Allow Accessibility in Settings to use a modifier key by itself."
-        case .monitorUnavailable: "Couldn’t listen for the modifier key. Try choosing the shortcut again."
-        case .alreadyAssigned(let shortcut): "\(shortcut.displayName) is already BetterWispr’s other shortcut."
-        case .needsKey: "This shortcut needs a key, not a modifier alone."
-        case .cancelsDictation: "Esc cancels a dictation, so this shortcut can’t use it."
+        case .unavailable(let shortcut): L10n.tr("%@ is used by another app.", String(shortcut.displayName))
+        case .accessibilityRequired: L10n.tr("Allow Accessibility in Settings to use a modifier key by itself.")
+        case .monitorUnavailable: L10n.tr("Couldn’t listen for the modifier key. Try choosing the shortcut again.")
+        case .alreadyAssigned(let shortcut): L10n.tr("%@ is already BetterWispr’s other shortcut.", String(shortcut.displayName))
+        case .needsKey: L10n.tr("This shortcut needs a key, not a modifier alone.")
+        case .cancelsDictation: L10n.tr("Esc cancels a dictation, so this shortcut can’t use it.")
         }
     }
 }

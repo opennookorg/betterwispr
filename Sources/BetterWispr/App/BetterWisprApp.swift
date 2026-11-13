@@ -28,18 +28,18 @@ struct BetterWisprApp: App {
         .commands {
             SidebarCommands()
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") { delegate.model.updater.checkForUpdates() }
+                Button(L10n.tr("Check for Updates…")) { delegate.model.updater.checkForUpdates() }
                     .disabled(!delegate.model.updater.canCheckForUpdates)
             }
             CommandGroup(after: .saveItem) {
-                Button("Export History…") { delegate.model.exportHistory() }
+                Button(L10n.tr("Export History…")) { delegate.model.exportHistory() }
                     .disabled(delegate.model.history.isEmpty)
             }
             CommandGroup(after: .newItem) {
-                Button(delegate.model.phase == .recording ? "Finish dictation" : "Start dictation") {
+                Button(delegate.model.phase == .recording ? L10n.tr("Finish dictation") : L10n.tr("Start dictation")) {
                     delegate.model.toggleRecording()
                 }
-                Button("Cancel dictation") { delegate.model.cancelRecording() }
+                Button(L10n.tr("Cancel dictation")) { delegate.model.cancelRecording() }
                     .keyboardShortcut(.escape, modifiers: [])
                     .disabled(!delegate.model.isBusy)
             }
@@ -68,7 +68,7 @@ private struct WelcomeGuideButton: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Show Welcome Guide") {
+        Button(L10n.tr("Show Welcome Guide")) {
             model.showOnboarding()
             openWindow(id: "dashboard")
             NSApplication.shared.activate(ignoringOtherApps: true)
@@ -84,52 +84,52 @@ private struct MenuContents: View {
     var body: some View {
         Text(status)
         Button { model.toggleRecording() } label: {
-            Text(model.phase == .recording ? "Finish Dictation" : "Start Dictation")
+            Text(model.phase == .recording ? L10n.tr("Finish Dictation") : L10n.tr("Start Dictation"))
             Text(model.settings.shortcut.displayName)
         }
         .disabled(model.phase == .preparing || model.phase == .transcribing)
-        if model.isBusy { Button("Cancel") { model.cancelRecording() } }
-        Button(model.meetings.capturingID == nil ? "Start Meeting Notes" : "Stop Meeting") {
+        if model.isBusy { Button(L10n.tr("Cancel")) { model.cancelRecording() } }
+        Button(model.meetings.capturingID == nil ? L10n.tr("Start Meeting Notes") : L10n.tr("Stop Meeting")) {
             guard model.meetings.capturingID == nil else { return model.meetings.stop() }
             model.startNotetaker()
         }
         Divider()
-        Picker("Model", selection: Binding(
+        Picker(L10n.tr("Model"), selection: Binding(
             get: { model.selectedModel.id },
             set: { id in
                 if let speechModel = model.models.first(where: { $0.id == id }) { model.selectModel(speechModel) }
             }
         )) {
             ForEach(model.models.filter(model.isModelInstalled)) { speechModel in
-                Text(speechModel.name).tag(speechModel.id)
+                Text(speechModel.localizedName).tag(speechModel.id)
             }
         }
         .disabled(model.isBusy)
-        MicrophonePicker(model: model) { Text("Microphone") }
+        MicrophonePicker(model: model) { Text(L10n.tr("Microphone")) }
         Divider()
-        Button("Open Dashboard", action: openDashboard)
-        Button("Settings…") {
+        Button(L10n.tr("Open Dashboard"), action: openDashboard)
+        Button(L10n.tr("Settings…")) {
             model.selectedPage = .settings
             openDashboard()
         }
         .keyboardShortcut(",")
         if let version = model.updater.pendingVersion {
-            Button("Install BetterWispr \(version)…") { model.updater.installUpdate() }
+            Button(L10n.tr("Install BetterWispr %@…", String(version))) { model.updater.installUpdate() }
         } else {
-            Button("Check for Updates…") { model.updater.checkForUpdates() }
+            Button(L10n.tr("Check for Updates…")) { model.updater.checkForUpdates() }
                 .disabled(!model.updater.canCheckForUpdates)
         }
         Divider()
-        Button("Quit BetterWispr") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
+        Button(L10n.tr("Quit BetterWispr")) { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
     }
 
     private var status: String {
         switch model.phase {
-        case .recording: "Listening…"
-        case .transcribing: "Transcribing…"
-        case .preparing: "Preparing…"
-        case .asking: "Waiting for your answer…"
-        case .idle, .failed, .unpasted, .cancelled, .completed, .sending: "BetterWispr: Ready"
+        case .recording: L10n.tr("Listening…")
+        case .transcribing: L10n.tr("Transcribing…")
+        case .preparing: L10n.tr("Preparing…")
+        case .asking: L10n.tr("Waiting for your answer…")
+        case .idle, .failed, .unpasted, .cancelled, .completed, .sending: L10n.tr("BetterWispr: Ready")
         }
     }
 

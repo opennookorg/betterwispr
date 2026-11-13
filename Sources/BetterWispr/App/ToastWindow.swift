@@ -18,9 +18,9 @@ struct Toast {
 extension Toast {
     init(_ result: OutputResult) {
         switch result {
-        case .copied: self.init(title: "Copied", message: "Ready to paste anywhere.", systemImage: "doc.on.doc")
-        case .copiedForManualPaste: self.init(title: "Copied", message: "Paste into your app with ⌘V.", systemImage: "doc.on.clipboard")
-        case .pasted(let app): self.init(title: "Pasted", message: "Sent to \(app).", systemImage: "text.cursor")
+        case .copied: self.init(title: L10n.tr("Copied"), message: L10n.tr("Ready to paste anywhere."), systemImage: "doc.on.doc")
+        case .copiedForManualPaste: self.init(title: L10n.tr("Copied"), message: L10n.tr("Paste into your app with ⌘V."), systemImage: "doc.on.clipboard")
+        case .pasted(let app): self.init(title: L10n.tr("Pasted"), message: L10n.tr("Sent to %@.", String(app)), systemImage: "text.cursor")
         }
     }
 
@@ -30,14 +30,14 @@ extension Toast {
 
     init(pruned count: Int, by retention: HistoryRetention) {
         let limit = switch retention {
-        case .forever: "from history"
-        case .latest100: "beyond the latest 100"
-        case .threeDays: "older than 3 days"
-        case .twoWeeks: "older than 2 weeks"
-        case .threeMonths: "older than 3 months"
+        case .forever: L10n.tr("from history")
+        case .latest100: L10n.tr("beyond the latest 100")
+        case .threeDays: L10n.tr("older than 3 days")
+        case .twoWeeks: L10n.tr("older than 2 weeks")
+        case .threeMonths: L10n.tr("older than 3 months")
         }
-        self.init(title: "Deleted \(count) \(count == 1 ? "dictation" : "dictations") \(limit)",
-                  message: "Your Keep history setting removes them from this Mac. Meetings and transcribed files stay.", systemImage: "trash")
+        self.init(title: L10n.tr("Deleted %ld dictations %@", count, limit),
+                  message: L10n.tr("Your Keep history setting removes them from this Mac. Meetings and transcribed files stay."), systemImage: "trash")
     }
 }
 

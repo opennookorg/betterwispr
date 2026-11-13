@@ -34,7 +34,7 @@ final class TranscriptionModel {
         transcripts = loaded.meetings
         if !loaded.unreadable.isEmpty {
             let count = loaded.unreadable.count
-            error = "\(count) transcript \(count == 1 ? "file" : "files") in \(self.store.directory.path) couldn’t be read and \(count == 1 ? "was" : "were") left untouched."
+            error = L10n.tr("Unreadable transcript files in %@: %@. They were left untouched.", self.store.directory.path, String(count))
         }
     }
 
@@ -75,7 +75,7 @@ final class TranscriptionModel {
         do {
             try store.delete(id: id)
         } catch {
-            self.error = "Couldn’t delete the transcript. \(error.localizedDescription)"
+            self.error = L10n.tr("Couldn’t delete the transcript. %@", String(error.localizedDescription))
             return
         }
         transcripts.removeAll { $0.id == id }
@@ -86,7 +86,7 @@ final class TranscriptionModel {
         guard let text = transcript(id)?.transcriptionText else { return }
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
-            catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
+            catch { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t copy"), error)) }
         }
     }
 
@@ -101,7 +101,7 @@ final class TranscriptionModel {
                 try await YTDLP.install()
                 ytDLP = YTDLP.executable
             } catch {
-                self.error = "Couldn’t install yt-dlp. \(error.localizedDescription)"
+                self.error = L10n.tr("Couldn’t install yt-dlp. %@", String(error.localizedDescription))
             }
         }
     }
@@ -115,7 +115,7 @@ final class TranscriptionModel {
     private func start(_ title: String, model: SpeechModel, provider: any SpeechProvider, language: String?, onSaved: @escaping () -> Void = {},
                        transcribe: @escaping (UUID) async throws -> MediaTranscript) {
         guard job == nil else { return }
-        let started = TranscriptionJob(title: title, modelName: model.name)
+        let started = TranscriptionJob(title: title, modelName: model.localizedName)
         job = started
         error = nil
         self.provider = provider
@@ -148,7 +148,7 @@ final class TranscriptionModel {
         work = nil
         provider = nil
         guard !transcript.segments.isEmpty else {
-            error = "No speech was found in “\(title)”."
+            error = L10n.tr("No speech was found in “%@”.", String(title))
             return
         }
         let record = Meeting(title: title, duration: transcript.duration, segments: transcript.segments, modelName: model.name, language: language ?? "auto")
@@ -157,12 +157,12 @@ final class TranscriptionModel {
         do {
             try store.save(record)
         } catch {
-            self.error = "The transcript is open but couldn’t be saved, so copy or export it before quitting. \(error.localizedDescription)"
+            self.error = L10n.tr("The transcript is open but couldn’t be saved, so copy or export it before quitting. %@", String(error.localizedDescription))
             return
         }
         onSaved()
         if let speakerError = transcript.speakerError {
-            error = "Couldn’t tell the speakers apart. \(speakerError.localizedDescription)"
+            error = L10n.tr("Couldn’t tell the speakers apart. %@", String(speakerError.localizedDescription))
         }
     }
 
@@ -225,7 +225,7 @@ extension AppModel {
         let speechModel = transcriptionModel
         guard isModelInstalled(speechModel) else {
             selectedPage = .models
-            statusMessage = "Download \(speechModel.name) in Models before transcribing."
+            statusMessage = L10n.tr("Download %@ in Models before transcribing.", String(speechModel.localizedName))
             return nil
         }
         return (speechModel, settings.language == "auto" ? nil : settings.language)

@@ -18,6 +18,15 @@ struct MeetingDetailView: View {
 
     private enum Tab: String, CaseIterable {
         case thoughts = "My thoughts", transcript = "Transcript", summary = "Summary", ask = "Ask"
+
+        var title: String {
+            switch self {
+            case .thoughts: L10n.tr("My thoughts")
+            case .transcript: L10n.tr("Transcript")
+            case .summary: L10n.tr("Summary")
+            case .ask: L10n.tr("Ask")
+            }
+        }
     }
 
     var body: some View {
@@ -41,7 +50,7 @@ struct MeetingDetailView: View {
                             case .summary: summary(meeting)
                             case .ask:
                                 AskPanel(model: model, thread: .meeting(id),
-                                         placeholder: isTranscribing ? "Ask about the transcript so far" : "Ask about this meeting",
+                                         placeholder: isTranscribing ? L10n.tr("Ask about the transcript so far") : L10n.tr("Ask about this meeting"),
                                          asking: $asking, onCite: show)
                             }
                         }
@@ -91,10 +100,10 @@ struct MeetingDetailView: View {
 
     private func header(_ meeting: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("New note", text: text(\.title), axis: .vertical)
+            TextField(L10n.tr("New note"), text: text(\.title), axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 34, weight: .regular, design: .serif))
-                .accessibilityLabel("Meeting title")
+                .accessibilityLabel(L10n.tr("Meeting title"))
             Text("\(meeting.createdAt.noteDay) · \(meeting.modelName)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -105,7 +114,7 @@ struct MeetingDetailView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .help(attendees.joined(separator: "\n"))
-                    .accessibilityLabel("Invited: \(attendees.formatted(.list(type: .and)))")
+                    .accessibilityLabel(L10n.tr("Invited: %@", String(attendees.formatted(.list(type: .and)))))
             }
         }
     }
@@ -114,7 +123,7 @@ struct MeetingDetailView: View {
         HStack(spacing: 24) {
             ForEach(Tab.allCases, id: \.self) { item in
                 Button { tab = item; citedID = nil } label: {
-                    Text(item.rawValue)
+                    Text(item.title)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(tab == item ? .primary : .secondary)
                         .padding(.vertical, 10)
@@ -140,7 +149,7 @@ struct MeetingDetailView: View {
                     Image(systemName: "speaker.slash")
                     Text(issue).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
-                    Button("Open Settings") { NSWorkspace.shared.open(Self.audioSettings) }
+                    Button(L10n.tr("Open Settings")) { NSWorkspace.shared.open(Self.audioSettings) }
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -149,9 +158,9 @@ struct MeetingDetailView: View {
             switch run?.phase {
             case .starting:
                 controlBar {
-                    progress("Preparing \(meeting.modelName)…")
+                    progress(L10n.tr("Preparing %@…", String(meeting.modelName)))
                     Spacer(minLength: 8)
-                    Button("Cancel", action: meetings.stop)
+                    Button(L10n.tr("Cancel"), action: meetings.stop)
                 }
             case .recording:
                 controlBar {
@@ -164,33 +173,33 @@ struct MeetingDetailView: View {
                     microphoneMenu
                     stopButton
                 }
-                Text("Always get consent when transcribing others.")
+                Text(L10n.tr("Always get consent when transcribing others."))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             case .finishing:
                 controlBar {
-                    progress("Transcribing the last few seconds…")
+                    progress(L10n.tr("Transcribing the last few seconds…"))
                     Spacer(minLength: 0)
                 }
             case .findingSpeakers:
                 controlBar {
-                    progress("Telling the speakers on the call apart…")
+                    progress(L10n.tr("Telling the speakers on the call apart…"))
                     Spacer(minLength: 8)
-                    Button("Skip") { meetings.skipSpeakers(id) }
+                    Button(L10n.tr("Skip")) { meetings.skipSpeakers(id) }
                 }
             case .generating:
                 controlBar {
                     if let (step, total) = run?.generationStep, total > 1 {
-                        progress("Writing summary… part \(step) of \(total)")
+                        progress(L10n.tr("Writing summary… part %@ of %@", String(step), String(total)))
                     } else {
-                        progress("Writing summary with \(meetings.notesSettings.notesModelName)…")
+                        progress(L10n.tr("Writing summary with %@…", String(meetings.notesSettings.localizedNotesModelName)))
                     }
                     Spacer(minLength: 8)
-                    Button("Cancel") { meetings.cancelNotes(id) }
+                    Button(L10n.tr("Cancel")) { meetings.cancelNotes(id) }
                 }
             case nil:
                 HStack {
-                    Label("Notes stored on this Mac", systemImage: "internaldrive")
+                    Label(L10n.tr("Notes stored on this Mac"), systemImage: "internaldrive")
                     Spacer()
                     Text(durationLabel(meeting.duration)).monospacedDigit()
                 }
@@ -220,7 +229,7 @@ struct MeetingDetailView: View {
     private var stopButton: some View {
         Button(action: meetings.stop) {
             Label {
-                Text("Stop")
+                Text(L10n.tr("Stop"))
             } icon: {
                 RoundedRectangle(cornerRadius: 2.5).fill(.white).frame(width: 9, height: 9)
             }
@@ -232,12 +241,12 @@ struct MeetingDetailView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(PressableButtonStyle())
-        .accessibilityLabel("Stop meeting")
+        .accessibilityLabel(L10n.tr("Stop meeting"))
     }
 
     private var microphoneMenu: some View {
         Menu {
-            MicrophonePicker(model: model) { Text("Microphone") }
+            MicrophonePicker(model: model) { Text(L10n.tr("Microphone")) }
                 .pickerStyle(.inline)
         } label: {
             Image(systemName: meetings.microphoneMuted ? "mic.slash.fill" : meetings.microphone == nil ? "mic.slash" : "mic")
@@ -247,11 +256,12 @@ struct MeetingDetailView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help(meetings.microphoneMuted ? "Muted: only other apps are recorded. Click to unmute."
-              : "\(meetings.microphone.map { "Microphone: \($0.name). " } ?? "")Click to mute, or use the arrow to choose a microphone.")
-        .accessibilityLabel("Microphone")
-        .accessibilityValue(meetings.microphoneMuted ? "Muted" : meetings.microphone?.name ?? "None")
-        .accessibilityHint("Mutes or unmutes your microphone")
+        .help(meetings.microphoneMuted ? L10n.tr("Muted: only other apps are recorded. Click to unmute.")
+              : meetings.microphone.map { L10n.tr("Microphone: %@. Click to mute, or use the arrow to choose a microphone.", String($0.name)) }
+              ?? L10n.tr("Click to mute, or use the arrow to choose a microphone."))
+        .accessibilityLabel(L10n.tr("Microphone"))
+        .accessibilityValue(meetings.microphoneMuted ? L10n.tr("Muted") : meetings.microphone?.name ?? L10n.tr("None"))
+        .accessibilityHint(L10n.tr("Mutes or unmutes your microphone"))
     }
 
     private func progress(_ title: String) -> some View {
@@ -265,14 +275,14 @@ struct MeetingDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             if meeting.summary != nil {
                 HStack(spacing: 6) {
-                    Text(meeting.summaryNeedsUpdate ? "Include your latest thoughts in the summary." : "Your summary includes these thoughts.")
-                    Button("Update summary") { meetings.generateNotes(id) }
+                    Text(meeting.summaryNeedsUpdate ? L10n.tr("Include your latest thoughts in the summary.") : L10n.tr("Your summary includes these thoughts."))
+                    Button(L10n.tr("Update summary")) { meetings.generateNotes(id) }
                         .disabled(isActive || meetings.notesAvailability != .available)
                 }
                 .font(.callout)
                 .foregroundStyle(.tertiary)
             } else {
-                Text("Your thoughts, in your words.")
+                Text(L10n.tr("Your thoughts, in your words."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -281,10 +291,10 @@ struct MeetingDetailView: View {
                 .lineSpacing(6)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 300)
-                .accessibilityLabel("My thoughts")
+                .accessibilityLabel(L10n.tr("My thoughts"))
                 .overlay(alignment: .topLeading) {
                     if meeting.notes.isEmpty {
-                        Text("Jot down questions, ideas, or anything you want to remember. Your summary will take these into account.")
+                        Text(L10n.tr("Jot down questions, ideas, or anything you want to remember. Your summary will take these into account."))
                             .font(.system(size: 15))
                             .foregroundStyle(.tertiary)
                             .lineSpacing(6)
@@ -300,32 +310,32 @@ struct MeetingDetailView: View {
             VStack(alignment: .leading, spacing: 26) {
                 HStack(alignment: .firstTextBaseline) {
                     if meeting.summaryNeedsUpdate {
-                        Text("Update to include your latest thoughts and transcript.")
+                        Text(L10n.tr("Update to include your latest thoughts and transcript."))
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
-                    Button("Update summary") { meetings.generateNotes(id) }
+                    Button(L10n.tr("Update summary")) { meetings.generateNotes(id) }
                         .disabled(isActive || meetings.notesAvailability != .available)
-                        .help("Combine the full transcript and your current thoughts using \(meetings.notesSettings.notesModelName)")
+                        .help(L10n.tr("Combine the full transcript and your current thoughts using %@", String(meetings.notesSettings.localizedNotesModelName)))
                 }
                 if !summary.overview.isEmpty {
                     Text(summary.overview).font(.system(size: 16)).lineSpacing(6).textSelection(.enabled)
                 }
-                if !summary.keyPoints.isEmpty { section("Key points") { bullets(summary.keyPoints) } }
-                if !summary.decisions.isEmpty { section("Decisions") { bullets(summary.decisions) } }
+                if !summary.keyPoints.isEmpty { section(L10n.tr("Key points")) { bullets(summary.keyPoints) } }
+                if !summary.decisions.isEmpty { section(L10n.tr("Decisions")) { bullets(summary.decisions) } }
                 if !summary.actionItems.isEmpty {
-                    section("Action items") {
+                    section(L10n.tr("Action items")) {
                         ForEach(summary.actionItems) { item in actionItem(item) }
                     }
                 }
-                Text(summary.modelName.map { "Generated with \($0)" } ?? "Generated summary")
+                Text(summary.modelName.map { L10n.tr("Generated with %@", String($0)) } ?? L10n.tr("Generated summary"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         } else if isActive {
             VStack(alignment: .leading, spacing: 10) {
-                Label("A summary when you’re done", systemImage: "sparkles").font(.headline)
-                Text("Finish recording to turn your transcript and thoughts into key points, decisions, and action items.")
+                Label(L10n.tr("A summary when you’re done"), systemImage: "sparkles").font(.headline)
+                Text(L10n.tr("Finish recording to turn your transcript and thoughts into key points, decisions, and action items."))
                     .foregroundStyle(.secondary)
                 if case .unavailable(let reason) = meetings.notesAvailability {
                     Text(reason).font(.callout).foregroundStyle(.secondary)
@@ -367,25 +377,27 @@ struct MeetingDetailView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.text)
-        .accessibilityValue(item.isDone ? "Done" : "Not done")
+        .accessibilityValue(item.isDone ? L10n.tr("Done") : L10n.tr("Not done"))
         .accessibilityAddTraits(.isToggle)
     }
 
     private func writeNotesCard(_ meeting: Meeting) -> some View {
         let unavailable: String? = switch meetings.notesAvailability {
-        case .available: meeting.hasContent ? nil : MeetingNotesError.nothingToSummarize.localizedDescription
+        case .available: meeting.hasContent
+            ? MeetingNotesGenerator.summaryLanguageProblem(settings: meetings.notesSettings, meetingLanguage: meeting.language)
+            : MeetingNotesError.nothingToSummarize.localizedDescription
         case .unavailable(let reason): reason
         }
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Bring it all together").font(.system(size: 24, design: .serif))
-            Text("\(meetings.notesSettings.notesModelName) turns your transcript and thoughts into a summary, key points, decisions, and action items.")
+            Text(L10n.tr("Bring it all together")).font(.system(size: 24, design: .serif))
+            Text(L10n.tr("%@ turns your transcript and thoughts into a summary, key points, decisions, and action items.", String(meetings.notesSettings.localizedNotesModelName)))
                 .foregroundStyle(.secondary)
             NotesModelPicker(model: model)
                 .pickerStyle(.menu)
                 .fixedSize()
                 .disabled(!meetings.runs.isEmpty)
             Button { meetings.generateNotes(id) } label: {
-                Label("Generate summary", systemImage: "sparkles")
+                Label(L10n.tr("Generate summary"), systemImage: "sparkles")
             }
             .buttonStyle(.borderedProminent)
             .disabled(unavailable != nil || isActive)
@@ -406,18 +418,18 @@ struct MeetingDetailView: View {
                 Button { showsSearch.toggle(); transcriptQuery = "" } label: {
                     Image(systemName: "magnifyingglass")
                 }
-                .help("Find in transcript")
-                .accessibilityLabel("Find in transcript")
+                .help(L10n.tr("Find in transcript"))
+                .accessibilityLabel(L10n.tr("Find in transcript"))
                 Button { meetings.copy(id, transcriptOnly: true) } label: { Image(systemName: "doc.on.doc") }
                     .disabled(meeting.segments.isEmpty)
-                    .help("Copy transcript")
-                    .accessibilityLabel("Copy transcript")
+                    .help(L10n.tr("Copy transcript"))
+                    .accessibilityLabel(L10n.tr("Copy transcript"))
             }
             .buttonStyle(.borderless)
             .font(.callout)
             .foregroundStyle(.secondary)
             if showsSearch {
-                TextField("Find in transcript", text: $transcriptQuery)
+                TextField(L10n.tr("Find in transcript"), text: $transcriptQuery)
                     .textFieldStyle(.roundedBorder)
             }
             if !meeting.participants.isEmpty { speakers(meeting) }
@@ -426,9 +438,9 @@ struct MeetingDetailView: View {
 
         if meeting.segments.isEmpty, !isRecording {
             VStack(spacing: 10) {
-                Text("No transcript yet")
+                Text(L10n.tr("No transcript yet"))
                     .font(.system(size: 21, design: .serif)).italic()
-                Text("Your own thoughts are saved in My thoughts.")
+                Text(L10n.tr("Your own thoughts are saved in My thoughts."))
                     .font(.callout)
             }
             .foregroundStyle(.secondary)
@@ -437,16 +449,16 @@ struct MeetingDetailView: View {
         } else {
             let cleaned = meeting.transcriptSegments
             if cleaned != meeting.segments {
-                Toggle("Show repeated microphone audio", isOn: $showsEchoes)
+                Toggle(L10n.tr("Show repeated microphone audio"), isOn: $showsEchoes)
                     .font(.caption).foregroundStyle(.secondary)
             }
             let segments = (showsEchoes ? meeting.segments : cleaned).filter { transcriptQuery.isEmpty || $0.text.localizedStandardContains(transcriptQuery) }
             if segments.isEmpty, !meeting.segments.isEmpty {
-                Text("No matching words").foregroundStyle(.secondary)
+                Text(L10n.tr("No matching words")).foregroundStyle(.secondary)
             }
             LazyVStack(alignment: .leading, spacing: 18) {
                 ForEach(segments) { segment in
-                    SegmentRow(segment: segment, label: segment.label(names: meeting.participantNames), isCited: segment.id == citedID,
+                    SegmentRow(segment: segment, label: segment.localizedLabel(names: meeting.participantNames), isCited: segment.id == citedID,
                                canChangeSpeaker: !isActive) {
                         speakerChoices(meeting, segment)
                     }
@@ -455,7 +467,7 @@ struct MeetingDetailView: View {
             }
             if isRecording { listening(meeting) }
         }
-        if !isRecording, pendingChunks > 0 { progress("Transcribing…") }
+        if !isRecording, pendingChunks > 0 { progress(L10n.tr("Transcribing…")) }
     }
 
     @ViewBuilder private func listening(_ meeting: Meeting) -> some View {
@@ -466,8 +478,8 @@ struct MeetingDetailView: View {
         if meeting.segments.isEmpty {
             VStack(spacing: 10) {
                 indicator.font(.system(size: 26))
-                Text("Listening").font(.system(size: 21, design: .serif))
-                Text("Words appear here a few seconds after they’re spoken.")
+                Text(L10n.tr("Listening")).font(.system(size: 21, design: .serif))
+                Text(L10n.tr("Words appear here a few seconds after they’re spoken."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -478,7 +490,7 @@ struct MeetingDetailView: View {
         } else {
             HStack(spacing: 8) {
                 indicator
-                Text(pendingChunks > 0 ? "Transcribing…" : "Listening…")
+                Text(pendingChunks > 0 ? L10n.tr("Transcribing…") : L10n.tr("Listening…"))
                     .foregroundStyle(.secondary)
             }
             .font(.callout)
@@ -492,11 +504,11 @@ struct MeetingDetailView: View {
                 HStack(spacing: 6) {
                     Circle().fill(voiceColor(number)).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
-                    TextField("Speaker \(number)", text: participantName(number))
+                    TextField(L10n.tr("Speaker %@", String(number)), text: participantName(number))
                         .textFieldStyle(.roundedBorder)
                         .focused($focusedName, equals: number)
                         .onSubmit { meetings.commitName(of: number, in: id) }
-                        .accessibilityLabel("Name for speaker \(number)")
+                        .accessibilityLabel(L10n.tr("Name for speaker %@", String(number)))
                     let suggestion = meetings.suggestedName(for: number, in: meeting)
                     if suggestion != nil || !meeting.unusedAttendees.isEmpty { nameMenu(meeting, number, suggestion: suggestion) }
                     if meeting.participants.count > 1, !isActive { mergeMenu(meeting, number) }
@@ -504,19 +516,19 @@ struct MeetingDetailView: View {
             }
         }
         .font(.callout)
-        .help("Name the voices in this meeting. Names appear in the transcript and the notes.")
+        .help(L10n.tr("Name the voices in this meeting. Names appear in the transcript and the notes."))
         .onChange(of: focusedName) { left, _ in
             if let left { meetings.commitName(of: left, in: id) }
         }
     }
 
     private func nameMenu(_ meeting: Meeting, _ number: Int, suggestion: String?) -> some View {
-        let name = MeetingSegment.label(of: number, names: meeting.participantNames)
-        let hint = suggestion.map { "\(name) sounds like \($0)" } ?? "Name \(name) after someone invited"
+        let name = MeetingSegment.localizedLabel(of: number, names: meeting.participantNames)
+        let hint = suggestion.map { L10n.tr("%@ sounds like %@", String(name), String($0)) } ?? L10n.tr("Name %@ after someone invited", String(name))
         return Menu {
-            Section("Name \(name)") {
+            Section(L10n.tr("Name %@", String(name))) {
                 if let suggestion {
-                    Button("Sounds like \(suggestion)") { participantName(number).wrappedValue = suggestion }
+                    Button(L10n.tr("Sounds like %@", String(suggestion))) { participantName(number).wrappedValue = suggestion }
                 }
                 ForEach(meeting.unusedAttendees, id: \.self) { attendee in
                     Button(attendee) {
@@ -536,11 +548,11 @@ struct MeetingDetailView: View {
     }
 
     private func mergeMenu(_ meeting: Meeting, _ number: Int) -> some View {
-        let name = MeetingSegment.label(of: number, names: meeting.participantNames)
+        let name = MeetingSegment.localizedLabel(of: number, names: meeting.participantNames)
         return Menu {
-            Section("Merge \(name) into") {
+            Section(L10n.tr("Merge %@ into", String(name))) {
                 ForEach(meeting.participants.filter { $0 != number }, id: \.self) { target in
-                    Button(MeetingSegment.label(of: target, names: meeting.participantNames)) {
+                    Button(MeetingSegment.localizedLabel(of: target, names: meeting.participantNames)) {
                         meetings.merge(number, into: target, in: id)
                     }
                 }
@@ -551,27 +563,27 @@ struct MeetingDetailView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Merge \(name) into another speaker")
-        .accessibilityLabel("Merge \(name) into another speaker")
+        .help(L10n.tr("Merge %@ into another speaker", String(name)))
+        .accessibilityLabel(L10n.tr("Merge %@ into another speaker", String(name)))
     }
 
     @ViewBuilder private func speakerChoices(_ meeting: Meeting, _ segment: MeetingSegment) -> some View {
-        Picker("Speaker", selection: Binding(
+        Picker(L10n.tr("Speaker"), selection: Binding(
             get: { segment.participant },
             set: { participant in meetings.edit(id) { $0.assign(segment: segment.id, toParticipant: participant) } }
         )) {
             ForEach(meeting.participants, id: \.self) { number in
-                Text(MeetingSegment.label(of: number, names: meeting.participantNames)).tag(Int?.some(number))
+                Text(MeetingSegment.localizedLabel(of: number, names: meeting.participantNames)).tag(Int?.some(number))
             }
             if segment.speaker == .me {
-                Text(Speaker.me.label).tag(Int?.none)
+                Text(Speaker.me.localizedLabel).tag(Int?.none)
             } else if meeting.segments.contains(where: { $0.speaker == .them && $0.participant == nil }) {
-                Text(Speaker.them.label).tag(Int?.none)
+                Text(Speaker.them.localizedLabel).tag(Int?.none)
             }
         }
         .pickerStyle(.inline)
         Divider()
-        Button("New speaker") { meetings.edit(id) { $0.assign(segment: segment.id, toParticipant: $0.nextParticipant) } }
+        Button(L10n.tr("New speaker")) { meetings.edit(id) { $0.assign(segment: segment.id, toParticipant: $0.nextParticipant) } }
     }
 
     @ViewBuilder private func speakerDetectionOffer(_ meeting: Meeting) -> some View {
@@ -580,18 +592,18 @@ struct MeetingDetailView: View {
             let installation = model.installation?.id == AppModel.speakerDetectionID ? model.installation : nil
             let installing = installation != nil && installation?.failure == nil
             VStack(alignment: .leading, spacing: 10) {
-                Label("Tell the voices on the call apart", systemImage: "person.2.wave.2")
+                Label(L10n.tr("Tell the voices on the call apart"), systemImage: "person.2.wave.2")
                     .font(.headline)
-                Text("Speaker detection labels the other side of a call Speaker 1, Speaker 2 and so on. It runs on this Mac and starts with your next meeting, because this meeting’s call audio wasn’t kept. For this meeting, click a speaker name to choose who said that line.")
+                Text(L10n.tr("Speaker detection labels the other side of a call Speaker 1, Speaker 2 and so on. It runs on this Mac and starts with your next meeting, because this meeting’s call audio wasn’t kept. For this meeting, click a speaker name to choose who said that line."))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 12) {
                     if installing {
-                        Button("Cancel", action: model.cancelInstallation)
+                        Button(L10n.tr("Cancel"), action: model.cancelInstallation)
                     } else {
-                        Button(installation == nil ? "Download speaker detection" : "Retry") { model.installSpeakerDetection() }
+                        Button(installation == nil ? L10n.tr("Download speaker detection") : L10n.tr("Retry")) { model.installSpeakerDetection() }
                             .disabled(model.isInstalling)
-                        Button("Don’t show again") {
+                        Button(L10n.tr("Don’t show again")) {
                             model.settings.dismissedSpeakerDetectionOffer = true
                             model.saveSettings()
                         }
@@ -600,7 +612,7 @@ struct MeetingDetailView: View {
                 }
                 if let installation {
                     if installing { ProgressView(value: installation.progress) }
-                    Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
+                    Text(installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel)
                         .font(.caption)
                         .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 }
@@ -637,7 +649,7 @@ struct MeetingDetailView: View {
     }
 
     private static let listeningAnchor = "listening"
-    private static let callAudioHint = "BetterWispr hasn’t heard the other side of the call yet. Allow it under Screen & System Audio Recording, and make sure call audio plays on this Mac."
+    private static let callAudioHint = L10n.tr("BetterWispr hasn’t heard the other side of the call yet. Allow it under Screen & System Audio Recording, and make sure call audio plays on this Mac.")
     private static let audioSettings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
 }
 
@@ -650,15 +662,16 @@ private struct LevelMeter: View {
     var body: some View {
         let level = min(1, max(0, speaker == .me ? meetings.levels.me : meetings.levels.them))
         HStack(spacing: 6) {
-            Text(speaker.label)
+            Text(speaker.localizedLabel)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 55, alignment: .leading)
             Waveform(mode: .listening(VoiceLevels(values: [level])), animated: !reduceMotion, color: speaker == .me ? .green : .blue, count: 14)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(speaker.label) level")
-        .accessibilityValue("\(Int(level * 100)) percent")
+        .accessibilityLabel(L10n.tr("%@ level", String(speaker.localizedLabel)))
+        .accessibilityValue(L10n.tr("%@ percent", String(Int(level * 100))))
     }
 }
 
@@ -677,7 +690,7 @@ private struct MeetingClock: View {
                 .font(.system(size: 15, weight: .semibold).monospacedDigit())
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Recording")
+        .accessibilityLabel(L10n.tr("Recording"))
         .accessibilityValue(durationLabel(meetings.elapsed))
     }
 }
@@ -714,8 +727,8 @@ struct SegmentRow<SpeakerChoices: View>: View {
                         Menu(content: speakerChoices) { Text(label).fontWeight(.semibold) }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
-                            .help("Change who said this")
-                            .accessibilityLabel("Speaker")
+                            .help(L10n.tr("Change who said this"))
+                            .accessibilityLabel(L10n.tr("Speaker"))
                             .accessibilityValue(label)
                     } else {
                         Text(label).fontWeight(.semibold)

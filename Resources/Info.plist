@@ -3,6 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key><string>org.betterwispr.app</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleName</key><string>BetterWispr</string>
     <key>CFBundleDisplayName</key><string>BetterWispr</string>
     <key>CFBundleExecutable</key><string>BetterWispr</string>

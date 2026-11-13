@@ -11,11 +11,11 @@ public enum YTDLPError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidLink: "Paste a full web link that starts with https://."
-        case .notInstalled: "Install yt-dlp to transcribe links."
-        case .releaseUnavailable(let status): "GitHub didn’t return yt-dlp (HTTP \(status)). Try again later."
-        case .unverified: "The downloaded yt-dlp didn’t match its published checksum, so it wasn’t installed."
-        case .download(let reason): "Couldn’t download this link. \(reason)"
+        case .invalidLink: L10n.tr("Paste a full web link that starts with https://.")
+        case .notInstalled: L10n.tr("Install yt-dlp to transcribe links.")
+        case .releaseUnavailable(let status): L10n.tr("GitHub didn’t return yt-dlp (HTTP %@). Try again later.", String(status))
+        case .unverified: L10n.tr("The downloaded yt-dlp didn’t match its published checksum, so it wasn’t installed.")
+        case .download(let reason): L10n.tr("Couldn’t download this link. %@", String(reason))
         }
     }
 }
@@ -108,8 +108,8 @@ public enum YTDLP {
     static func failure(_ errors: String, status: Int32, runtime: URL?) -> YTDLPError {
         let lines = errors.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         let reason = lines.last { $0.hasPrefix("ERROR:") }.map { $0.dropFirst("ERROR:".count).trimmingCharacters(in: .whitespaces) }
-            ?? (status == 0 ? "yt-dlp found no audio at this link." : lines.last ?? "yt-dlp stopped with status \(status).")
-        let hint = runtime == nil ? " If YouTube links fail, install Deno with brew install deno so yt-dlp can read YouTube fully." : ""
+            ?? (status == 0 ? L10n.tr("yt-dlp found no audio at this link.") : lines.last ?? L10n.tr("yt-dlp stopped with status %@.", String(status)))
+        let hint = runtime == nil ? L10n.tr(" If YouTube links fail, install Deno with brew install deno so yt-dlp can read YouTube fully.") : ""
         return .download(reason + hint)
     }
 

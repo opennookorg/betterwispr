@@ -1,4 +1,5 @@
 import SwiftUI
+import BetterWisprCore
 
 struct ConnectedAppsSection: View {
     @Bindable var model: AppModel
@@ -13,22 +14,22 @@ struct ConnectedAppsSection: View {
     }
 
     var body: some View {
-        SettingsSection("Connected apps") {
-            SettingToggle("Share meetings with AI apps",
-                          caption: "Lets Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. They can’t change or delete anything.",
+        SettingsSection(L10n.tr("Connected apps")) {
+            SettingToggle(L10n.tr("Share meetings with AI apps"),
+                          caption: L10n.tr("Lets Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. They can’t change or delete anything."),
                           isOn: Binding(get: { model.settings.mcpServer }, set: { model.settings.mcpServer = $0; model.saveSettings() }))
             if model.settings.mcpServer {
                 RowDivider()
-                SnippetRow(title: "Claude Code", caption: "Run in Terminal.", snippet: "claude mcp add --scope user betterwispr -- \(quotedExecutable) --mcp", copy: model.copyText)
+                SnippetRow(title: "Claude Code", caption: L10n.tr("Run in Terminal."), snippet: "claude mcp add --scope user betterwispr -- \(quotedExecutable) --mcp", copy: model.copyText)
                 RowDivider()
-                SnippetRow(title: "Claude Desktop and Cursor",
-                           caption: "Add to ~/Library/Application Support/Claude/claude_desktop_config.json or ~/.cursor/mcp.json, keeping any servers already listed, then restart the app.",
+                SnippetRow(title: L10n.tr("Claude Desktop and Cursor"),
+                           caption: L10n.tr("Add to ~/Library/Application Support/Claude/claude_desktop_config.json or ~/.cursor/mcp.json, keeping any servers already listed, then restart the app."),
                            snippet: desktopConfig, copy: model.copyText)
                 RowDivider()
-                SnippetRow(title: "Other apps", caption: "Start this command as a local (stdio) MCP server.", snippet: "\(quotedExecutable) --mcp", copy: model.copyText)
+                SnippetRow(title: L10n.tr("Other apps"), caption: L10n.tr("Start this command as a local (stdio) MCP server."), snippet: "\(quotedExecutable) --mcp", copy: model.copyText)
             }
         } footer: {
-            Text("An app you connect reads meeting titles, attendees, summaries, your notes and transcripts, and sends what it reads to its AI provider. BetterWispr itself sends nothing. Turn this off to stop sharing right away.")
+            Text(L10n.tr("An app you connect reads meeting titles, attendees, summaries, your notes and transcripts, and sends what it reads to its AI provider. BetterWispr itself sends nothing. Turn this off to stop sharing right away."))
         }
     }
 }
@@ -42,9 +43,9 @@ private struct SnippetRow: View {
     var body: some View {
         VStack(spacing: 0) {
             SettingRow(title, caption: caption) {
-                Button("Copy") { copy(snippet) }
+                Button(L10n.tr("Copy")) { copy(snippet) }
                     .controlSize(.small)
-                    .accessibilityLabel("Copy \(title) setup")
+                    .accessibilityLabel(L10n.tr("Copy %@ setup", String(title)))
             }
             Text(snippet)
                 .font(.callout.monospaced())

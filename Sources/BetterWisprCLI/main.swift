@@ -257,7 +257,7 @@ func media(_ source: String, provider: any SpeechProvider, language: String?, vo
 @MainActor
 func write(notes: URL, for segments: [MeetingSegment], language: String?, settings: AppSettings) async throws {
     var record = Meeting(segments: segments, modelName: "", language: language ?? "auto")
-    let generated = try await MeetingNotesGenerator.generate(segments: segments, userNotes: "", settings: settings) { _, _ in }
+    let generated = try await MeetingNotesGenerator.generate(segments: segments, userNotes: "", language: language ?? "auto", settings: settings) { _, _ in }
     record.title = generated.title
     record.summary = generated.summary
     try record.markdown.write(to: notes, atomically: true, encoding: .utf8)

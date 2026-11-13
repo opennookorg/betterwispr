@@ -32,8 +32,9 @@ public struct SendKeystroke: Codable, Equatable, Hashable, Sendable {
         self = keystroke
     }
 
-    public var displayName: String { modifiers.isEmpty ? key : modifiers.symbols + " " + key }
-    public var spokenName: String { (modifiers.spokenNames + [key]).joined(separator: " ") }
+    private var localizedKey: String { DictationShortcut.localizedKeyName(keyCode: keyCode, fallback: key) }
+    public var displayName: String { modifiers.isEmpty ? localizedKey : modifiers.symbols + " " + localizedKey }
+    public var spokenName: String { (modifiers.spokenNames.map { L10n.tr($0) } + [localizedKey]).joined(separator: " ") }
 }
 
 /// Posts `keystroke` after a dictation is pasted into the app with this bundle identifier, whatever its focused field is.

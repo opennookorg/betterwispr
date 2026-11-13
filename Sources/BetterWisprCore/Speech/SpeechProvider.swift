@@ -12,9 +12,9 @@ public enum SpeechProcessingLocation: Sendable {
 
     public var disclosure: String {
         switch self {
-        case .onDevice: "On-device transcription"
-        case .configuredEndpoint: "Audio sent to your selected endpoint"
-        case .chatGPT: "Audio sent to ChatGPT"
+        case .onDevice: L10n.tr("On-device transcription")
+        case .configuredEndpoint: L10n.tr("Audio sent to your selected endpoint")
+        case .chatGPT: L10n.tr("Audio sent to ChatGPT")
         }
     }
 }
@@ -51,7 +51,7 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
     /// The wording for an action that transcribes a recording, naming where the audio goes when it leaves this Mac.
     public func recordingAction(onDevice: (title: String, help: String)) -> (title: String, help: String) {
         guard let audioDestination else { return onDevice }
-        return ("Send to \(audioDestination)", "Sends this recording to \(connection?.endpoint ?? audioDestination)")
+        return (L10n.tr("Send to %@", String(audioDestination)), L10n.tr("Sends this recording to %@", String(connection?.endpoint ?? audioDestination)))
     }
 
     public var requiresModelDownload: Bool {
@@ -179,16 +179,16 @@ public enum SpeechError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .modelNotInstalled(let name): "Download \(name) in Models first. Transcription never downloads files."
-        case .invalidModel: "This speech provider cannot load the selected model."
-        case .notPrepared: "Prepare a speech model before starting dictation."
-        case .busy: "A speech operation is already running."
-        case .permissionDenied: "Allow Speech Recognition for BetterWispr in System Settings → Privacy & Security."
-        case .onDeviceUnavailable(let locale): "Apple on-device recognition is unavailable for \(locale). Download a model in Models for offline dictation."
-        case .timedOut: "On-device speech recognition timed out. Try a shorter recording or a Whisper model."
-        case .emptyAudio: "The recording contains no audio."
-        case .audioUnavailable: "Select an existing local audio file."
-        case .downloadFailed: "Hugging Face didn’t send the model files. Check your internet connection and try again."
+        case .modelNotInstalled(let name): L10n.tr("Download %@ in Models first. Transcription never downloads files.", String(name))
+        case .invalidModel: L10n.tr("This speech provider cannot load the selected model.")
+        case .notPrepared: L10n.tr("Prepare a speech model before starting dictation.")
+        case .busy: L10n.tr("A speech operation is already running.")
+        case .permissionDenied: L10n.tr("Allow Speech Recognition for BetterWispr in System Settings → Privacy & Security.")
+        case .onDeviceUnavailable(let locale): L10n.tr("Apple on-device recognition is unavailable for %@. Download a model in Models for offline dictation.", String(locale))
+        case .timedOut: L10n.tr("On-device speech recognition timed out. Try a shorter recording or a Whisper model.")
+        case .emptyAudio: L10n.tr("The recording contains no audio.")
+        case .audioUnavailable: L10n.tr("Select an existing local audio file.")
+        case .downloadFailed: L10n.tr("Hugging Face didn’t send the model files. Check your internet connection and try again.")
         }
     }
 }

@@ -96,7 +96,7 @@ struct CLINotesModel: NotesLanguageModel {
     private func response(to prompt: String) async throws -> (text: String, modelName: String) {
         let located: URL? = if let locatedExecutable { locatedExecutable } else { await cli.locateExecutable() }
         guard let executable = located else {
-            throw MeetingNotesError.unavailable("Install \(cli.name), then sign in with \(cli.loginCommand) in Terminal.")
+            throw MeetingNotesError.unavailable(L10n.tr("Install %@, then sign in with %@ in Terminal.", String(cli.name), String(cli.loginCommand)))
         }
         var destination: ClaudeCodeDestination?
         // Use the CLI's login, never extract or store its OAuth credentials in BetterWispr.
@@ -108,7 +108,7 @@ struct CLINotesModel: NotesLanguageModel {
         }
         let chosen = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard chosen.count <= 200, !chosen.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw MeetingNotesError.unavailable("Enter a model ID of at most 200 characters without control characters.")
+            throw MeetingNotesError.unavailable(L10n.tr("Enter a model ID of at most 200 characters without control characters."))
         }
         let output = try await Self.run(executable, arguments: arguments + (chosen.isEmpty ? [] : ["--model", chosen]),
                                         input: "\(instructions)\n\n\(prompt)", cli: cli, finalMessage: cli == .codex)
@@ -153,10 +153,10 @@ struct CLINotesModel: NotesLanguageModel {
     static func claudeSignInProblem(_ destination: ClaudeCodeDestination, anySignIn: Bool, confirmed: String?) -> String? {
         if anySignIn {
             guard destination.label != confirmed else { return nil }
-            return "Confirm that Claude Code may send meeting text to \(destination.label) in Models > Meeting notes, then try again. Nothing was sent."
+            return L10n.tr("Confirm that Claude Code may send meeting text to %@ in Models > Meeting notes, then try again. Nothing was sent.", String(destination.label))
         }
         guard !destination.isSubscription else { return nil }
-        return "Claude Code sends to \(destination.label), not only your Claude subscription, so nothing was sent. Run claude auth login in Terminal and remove any custom base URL. For meeting notes only, you can instead turn on Allow any Claude Code sign-in in Models."
+        return L10n.tr("Claude Code sends to %@, not only your Claude subscription, so nothing was sent. Run claude auth login in Terminal and remove any custom base URL. For meeting notes only, you can instead turn on Allow any Claude Code sign-in in Models.", String(destination.label))
     }
 
     private static let spendingLimitPerRequest = "1.00"
@@ -172,9 +172,9 @@ struct CLINotesModel: NotesLanguageModel {
 
     private static func failure(_ cli: NotesCLI, output: String? = nil) -> MeetingNotesError {
         if let output, (try? JSONDecoder().decode(ClaudeStop.self, from: Data(output.utf8)))?.subtype == "error_max_budget_usd" {
-            return .unavailable("\(cli.name) stopped at BetterWispr’s spending limit of about $\(spendingLimitPerRequest) per request. Your meeting is still saved.")
+            return .unavailable(L10n.tr("%@ stopped at BetterWispr’s spending limit of about $%@ per request. Your meeting is still saved.", String(cli.name), String(spendingLimitPerRequest)))
         }
-        return .unavailable("\(cli.name) couldn’t write notes. Update the CLI, check your usage limits or spending cap and model, and sign in with \(cli.loginCommand) in Terminal. Your meeting is still saved.")
+        return .unavailable(L10n.tr("%@ couldn’t write notes. Update the CLI, check your usage limits or spending cap and model, and sign in with %@ in Terminal. Your meeting is still saved.", String(cli.name), String(cli.loginCommand)))
     }
 
     /// File-backed stdio avoids pipe deadlocks. All Process access stays on the main actor;
@@ -218,7 +218,7 @@ struct CLINotesModel: NotesLanguageModel {
             while process.isRunning {
                 try Task.checkCancellation()
                 guard ContinuousClock.now < deadline else {
-                    throw MeetingNotesError.unavailable("\(cli.name) took too long to respond. Try again; your meeting is still saved.")
+                    throw MeetingNotesError.unavailable(L10n.tr("%@ took too long to respond. Try again; your meeting is still saved.", String(cli.name)))
                 }
                 let size = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
                 guard size <= 2_000_000 else { throw Self.failure(cli) }

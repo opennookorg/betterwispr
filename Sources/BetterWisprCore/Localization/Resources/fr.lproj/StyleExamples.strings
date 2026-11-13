@@ -1,0 +1,12 @@
+/* Exemples de présentation, sans effet sur la langue de dictée. */
+"um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic." = "euh bonjour Sam, je je pense que nous nous retrouvons demain. Non, non, ne supprime rien.";
+"You say" = "Vous dites (exemple français)";
+"BetterWispr types" = "BetterWispr écrit (exemple français)";
+"Example: %@" = "Exemple français : %@";
+"Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”." = "Supprime les hésitations comme « um » et « you know », les répétitions comme « we we » et les autocorrections comme « at 5, no, at 6 », uniquement dans les dictées en anglais.";
+"Light and Medium cleanup only edit English dictation. This French example is left unchanged." = "Les nettoyages Léger et Moyen ne modifient que les dictées en anglais. Cet exemple français reste inchangé.";
+"French examples illustrate the presentation. Tones only change English dictation." = "Ces exemples français illustrent la présentation. Les tons ne modifient que les dictées en anglais.";
+"Hey, are you around for dinner tonight? Let's do 7 if that works for you." = "Salut, tu es disponible pour dîner ce soir ? On se retrouve à 19 h si ça te convient.";
+"Hey, when you have a minute, let's go over the launch numbers." = "Bonjour, quand tu as un moment, faisons le point sur les résultats du lancement.";
+"Hi Sam,\n\nThanks for the quick call today. Looking forward to working together.\n\nBest,\nAlex" = "Bonjour Sam,\n\nMerci pour notre échange aujourd’hui. Au plaisir de travailler ensemble.\n\nCordialement,\nAlex";
+"So far, the new plan is working well.\n\nTomorrow I want to finish the draft, especially the summary." = "Pour le moment, le nouveau plan fonctionne bien.\n\nDemain, je veux terminer le brouillon, surtout le résumé.";

@@ -26,12 +26,12 @@ public enum LlamaEngineError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .modelMissing: "The built-in model isn’t downloaded. Download it in Models."
-        case .loadFailed, .contextFailed: "The built-in model couldn’t start on this Mac."
-        case .grammarRejected: "The built-in model couldn’t prepare its reply format."
-        case .promptTooLong: "This text is too long for the built-in model."
-        case .replyTooLong: "The built-in model’s reply ran past its limit."
-        case .decodeFailed: "The built-in model stopped unexpectedly. Try again."
+        case .modelMissing: L10n.tr("The built-in model isn’t downloaded. Download it in Models.")
+        case .loadFailed, .contextFailed: L10n.tr("The built-in model couldn’t start on this Mac.")
+        case .grammarRejected: L10n.tr("The built-in model couldn’t prepare its reply format.")
+        case .promptTooLong: L10n.tr("This text is too long for the built-in model.")
+        case .replyTooLong: L10n.tr("The built-in model’s reply ran past its limit.")
+        case .decodeFailed: L10n.tr("The built-in model stopped unexpectedly. Try again.")
         }
     }
 }

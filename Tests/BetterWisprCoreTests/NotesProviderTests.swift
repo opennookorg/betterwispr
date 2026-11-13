@@ -516,3 +516,37 @@ private final class NotesEndpointStub: URLProtocol, @unchecked Sendable {
         Task { await NotesEndpointStub.probe.stop(url) }
     }
 }
+
+@Test func notesLanguageRuleNamesTheLanguageOrMatchesTheTranscript() {
+    #expect(NotesWriter.languageRule("de").contains("You MUST write the notes in German"))
+    #expect(NotesWriter.languageRule("ja").contains("Japanese"))
+    let matching = NotesWriter.languageRule(nil)
+    #expect(matching.contains("language spoken most in the transcript"))
+    #expect(!matching.contains("German"))
+}
+
+@Test func meetingNotesFollowTheMeetingLanguageUnlessASummaryLanguageIsChosen() throws {
+    var settings = AppSettings()
+    settings.notesSelection = .cli(.codex)
+    func instructions(_ meetingLanguage: String) throws -> String {
+        try #require(try MeetingNotesGenerator.meetingNotesModel(settings, meetingLanguage: meetingLanguage) as? CLINotesModel).instructions
+    }
+    #expect(try instructions("de-DE").hasSuffix(NotesWriter.languageRule("de")))
+    #expect(try instructions("auto").hasSuffix(NotesWriter.languageRule(nil)))
+    settings.summaryLanguage = "fr"
+    #expect(try instructions("de").hasSuffix(NotesWriter.languageRule("fr")))
+    #expect(try instructions("auto").contains("French"))
+    #expect(MeetingNotesGenerator.summaryLanguageProblem(settings: settings) == nil)
+    settings.notesSelection = .apple
+    settings.summaryLanguage = nil
+    #expect(MeetingNotesGenerator.summaryLanguageProblem(settings: settings) == nil)
+}
+
+@Test func summaryLanguageDecodesOldAndCorruptSettingsAsSameAsMeeting() throws {
+    let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"apple","showCapsule":true,"silenceThreshold":0.002%@}"#
+    #expect(try JSONDecoder().decode(AppSettings.self, from: Data(String(format: saved, "").utf8)).summaryLanguage == nil)
+    #expect(try JSONDecoder().decode(AppSettings.self, from: Data(String(format: saved, #","summaryLanguage":7"#).utf8)).summaryLanguage == nil)
+    var settings = AppSettings()
+    settings.summaryLanguage = "es"
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings)).summaryLanguage == "es")
+}

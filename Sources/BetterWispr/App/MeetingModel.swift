@@ -90,20 +90,20 @@ final class MeetingModel {
         meetings = loaded.meetings
         if !loaded.unreadable.isEmpty {
             let count = loaded.unreadable.count
-            message = "\(count) meeting \(count == 1 ? "file" : "files") in \(self.store.directory.path) couldn’t be read and \(count == 1 ? "was" : "were") left untouched."
+            message = L10n.tr("Unreadable meeting files in %@: %@. They were left untouched.", self.store.directory.path, String(count))
         }
         let askStore = AllMeetingsAskStore(url: self.store.directory.deletingLastPathComponent().appendingPathComponent("ask.json"))
         do {
             allMeetingsThread = try askStore.load()
             writableAskStore = askStore
         } catch {
-            let unreadable = "\(askStore.url.path) couldn’t be read and was left untouched, so new questions about all meetings won’t be saved."
+            let unreadable = L10n.tr("%@ couldn’t be read and was left untouched, so new questions about all meetings won’t be saved.", String(askStore.url.path))
             message = [message, unreadable].compactMap { $0 }.joined(separator: " ")
         }
         recorder.onChunk = { [weak self] in self?.enqueue($0) }
         recorder.onLevels = { [weak self] in self?.receive($0) }
         recorder.onMicrophone = { [weak self] in self?.microphone = $0 }
-        recorder.onError = { [weak self] in self?.message = "Part of the recording couldn’t be saved: \($0.localizedDescription)" }
+        recorder.onError = { [weak self] in self?.message = L10n.tr("Part of the recording couldn’t be saved: %@", String($0.localizedDescription)) }
     }
 
     func meeting(_ id: UUID) -> Meeting? { meetings.first { $0.id == id } }
@@ -162,7 +162,7 @@ final class MeetingModel {
             } catch {
                 guard let self, self.owns(run) else { return }
                 self.discard(run)
-                if !(error is CancellationError) { self.message = "Couldn’t start the meeting. \(error.localizedDescription)" }
+                if !(error is CancellationError) { self.message = L10n.tr("Couldn’t start the meeting. %@", String(error.localizedDescription)) }
             }
         }
     }
@@ -274,14 +274,14 @@ final class MeetingModel {
 
     func delete(_ id: UUID) {
         guard !isActive(id) else {
-            message = "Stop this meeting before deleting it."
+            message = L10n.tr("Stop this meeting before deleting it.")
             return
         }
         saves.removeValue(forKey: id)?.cancel()
         do {
             try store.delete(id: id)
         } catch {
-            message = "Couldn’t delete the meeting. \(error.localizedDescription)"
+            message = L10n.tr("Couldn’t delete the meeting. %@", String(error.localizedDescription))
             return
         }
         heardVoices[id] = nil
@@ -303,7 +303,7 @@ final class MeetingModel {
         let text = transcriptOnly ? meeting.transcript : meeting.markdown
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
-            catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
+            catch { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t copy"), error)) }
         }
     }
 
@@ -370,7 +370,7 @@ final class MeetingModel {
         } catch {
             guard owns(run) else { return }
             if !(error is CancellationError), !detection.isCancelled {
-                message = "Couldn’t tell the speakers on the call apart. \(error.localizedDescription)"
+                message = L10n.tr("Couldn’t tell the speakers on the call apart. %@", String(error.localizedDescription))
             }
         }
         run.detection = nil
@@ -392,7 +392,7 @@ final class MeetingModel {
         let sourceFingerprint = meeting.summarySourceFingerprint
         let modelName = notesSettings.notesModelName
         do {
-            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, names: meeting.participantNames, userNotes: meeting.notes, invite: meeting.calendarInvite, settings: notesSettings) { [weak self] step, total in
+            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, names: meeting.participantNames, userNotes: meeting.notes, invite: meeting.calendarInvite, language: meeting.language, settings: notesSettings) { [weak self] step, total in
                 guard let self, self.owns(run) else { return }
                 run.generationStep = (step, total)
             }
@@ -407,7 +407,7 @@ final class MeetingModel {
             saveNow(id)
         } catch {
             guard owns(run) else { return }
-            if !(error is CancellationError) { message = "Couldn’t write notes. \(error.localizedDescription)" }
+            if !(error is CancellationError) { message = L10n.tr("Couldn’t write notes. %@", String(error.localizedDescription)) }
         }
         run.generationStep = nil
     }
@@ -446,7 +446,7 @@ final class MeetingModel {
             } catch {
                 guard owns(run) else { return }
                 if !(error is CancellationError) {
-                    message = "A few seconds from \(chunk.speaker.label) couldn’t be transcribed. \(error.localizedDescription)"
+                    message = L10n.tr("A few seconds from %@ couldn’t be transcribed. %@", String(chunk.speaker.localizedLabel), String(error.localizedDescription))
                 }
             }
         }
@@ -495,7 +495,7 @@ final class MeetingModel {
     func saveNow(_ id: UUID) {
         saves.removeValue(forKey: id)?.cancel()
         guard let meeting = meeting(id) else { return }
-        do { try store.save(meeting) } catch { message = "This meeting couldn’t be saved. \(error.localizedDescription)" }
+        do { try store.save(meeting) } catch { message = L10n.tr("This meeting couldn’t be saved. %@", String(error.localizedDescription)) }
         rememberNamedVoices(in: meeting)
     }
 
@@ -531,12 +531,12 @@ final class MeetingModel {
     }
 
     private func voicesError(_ error: any Error) -> String {
-        "Remembered voices in \(voiceStore.url.path) couldn’t be used and were left as they were. \(error.localizedDescription)"
+        L10n.tr("Remembered voices in %@ couldn’t be used and were left as they were. %@", String(voiceStore.url.path), String(error.localizedDescription))
     }
 
     private func saveAllMeetingsThread() {
         guard let writableAskStore else { return }
-        do { try writableAskStore.save(allMeetingsThread) } catch { message = "Questions about all meetings couldn’t be saved. \(error.localizedDescription)" }
+        do { try writableAskStore.save(allMeetingsThread) } catch { message = L10n.tr("Questions about all meetings couldn’t be saved. %@", String(error.localizedDescription)) }
     }
 
     private func discardIfEmpty(_ run: MeetingRun) {

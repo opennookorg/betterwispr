@@ -11,16 +11,16 @@ struct VocabularyView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Spoken phrase", text: $phrase, prompt: Text("better whisper"))
-                TextField("Write as", text: $replacement, prompt: Text("Optional, e.g. BetterWispr"))
+                TextField(L10n.tr("Spoken phrase"), text: $phrase, prompt: Text(L10n.tr("better whisper")))
+                TextField(L10n.tr("Write as"), text: $replacement, prompt: Text(L10n.tr("Optional, e.g. BetterWispr")))
             } header: {
-                Text("Add a Word")
+                Text(L10n.tr("Add a Word"))
             } footer: {
                 HStack(alignment: .top) {
-                    Text("Leave “Write as” empty to add a spelling hint. To fix a misheard command, write the command, such as “Kocia mark” as “question mark”. Replacements apply to whole phrases, so unrelated words stay intact.")
+                    Text(L10n.tr("Leave “Write as” empty to add a spelling hint. To fix a misheard command, write the command, such as “Kocia mark” as “question mark”. Replacements apply to whole phrases, so unrelated words stay intact."))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 20)
-                    Button("Add Word", action: addEntry)
+                    Button(L10n.tr("Add Word"), action: addEntry)
                         .disabled(!canAdd)
                 }
             }
@@ -33,15 +33,15 @@ struct VocabularyView: View {
             if model.settings.learnCorrections || model.vocabulary.contains(where: \.learned) {
                 Section {
                     Toggle(isOn: setting(\.replaceLearnedWords)) {
-                        Text("Replace with learned words")
-                        Text("When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards.")
+                        Text(L10n.tr("Replace with learned words"))
+                        Text(L10n.tr("When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards."))
                     }
                 }
             }
 
             Section {
                 if model.vocabulary.isEmpty {
-                    Text("Add a name that often gets misspelled, a technical term or a phrase you use every day.")
+                    Text(L10n.tr("Add a name that often gets misspelled, a technical term or a phrase you use every day."))
                         .foregroundStyle(.secondary)
                 }
                 ForEach(model.vocabulary) { entry in
@@ -54,33 +54,35 @@ struct VocabularyView: View {
                             }
                             .buttonStyle(.borderless)
                             .foregroundStyle(.secondary)
-                            .help("Remove \(entry.phrase)")
-                            .accessibilityLabel("Remove \(entry.phrase)")
+                            .help(L10n.tr("Remove %@", String(entry.phrase)))
+                            .accessibilityLabel(L10n.tr("Remove %@", String(entry.phrase)))
                         }
                     } label: {
                         HStack(spacing: 6) {
                             Text(entry.phrase)
                             if entry.learned {
-                                Text("Learned")
+                                Text(L10n.tr("Learned"))
                                     .font(.caption2.weight(.medium))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 1)
                                     .background(.tint.opacity(0.15), in: Capsule())
                                     .foregroundStyle(.tint)
-                                    .help("Added from a correction you made")
+                                    .help(L10n.tr("Added from a correction you made"))
                             }
                         }
                     }
                 }
             } header: {
                 if model.vocabulary.isEmpty {
-                    Text("Your Vocabulary")
+                    Text(L10n.tr("Your Vocabulary"))
                 } else {
-                    Text("^[\(model.vocabulary.count) entry](inflect: true)")
+                    Text(L10n.tr("%ld entries", model.vocabulary.count))
                 }
             } footer: {
                 if model.settings.learnCorrections {
-                    Text("Entries marked Learned come from fixes you made to a dictation, in History or right after BetterWispr pasted it. Remove any you don’t want.")
+                    Text(L10n.tr("Entries marked Learned come from fixes you made to a dictation, in History or right after BetterWispr pasted it. Remove any you don’t want."))
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -92,26 +94,26 @@ struct VocabularyView: View {
         Section {
             if model.phraseBoosterInstalled {
                 Toggle(isOn: setting(\.usePhraseBooster)) {
-                    Text("Use phrase booster")
-                    Text("When you speak English, it listens for these words and fixes the spelling where your voice matches one. It runs on this Mac.")
+                    Text(L10n.tr("Use phrase booster"))
+                    Text(L10n.tr("When you speak English, it listens for these words and fixes the spelling where your voice matches one. It runs on this Mac."))
                 }
             } else {
                 let installation = model.installation?.id == AppModel.phraseBoosterID ? model.installation : nil
                 let installing = installation != nil && installation?.failure == nil
                 LabeledContent {
                     if installing {
-                        Button("Cancel", action: model.cancelInstallation)
+                        Button(L10n.tr("Cancel"), action: model.cancelInstallation)
                     } else {
-                        Button(installation == nil ? "Download" : "Retry") { model.installPhraseBooster() }
+                        Button(installation == nil ? L10n.tr("Download") : L10n.tr("Retry")) { model.installPhraseBooster() }
                             .disabled(model.isInstalling)
                     }
                 } label: {
-                    Text("Phrase booster")
-                    Text("Helps Parakeet spell the words in this list. About 100 MB. New Parakeet downloads include it.")
+                    Text(L10n.tr("Phrase booster"))
+                    Text(L10n.tr("Helps Parakeet spell the words in this list. About 100 MB. New Parakeet downloads include it."))
                 }
                 if let installation {
                     if installing { ProgressView(value: installation.progress) }
-                    Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
+                    Text(installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel)
                         .font(.caption)
                         .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 }

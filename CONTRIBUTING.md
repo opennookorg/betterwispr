@@ -50,7 +50,8 @@ betterwispr-frontend/      Website (betterwispr.com)
 ```
 
 Read [docs/architecture.md](docs/architecture.md) before adding a model,
-provider or integration.
+provider or integration. See [docs/localization.md](docs/localization.md) to add
+an interface language using staged native resource folders.
 
 ## Ground rules
 

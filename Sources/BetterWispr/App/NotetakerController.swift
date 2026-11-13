@@ -1,4 +1,5 @@
 import AppKit
+import BetterWisprCore
 import SwiftUI
 
 /// The meeting card docked to the right edge of the screen, floating beside the call while notes are taken.
@@ -14,7 +15,7 @@ final class NotetakerController {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 720),
                         styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
                         backing: .buffered, defer: true)
-        panel.title = "Notetaker"
+        panel.title = L10n.tr("Notetaker")
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.backgroundColor = .textBackgroundColor
@@ -27,11 +28,11 @@ final class NotetakerController {
         panel.minSize = NSSize(width: 380, height: 460)
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
-        let expand = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Open in BetterWispr")!,
+        let expand = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: L10n.tr("Open in BetterWispr"))!,
                               target: self, action: #selector(openInDashboard))
         expand.isBordered = false
         expand.contentTintColor = .secondaryLabelColor
-        expand.toolTip = "Open in BetterWispr"
+        expand.toolTip = L10n.tr("Open in BetterWispr")
         expand.frame = NSRect(x: 0, y: 0, width: 40, height: 28)
         let accessory = NSTitlebarAccessoryViewController()
         accessory.view = expand
