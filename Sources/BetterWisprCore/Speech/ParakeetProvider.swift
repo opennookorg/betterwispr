@@ -258,7 +258,7 @@ public final class ParakeetProvider: SpeechProvider {
         guard transcriptionTask == nil else { throw SpeechError.busy }
         try Task.checkCancellation()
         let hint = Self.hint(for: language)
-        let script = Self.scriptHint(for: detectionLanguages)
+        let script = language == nil ? Self.scriptHint(for: detectionLanguages) : nil
         let terms = usesPhraseBooster && loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary + screenTerms) : []
         let task = Task { () async throws -> (text: String, vocabularyFixes: Int) in
             let text: String
@@ -294,7 +294,7 @@ public final class ParakeetProvider: SpeechProvider {
     public func liveTranscribe(_ samples: [Float], language: String?) async throws -> LivePass {
         guard let manager, !preparing else { throw SpeechError.notPrepared }
         guard transcriptionTask == nil, livePass == nil else { throw SpeechError.busy }
-        let hint = Self.hint(for: language) ?? Self.scriptHint(for: detectionLanguages)
+        let hint = language == nil ? Self.scriptHint(for: detectionLanguages) : Self.hint(for: language)
         let task = Task {
             var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             let result = try await manager.transcribe(samples, decoderState: &state, language: hint)
