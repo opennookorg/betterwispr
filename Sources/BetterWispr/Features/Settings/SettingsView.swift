@@ -42,11 +42,10 @@ struct SettingsView: View {
                     RowDivider()
                     ShortcutRecorder(model: model, kind: .selectedText)
                     RowDivider()
-                    SettingRow(L10n.tr("Behavior"), caption: model.settings.dictationMode == .hold
-                        ? L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
-                        : L10n.tr("Press once to speak. Press again or click ✓ to finish.")) {
+                    SettingRow(L10n.tr("Behavior"), caption: behaviorCaption) {
                         Picker(L10n.tr("Behavior"), selection: setting(\.dictationMode)) {
                             Text(L10n.tr("Hold or tap")).tag(DictationMode.hold)
+                            Text(L10n.tr("Hold only")).tag(DictationMode.holdOnly)
                             Text(L10n.tr("Press to toggle")).tag(DictationMode.toggle)
                         }
                         .pickerStyle(.segmented)
@@ -216,6 +215,14 @@ struct SettingsView: View {
                     }
                     RowDivider()
                     SettingToggle(L10n.tr("Floating recording capsule"), caption: L10n.tr("A small voice control at the bottom of your screen."), isOn: setting(\.showCapsule))
+                    RowDivider()
+                    SettingRow(L10n.tr("Capsule position"), caption: L10n.tr("Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it.")) {
+                        Picker(L10n.tr("Capsule position"), selection: setting(\.capsulePosition)) {
+                            ForEach(CapsulePosition.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                     RowDivider()
                     SettingToggle(L10n.tr("Hide capsule while dictating"), caption: L10n.tr("Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak."), isOn: setting(\.hideCapsuleWhileDictating))
                     RowDivider()
@@ -455,6 +462,14 @@ struct SettingsView: View {
                 model.saveSettings()
             }
         )
+    }
+
+    private var behaviorCaption: String {
+        switch model.settings.dictationMode {
+        case .hold: L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
+        case .holdOnly: L10n.tr("Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation.")
+        case .toggle: L10n.tr("Press once to speak. Press again or click ✓ to finish.")
+        }
     }
 
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {

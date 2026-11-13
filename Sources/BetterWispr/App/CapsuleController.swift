@@ -10,7 +10,7 @@ private final class RecordingPanel: NSPanel {
 
 @MainActor @Observable
 final class CapsuleHover {
-    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, dictation }
+    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, hide, dictation }
 
     private(set) var isHovering = false
     private(set) var target: Target?
@@ -34,7 +34,7 @@ final class CapsuleHover {
         let activation = CGRect(x: surface.midX - width / 2 - 6, y: surface.maxY - height - 8,
                                 width: width + 12, height: height + 16)
         let inside = activation.contains(point)
-        let hit = [Target.microphone, .notetaker, .meetingNotes, .dictation].first { regions[$0]?.contains(point) == true }
+        let hit = [Target.microphone, .notetaker, .meetingNotes, .hide, .dictation].first { regions[$0]?.contains(point) == true }
         // Crossing the narrow gap between controls must not flash the tooltip off.
         set(isHovering: inside, target: hit ?? (inside && target.flatMap { regions[$0] } != nil ? target : nil))
     }
@@ -96,6 +96,19 @@ extension AppModel {
     }
 
     var showsCapsuleAtTop: Bool { meetingPrompt != nil && settings.meetingPromptPosition == .top }
+
+    /// Hides the idle capsule and says where to turn it back on.
+    func hideIdleCapsule() {
+        settings.showCapsule = false
+        saveSettings()
+        ToastWindow.shared.show(Toast(title: L10n.tr("Capsule hidden"),
+                                      message: L10n.tr("Turn on Floating recording capsule in Settings to bring it back."),
+                                      systemImage: "eye.slash",
+                                      action: Toast.Action(title: L10n.tr("Undo")) { [weak self] in
+                                          self?.settings.showCapsule = true
+                                          self?.saveSettings()
+                                      }))
+    }
 
     var showsCapsule: Bool {
         if isBusy && settings.hideCapsuleWhileDictating { return false }
@@ -183,13 +196,20 @@ final class CapsuleController {
             Self.screenIndex(showing: MeetingPlatform.windowBounds(of: meeting.appID), in: screens.map(\.frame)).map { screens[$0] }
         }
         guard let screen = meetingScreen ?? screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main else { return }
-        panel.setFrameOrigin(Self.origin(atTop: model.showsCapsuleAtTop, size: panel.frame.size, frame: screen.frame,
+        panel.setFrameOrigin(Self.origin(atTop: model.showsCapsuleAtTop, position: model.settings.capsulePosition, size: panel.frame.size, frame: screen.frame,
                                          visibleFrame: screen.visibleFrame, safeTop: screen.safeAreaInsets.top))
     }
 
-    /// The panel origin centered at the bottom of the visible frame, or just below the menu bar and camera housing.
-    static func origin(atTop: Bool, size: CGSize, frame: CGRect, visibleFrame: CGRect, safeTop: CGFloat) -> CGPoint {
-        guard atTop else { return CGPoint(x: visibleFrame.midX - size.width / 2, y: visibleFrame.minY + 12) }
+    /// The panel origin at `position` along the bottom of the visible frame, or centered just below the menu bar and camera housing.
+    static func origin(atTop: Bool, position: CapsulePosition = .bottomCenter, size: CGSize, frame: CGRect, visibleFrame: CGRect, safeTop: CGFloat) -> CGPoint {
+        guard atTop else {
+            let x = switch position {
+            case .bottomCenter: visibleFrame.midX - size.width / 2
+            case .bottomLeft: visibleFrame.minX + 16
+            case .bottomRight: visibleFrame.maxX - size.width - 16
+            }
+            return CGPoint(x: x, y: visibleFrame.minY + 12)
+        }
         return CGPoint(x: frame.midX - size.width / 2, y: min(visibleFrame.maxY, frame.maxY - safeTop) - size.height - 4)
     }
 
@@ -209,5 +229,31 @@ final class CapsuleController {
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         panel.close()
+    }
+}
+
+extension CapsulePosition {
+    var title: String {
+        switch self {
+        case .bottomCenter: L10n.tr("Bottom center")
+        case .bottomLeft: L10n.tr("Bottom left")
+        case .bottomRight: L10n.tr("Bottom right")
+        }
+    }
+
+    var alignment: Alignment {
+        switch self {
+        case .bottomCenter: .bottom
+        case .bottomLeft: .bottomLeading
+        case .bottomRight: .bottomTrailing
+        }
+    }
+
+    var stackAlignment: HorizontalAlignment {
+        switch self {
+        case .bottomCenter: .center
+        case .bottomLeft: .leading
+        case .bottomRight: .trailing
+        }
     }
 }

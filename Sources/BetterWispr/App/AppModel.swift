@@ -363,7 +363,7 @@ final class AppModel {
 
     func shortcutPressed() {
         guard shortcutPressedAt == nil || !isBusy else { return }
-        guard settings.dictationMode == .hold, !isBusy else { toggleRecording(); return }
+        guard settings.dictationMode != .toggle, !isBusy else { toggleRecording(); return }
         shortcutPressedAt = Date()
         startRecording(held: true)
     }
@@ -372,12 +372,13 @@ final class AppModel {
         guard let pressedAt = shortcutPressedAt else { return }
         shortcutPressedAt = nil
         guard phase == .preparing || phase == .recording else { return }
-        if Date().timeIntervalSince(pressedAt) < 0.3 {
+        switch settings.dictationMode.release(afterHolding: Date().timeIntervalSince(pressedAt), recording: phase == .recording) {
+        case .keepListening:
             isHeldSession = false
             if phase == .recording { statusMessage = listeningStatus }
+        case .finish: finishRecording()
+        case .abandon: abandon(.releasedEarly(settings.shortcut))
         }
-        else if phase == .preparing { abandon(.releasedEarly(settings.shortcut)) }
-        else { finishRecording() }
     }
 
     func registerShortcut() {

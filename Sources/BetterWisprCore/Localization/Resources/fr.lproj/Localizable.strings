@@ -1133,3 +1133,12 @@
 "Same as meeting" = "Comme la réunion";
 "Expanded" = "Développé";
 "Collapsed" = "Réduit";
+"Hold only" = "Maintenir uniquement";
+"Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation." = "La dictée ne dure que tant que vous maintenez le raccourci. Relâchez pour terminer. Un appui bref ne lance jamais de dictée sans les mains.";
+"Capsule position" = "Position de la capsule";
+"Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it." = "Emplacement de la capsule en bas de l’écran. Vous pouvez aussi faire un clic droit sur la capsule pour la déplacer ou la masquer.";
+"Bottom left" = "En bas à gauche";
+"Bottom right" = "En bas à droite";
+"Capsule hidden" = "Capsule masquée";
+"Turn on Floating recording capsule in Settings to bring it back." = "Activez Capsule d’enregistrement flottante dans les Réglages pour la retrouver.";
+"Hide capsule" = "Masquer la capsule";

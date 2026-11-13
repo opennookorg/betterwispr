@@ -1300,6 +1300,19 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
   expands to the 108 × 28 point pill with separate × and ✓ controls.
   Release before the bars move; it shows "Keep holding ⌥ Space." and pastes nothing.
+- [ ] Hold only mode: choose "Hold only" in Settings > Shortcut. Hold ⌥ Space,
+  speak, release; text is inserted once. Tap ⌥ Space briefly, both before and
+  after the bars move; no hands-free pill appears, it shows "Keep holding
+  ⌥ Space." and pastes nothing. Repeat with an Fn shortcut and a modifier-only
+  shortcut such as Right ⌥.
+- [ ] Capsule position: in Settings > App choose Bottom left, then Bottom right.
+  The idle capsule, its hover controls, live preview and every card sit at that
+  corner on the screen with the pointer, fully on screen. With the meeting
+  prompt set to Top center, a detected meeting still appears at the top center.
+  Right-click the hover controls to change the position from the capsule.
+- [ ] Hover over the idle capsule and click the eye button. The capsule hides and
+  a toast points to Floating recording capsule in Settings; Undo brings it back.
+  Dictating while it is hidden still shows the capsule.
 - [ ] Toggle mode: press ⌥ Space once and speak. The 108 × 28 point capsule has
   nine waveform bars, a gray × button and a white ✓ button. The circles are
   18 points across with 24-point hit areas. Clicking ✓
