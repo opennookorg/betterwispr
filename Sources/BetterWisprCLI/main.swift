@@ -41,7 +41,8 @@ func run() async throws {
             pass took and the speaker the pass after the meeting gives. With --my-voice, the file is microphone
             audio instead, and the voice nearest the one in SAMPLE stays Me, printed as speaker 0. SAMPLE needs
             at least 20 seconds of that voice.
-          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
+          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--format email|work|personal|aiPrompts|documents] [--notes-model builtin|OLLAMA_MODEL]
+            --format runs Medium cleanup as Dictate and format does for that kind of app.
             Each manifest line is {"id", "language", "audio", "reference"}. Prints one JSON line per clip
             with the hypothesis and recognition seconds. Without --language, each clip uses its own language.
           --latency MANIFEST.jsonl [--model PARAKEET_MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
@@ -100,7 +101,7 @@ func run() async throws {
     var index = 0
     while index < arguments.count {
         let option = arguments[index]
-        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--latency", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--notes-model"].contains(option),
+        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--latency", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--format", "--notes-model"].contains(option),
               index + 1 < arguments.count, !arguments[index + 1].hasPrefix("--"), options[option] == nil else {
             throw CLIError.usage("Invalid or repeated argument: \(option). Run --help for usage.")
         }
@@ -149,11 +150,17 @@ func run() async throws {
         guard let cleanup = CleanupLevel(rawValue: options["--cleanup"] ?? "none") else {
             throw CLIError.usage("--cleanup must be light or medium.")
         }
+        let format = try options["--format"].map { name in
+            guard let category = AppCategory(rawValue: name), category != .other else {
+                throw CLIError.usage("--format must be email, work, personal, aiPrompts or documents.")
+            }
+            return DictationFormat(category: category)
+        }
         var settings = AppSettings()
         settings.cleanup = cleanup
         settings.notesSelection = notesSelection
         try await bench(manifest: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), provider: provider,
-                        language: options["--language"], vocabulary: vocabulary, screenTerms: screenTerms, settings: settings)
+                        language: options["--language"], vocabulary: vocabulary, screenTerms: screenTerms, settings: settings, format: format)
     } else if let path = options["--latency"] {
         guard let parakeet = provider as? ParakeetProvider else { throw CLIError.usage("--latency needs a Parakeet model.") }
         var settings = AppSettings()
@@ -325,7 +332,7 @@ func write(notes: URL, for segments: [MeetingSegment], language: String?, settin
 
 /// Transcribes every manifest clip with the prepared provider, one JSON line per clip on stdout.
 @MainActor
-func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocabulary: [String], screenTerms: [String], settings: AppSettings) async throws {
+func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocabulary: [String], screenTerms: [String], settings: AppSettings, format: DictationFormat? = nil) async throws {
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
     encoder.outputFormatting = .withoutEscapingSlashes
@@ -342,7 +349,7 @@ func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocab
             var cleaned = TranscriptCleaner.clean(hypothesis, language: spoken)
             if settings.cleanup == .medium, TranscriptCleaner.isEnglish(cleaned, language: spoken) {
                 let commanded = VoiceCommands.apply(cleaned)
-                cleaned = await TranscriptPolisher.polish(commanded, settings: settings, vocabulary: vocabulary, context: nil) ?? commanded
+                cleaned = await TranscriptPolisher.polish(commanded, settings: settings, vocabulary: vocabulary, context: nil, format: format) ?? commanded
             }
             result.cleaned = cleaned
             result.cleanupSeconds = seconds(cleaning.duration(to: clock.now))
