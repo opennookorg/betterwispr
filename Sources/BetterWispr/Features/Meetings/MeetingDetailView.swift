@@ -248,7 +248,7 @@ struct MeetingDetailView: View {
         .menuStyle(.borderlessButton)
         .fixedSize()
         .help(meetings.microphoneMuted ? "Muted: only other apps are recorded. Click to unmute."
-              : "Click to mute your microphone. Use the arrow to choose \(meetings.microphone.map { "another microphone than \($0.name)" } ?? "a microphone").")
+              : "\(meetings.microphone.map { "Microphone: \($0.name). " } ?? "")Click to mute, or use the arrow to choose a microphone.")
         .accessibilityLabel("Microphone")
         .accessibilityValue(meetings.microphoneMuted ? "Muted" : meetings.microphone?.name ?? "None")
         .accessibilityHint("Mutes or unmutes your microphone")

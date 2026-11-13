@@ -139,6 +139,7 @@ public final class MeetingRecorder {
         let input = try MicrophoneInput(choice: choice)
         let format = input.format
         let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: threshold, policy: policy, startOffset: startOffset)
+        writer.setMuted(microphoneMuted)
         let capture = progress.begin()
         let sampleRate = format.sampleRate
         let origin = origin
@@ -349,7 +350,10 @@ final class MeetingChunkWriter: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let count = AVAudioFramePosition(buffer.frameLength)
-        guard !muted else { return (0, seconds(count)) }
+        guard !muted else {
+            if time == nil { nextStart += seconds(count) }
+            return (0, seconds(count))
+        }
         if let time, isLate(time) { rotate() }
         guard let file, count > 0 else { return (0, seconds(count)) }
         if frames == 0 { chunkStart = time ?? nextStart }

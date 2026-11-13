@@ -133,7 +133,6 @@ final class MeetingModel {
         systemAudioIssue = nil
         showsCallAudioHint = false
         heard = (false, false)
-        microphoneMuted = false
         run.voices = SpeakerDetection.isInstalled() ? try? SpeakerRecording() : nil
         run.separatesRoomVoices = separateRoomVoices
         elapsed = 0
@@ -146,6 +145,7 @@ final class MeetingModel {
                 await releasing?.value
                 guard let self, self.owns(run) else { return }
                 self.recorderOwner = run
+                self.microphoneMuted = false
                 try await self.recorder.start(silenceThreshold: silenceThreshold, microphone: microphone)
                 guard self.owns(run) else { return }
                 self.systemAudioIssue = self.recorder.systemAudioIssue
