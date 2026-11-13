@@ -22,8 +22,8 @@ func run() async throws {
           --download-yt-dlp
           --download-builtin-model
           --transcribe-file PATH [--model MODEL_ID] [--language en] [--languages en,es] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"]
-            --languages limits a Whisper model's automatic detection to the listed languages, as Dictation languages does.
-          --live-file PATH [--model MODEL_ID] [--language en]
+            --languages limits a Whisper model's automatic detection to the listed languages, and a Parakeet model's to their alphabet, as Dictation languages does.
+          --live-file PATH [--model MODEL_ID] [--language en] [--languages en,pt]
             Feeds the file through the Parakeet live preview in real time, printing each confirmed | provisional
             update with its pass latency, then the batch transcription of the same file.
           --meeting PATH [--model MODEL_ID] [--language en] [--vocabulary "Term,Other term"] [--notes OUT.md] [--notes-model builtin|OLLAMA_MODEL]
@@ -116,6 +116,9 @@ func run() async throws {
     case .api: throw CLIError.usage("Configure API connections in the macOS app. The CLI uses local models only.")
     case .codex: provider = CodexSpeechProvider()
     }
+    let detectionLanguages = Set(options["--languages"]?.split(separator: ",").map(String.init) ?? [])
+    (provider as? WhisperKitProvider)?.detectionLanguages = detectionLanguages
+    (provider as? ParakeetProvider)?.detectionLanguages = detectionLanguages
     let clock = ContinuousClock()
     let started = clock.now
     if options["--download-model"] != nil {
@@ -158,7 +161,6 @@ func run() async throws {
     } else if let path = options["--transcribe-file"] {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let language = options["--language"].flatMap { $0 == "auto" ? nil : $0 }
-        (provider as? WhisperKitProvider)?.detectionLanguages = Set(options["--languages"]?.split(separator: ",").map(String.init) ?? [])
         let transcript = try await provider.transcribe(audioURL: url, language: language, vocabulary: vocabulary, screenTerms: screenTerms)
         print(transcript)
         FileHandle.standardError.write(Data("Completed in \(started.duration(to: clock.now)).\n".utf8))

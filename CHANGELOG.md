@@ -4,6 +4,11 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Added
+- Dictation languages now works with Parakeet. Under Settings > Microphone and language, with Spoken language on Detect automatically, choose the languages you speak. When they all use one alphabet, Parakeet never writes letters from another, so English and Portuguese no longer turn into Cyrillic words. Choosing languages with different alphabets, or All languages, keeps every alphabet as before. Parakeet TDT v3 and Parakeet Ultra filter this way; the other Parakeet models ignore the list. Words from another language written in the same alphabet, such as Polish, can still appear. The `--languages` option of the command-line tool applies to Parakeet too.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added

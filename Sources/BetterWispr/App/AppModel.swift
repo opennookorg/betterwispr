@@ -746,6 +746,7 @@ final class AppModel {
             let hints = VocabularyProcessor.hints(self.vocabulary)
             let spellsScreenNames = self.spellsScreenNames(with: model, settings: self.settings)
             parakeet.usesPhraseBooster = self.settings.usePhraseBooster
+            parakeet.detectionLanguages = self.settings.dictationLanguages
             live.onSegment = { [weak self] in self?.editAhead($0, token: token) }
             live.start(pass: { try await parakeet.liveTranscribe($0, language: language) }, segment: { [weak self] samples in
                 let context = self?.dictationContext
@@ -907,6 +908,7 @@ final class AppModel {
                 guard self.generation == token, let provider = self.provider else { return }
                 (provider as? WhisperKitProvider)?.detectionLanguages = recording.settings.dictationLanguages
                 (provider as? ParakeetProvider)?.usesPhraseBooster = recording.settings.usePhraseBooster
+                (provider as? ParakeetProvider)?.detectionLanguages = recording.settings.dictationLanguages
                 let recognitionStarted = ContinuousClock.now
                 var pieces: [String] = []
                 var recognitionFixes = 0

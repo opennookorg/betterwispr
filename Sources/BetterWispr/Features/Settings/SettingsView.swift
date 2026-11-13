@@ -72,7 +72,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .fixedSize()
                     }
-                    if model.selectedModel.engine == .whisperKit && model.settings.language == "auto" {
+                    if [.whisperKit, .parakeet].contains(model.selectedModel.engine) && model.settings.language == "auto" {
                         RowDivider()
                         SettingRow(L10n.tr("Dictation languages"), caption: L10n.tr("Automatic detection chooses only among these.")) {
                             Menu(dictationLanguagesLabel) {
