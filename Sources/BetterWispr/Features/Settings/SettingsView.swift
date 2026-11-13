@@ -18,6 +18,14 @@ struct SettingsView: View {
         ("“write an email to Sam saying …, best regards, Kartik”", L10n.tr("Hi Sam, body and sign-off")),
     ]
 
+    private var styleExamplesCaption: String {
+        guard let examples = model.styleExamples else { return L10n.tr("Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept.") }
+        let learned = examples.count == 1 ? L10n.tr("1 example learned.") : L10n.tr("%d examples learned.", examples.count)
+        return learned + " " + (model.settings.saveHistory
+            ? L10n.tr("When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app.")
+            : L10n.tr("New examples are kept only while Save dictation history is on."))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
@@ -42,11 +50,12 @@ struct SettingsView: View {
                     RowDivider()
                     ShortcutRecorder(model: model, kind: .selectedText)
                     RowDivider()
-                    SettingRow(L10n.tr("Behavior"), caption: model.settings.dictationMode == .hold
-                        ? L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
-                        : L10n.tr("Press once to speak. Press again or click ✓ to finish.")) {
+                    ShortcutRecorder(model: model, kind: .format)
+                    RowDivider()
+                    SettingRow(L10n.tr("Behavior"), caption: behaviorCaption) {
                         Picker(L10n.tr("Behavior"), selection: setting(\.dictationMode)) {
                             Text(L10n.tr("Hold or tap")).tag(DictationMode.hold)
+                            Text(L10n.tr("Hold only")).tag(DictationMode.holdOnly)
                             Text(L10n.tr("Press to toggle")).tag(DictationMode.toggle)
                         }
                         .pickerStyle(.segmented)
@@ -66,7 +75,7 @@ struct SettingsView: View {
                     RowDivider()
                     SettingRow(L10n.tr("Spoken language"), caption: L10n.tr("A fixed language gives more consistent results.")) {
                         Picker(L10n.tr("Spoken language"), selection: setting(\.language)) {
-                            Text(model.selectedModel.engine == .apple ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
+                            Text([.apple, .cohere].contains(model.selectedModel.engine) ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
                             ForEach(languageChoices, id: \.code) { Text($0.name).tag($0.code) }
                         }
                         .labelsHidden()
@@ -217,6 +226,14 @@ struct SettingsView: View {
                     RowDivider()
                     SettingToggle(L10n.tr("Floating recording capsule"), caption: L10n.tr("A small voice control at the bottom of your screen."), isOn: setting(\.showCapsule))
                     RowDivider()
+                    SettingRow(L10n.tr("Capsule position"), caption: L10n.tr("Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it.")) {
+                        Picker(L10n.tr("Capsule position"), selection: setting(\.capsulePosition)) {
+                            ForEach(CapsulePosition.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    RowDivider()
                     SettingToggle(L10n.tr("Hide capsule while dictating"), caption: L10n.tr("Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak."), isOn: setting(\.hideCapsuleWhileDictating))
                     RowDivider()
                     SettingToggle(L10n.tr("Tell me when no speech is heard"), caption: L10n.tr("Shows “No speech heard.” with a sound when a dictation ends without words. When off, it closes quietly."), isOn: setting(\.showNoSpeechNotice))
@@ -268,6 +285,13 @@ struct SettingsView: View {
                             }
                             .labelsHidden()
                             .fixedSize()
+                        }
+                    }
+                    if model.settings.formatShortcut != nil || model.styleExamples?.count ?? 0 > 0 {
+                        RowDivider()
+                        SettingRow(L10n.tr("Writing examples"), caption: styleExamplesCaption) {
+                            Button(L10n.tr("Forget"), role: .destructive) { model.forgetStyleExamples() }
+                                .disabled(model.styleExamples?.count ?? 0 == 0)
                         }
                     }
                 }
@@ -457,6 +481,14 @@ struct SettingsView: View {
         )
     }
 
+    private var behaviorCaption: String {
+        switch model.settings.dictationMode {
+        case .hold: L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
+        case .holdOnly: L10n.tr("Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation.")
+        case .toggle: L10n.tr("Press once to speak. Press again or click ✓ to finish.")
+        }
+    }
+
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {
         Binding(
             get: { model.settings[keyPath: keyPath] },
@@ -473,7 +505,7 @@ struct SettingsView: View {
 }
 
 private struct ShortcutRecorder: View {
-    enum Kind { case dictation, cancel, selectedText }
+    enum Kind { case dictation, cancel, selectedText, format }
 
     let model: AppModel
     let kind: Kind
@@ -489,6 +521,7 @@ private struct ShortcutRecorder: View {
         case .dictation: model.settings.shortcut
         case .cancel: model.settings.cancelShortcut
         case .selectedText: model.settings.selectedTextShortcut
+        case .format: model.settings.formatShortcut
         }
     }
     private var title: String {
@@ -496,6 +529,7 @@ private struct ShortcutRecorder: View {
         case .dictation: L10n.tr("Keyboard shortcut")
         case .cancel: L10n.tr("Cancel shortcut")
         case .selectedText: L10n.tr("Clean up selected text")
+        case .format: L10n.tr("Dictate and format")
         }
     }
     private var placeholder: String { kind == .dictation ? "" : L10n.tr("Set Shortcut…") }
@@ -518,7 +552,7 @@ private struct ShortcutRecorder: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help(kind == .cancel ? L10n.tr("Remove the cancel shortcut") : L10n.tr("Remove the clean up shortcut"))
+                    .help(clearHelp)
                     .transition(.opacity)
                 }
                 recordButton
@@ -537,6 +571,14 @@ private struct ShortcutRecorder: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
     }
 
+    private var clearHelp: String {
+        switch kind {
+        case .cancel: L10n.tr("Remove the cancel shortcut")
+        case .format: L10n.tr("Remove the Dictate and format shortcut")
+        default: L10n.tr("Remove the clean up shortcut")
+        }
+    }
+
     private var caption: String? {
         if isCapturing {
             return feedback ?? (kind == .dictation ? L10n.tr("Press and release ⌃, ⌥, ⇧, ⌘ or Fn alone, use a key combination, or press an F-key. Esc cancels.")
@@ -548,6 +590,7 @@ private struct ShortcutRecorder: View {
             return shortcut?.isModifierOnly == true ? L10n.tr("Needs Accessibility. Uses the left or right key you recorded.") : L10n.tr("Starts dictation from any app.")
         case .cancel: return L10n.tr("Also cancels a dictation from any app. Esc always does.")
         case .selectedText: return L10n.tr("Edits the text you select in any app with your cleanup provider from Style. English only.")
+        case .format: return L10n.tr("Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.")
         }
     }
 
@@ -586,6 +629,7 @@ private struct ShortcutRecorder: View {
         case .dictation: if let shortcut { model.changeShortcut(shortcut) }
         case .cancel: model.changeCancelShortcut(shortcut)
         case .selectedText: model.changeSelectedTextShortcut(shortcut)
+        case .format: model.changeFormatShortcut(shortcut)
         }
     }
 

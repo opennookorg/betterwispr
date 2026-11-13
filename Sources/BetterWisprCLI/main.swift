@@ -35,6 +35,12 @@ func run() async throws {
             Transcribes an audio or video file, or a web link fetched with yt-dlp, as the Transcribe page does:
             chunks cut at the quietest moment 30 to 59.5 seconds apart, meeting cleanup and vocabulary, one JSON
             segment per line. Speaker detection labels voices when it is installed.
+          --live-speakers PATH [--window SECONDS] [--my-voice SAMPLE]
+            Plays the file through the meeting chunker as call audio and prints one JSON line per chunk with the
+            provisional speaker first shown during a call, the one shown when the call ends, the seconds each
+            pass took and the speaker the pass after the meeting gives. With --my-voice, the file is microphone
+            audio instead, and the voice nearest the one in SAMPLE stays Me, printed as speaker 0. SAMPLE needs
+            at least 20 seconds of that voice.
           --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
             Each manifest line is {"id", "language", "audio", "reference"}. Prints one JSON line per clip
             with the hypothesis and recognition seconds. Without --language, each clip uses its own language.
@@ -68,6 +74,15 @@ func run() async throws {
     if arguments == ["--download-speaker-detection"] {
         try await SpeakerDetection.install()
         print("Installed speaker detection at \(SpeakerDetection.directory.path).")
+        return
+    }
+    if arguments.first == "--live-speakers", arguments.count >= 2, arguments.count % 2 == 0 {
+        let options = Dictionary(stride(from: 2, to: arguments.count, by: 2).map { (arguments[$0], arguments[$0 + 1]) }) { $1 }
+        guard Set(options.keys).isSubset(of: ["--window", "--my-voice"]), let window = TimeInterval(options["--window"] ?? "300") else {
+            throw CLIError.usage("--live-speakers takes --window SECONDS and --my-voice SAMPLE.")
+        }
+        let sample = options["--my-voice"].map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        try await liveSpeakers(URL(fileURLWithPath: (arguments[1] as NSString).expandingTildeInPath), window: window, sample: sample)
         return
     }
     if arguments == ["--download-yt-dlp"] {
@@ -113,6 +128,7 @@ func run() async throws {
     case .apple: throw CLIError.usage("Apple speech requires permissions granted through the macOS app. Select a Parakeet or Whisper model in the CLI.")
     case .whisperKit: provider = WhisperKitProvider()
     case .parakeet: provider = ParakeetProvider()
+    case .cohere: provider = CohereProvider()
     case .api: throw CLIError.usage("Configure API connections in the macOS app. The CLI uses local models only.")
     case .codex: provider = CodexSpeechProvider()
     }
@@ -222,6 +238,48 @@ func meeting(_ url: URL, provider: any SpeechProvider, language: String?, vocabu
     for segment in segments { print(String(decoding: try encoder.encode(segment), as: UTF8.self)) }
     guard let notes else { return }
     try await write(notes: notes, for: segments, language: language, settings: settings)
+}
+
+/// Labels call audio chunk by chunk as a meeting does while it records, then with the pass that runs after it, without transcribing.
+@MainActor
+func liveSpeakers(_ url: URL, window: TimeInterval, sample: URL?) async throws {
+    guard SpeakerDetection.isInstalled() else { throw CLIError.usage("Install speaker detection first with --download-speaker-detection.") }
+    var myVoice: [Float]?
+    if let sample {
+        myVoice = try await SpeakerDetection.voice(inRecording: sample)
+        if myVoice == nil { throw CLIError.usage("The sample needs at least 20 seconds of one voice.") }
+    }
+    let chunks = try MeetingRecorder.chunks(of: url, speaker: sample == nil ? .them : .me)
+    defer { for chunk in chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    let voices = try SpeakerRecording()
+    defer { voices.discard() }
+    let labeller = LiveSpeakerLabeller(window: window)
+    var segments: [MeetingSegment] = []
+    var seconds: [UUID: Double] = [:]
+    var first: [UUID: Int] = [:]
+    var live: [UUID: Int] = [:]
+    for chunk in chunks where chunk.hasSpeech {
+        let segment = MeetingSegment(speaker: chunk.speaker, start: chunk.start, duration: chunk.duration, text: "", rawText: "")
+        let started = Date()
+        if sample == nil { await labeller.add(chunk.url, for: segment.id) }
+        let numbers = await labeller.speakers() ?? [:]
+        seconds[segment.id] = Date().timeIntervalSince(started)
+        first[segment.id] = numbers[segment.id]
+        live.merge(numbers) { $1 }
+        segments.append(segment)
+        try await voices.append(chunk.url, for: segment.id)
+    }
+    segments = segments.map { segment in
+        var segment = segment
+        segment.participant = live[segment.id]
+        return segment
+    }
+    let final = try await SpeakerDetection.label(segments, voices: voices, myVoice: myVoice) { _, _, _ in nil }.segments
+    for segment in final {
+        let fields: [String: Any] = ["start": segment.start, "duration": segment.duration, "first": first[segment.id] ?? 0, "live": live[segment.id] ?? 0,
+                                     "final": segment.participant ?? 0, "seconds": seconds[segment.id] ?? 0]
+        print(String(decoding: try JSONSerialization.data(withJSONObject: fields, options: .sortedKeys), as: UTF8.self))
+    }
 }
 
 /// Transcribes a media file, or a link's audio fetched with yt-dlp, and prints one JSON segment per line.

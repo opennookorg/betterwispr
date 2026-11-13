@@ -22,33 +22,53 @@ public struct VoiceStore: Sendable {
     }
 
     private struct File: Codable {
-        var version: Int
-        var voices: [KnownVoice]
+        var version = 1
+        var voices: [KnownVoice] = []
+        var me: [Float]?
+    }
+
+    private func read() throws -> File {
+        guard FileManager.default.fileExists(atPath: url.path) else { return File() }
+        let file = try JSONDecoder().decode(File.self, from: Data(contentsOf: url))
+        guard file.version == 1 else { throw StoreError.unsupportedVersion(file.version) }
+        return file
     }
 
     public func load() throws -> [KnownVoice] {
-        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-        let file = try JSONDecoder().decode(File.self, from: Data(contentsOf: url))
-        guard file.version == 1 else { throw StoreError.unsupportedVersion(file.version) }
-        return file.voices
+        try read().voices
     }
 
-    private func save(_ voices: [KnownVoice]) throws {
+    /// The profile of the user's own voice, present only after they record one.
+    public func myVoice() throws -> [Float]? {
+        try read().me
+    }
+
+    /// Saves or removes the user's own voice profile, writing only on a change and never over a file that can't be read.
+    public func setMyVoice(_ voice: [Float]?) throws {
+        var file = try read()
+        guard file.me != voice else { return }
+        file.me = voice
+        try save(file)
+    }
+
+    private func save(_ file: File) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-        try JSONEncoder().encode(File(version: 1, voices: voices)).write(to: url, options: .atomic)
+        try JSONEncoder().encode(file).write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// Replaces the voices remembered from one meeting and removes rejected ones, writing only on a change and never over a file that can't be read.
     public func replaceVoices(from meeting: UUID, with voices: [KnownVoice], removing rejected: [KnownVoice] = []) throws {
-        let known = try load()
+        var file = try read()
+        let known = file.voices
         guard known.filter({ $0.meetingID == meeting }) != voices || known.contains(where: rejected.contains) else { return }
-        try save(known.filter { $0.meetingID != meeting && !rejected.contains($0) } + voices)
+        file.voices = known.filter { $0.meetingID != meeting && !rejected.contains($0) } + voices
+        try save(file)
     }
 
-    /// Deletes every remembered voice, including a file that couldn't be read.
+    /// Deletes every remembered voice and the user's own, including a file that couldn't be read.
     public func forget() throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         try FileManager.default.removeItem(at: url)

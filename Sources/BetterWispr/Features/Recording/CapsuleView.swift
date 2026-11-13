@@ -17,6 +17,7 @@ struct CapsuleView: View {
     }
     private var meetingPrompt: DetectedMeeting? { model.meetingPrompt }
     private var atTop: Bool { model.showsCapsuleAtTop }
+    private var position: CapsulePosition { atTop ? .bottomCenter : model.settings.capsulePosition }
     private var showsCard: Bool {
         switch model.phase {
         case .cancelled, .completed, .unpasted, .failed, .sending, .asking: true
@@ -31,7 +32,7 @@ struct CapsuleView: View {
     private var swap: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: atTop ? .top : .bottom)) }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: position.stackAlignment, spacing: 6) {
             if atTop {
                 surface
                 Spacer(minLength: 0)
@@ -47,7 +48,8 @@ struct CapsuleView: View {
             }
         }
         .padding(atTop ? .top : .bottom, atTop ? 8 : 16)
-        .frame(width: 440, height: 240)
+        .padding(.horizontal, 12)
+        .frame(width: 440, height: 240, alignment: atTop ? .top : position.alignment)
         .coordinateSpace(name: "capsule")
         .onPreferenceChange(CapsuleRegions.self) { hover.update(regions: $0) }
         .environment(\.colorScheme, .dark)
@@ -171,6 +173,7 @@ struct CapsuleView: View {
         case .notetaker:
             isMeetingCapturing ? L10n.tr("Stop notetaker") : L10n.tr("Start notetaker")
         case .meetingNotes: L10n.tr("Open meeting notes")
+        case .hide: L10n.tr("Hide capsule")
         case .dictation:
             switch model.phase {
             case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.settings.shortcut.displayName)) : L10n.tr("Finish dictation")
@@ -451,6 +454,24 @@ struct CapsuleView: View {
             .background { CapsuleGlass(cornerRadius: 14) }
             .capsuleRegion(.microphone)
             meetingButton
+            Button(action: model.hideIdleCapsule) {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(hover.target == .hide ? 1 : 0.6))
+                    .frame(width: 28, height: 28)
+                    .background(.white.opacity(hover.target == .hide ? 0.12 : 0), in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("Hide capsule"))
+            .background { CapsuleGlass(cornerRadius: 14) }
+            .capsuleRegion(.hide)
+        }
+        .contextMenu {
+            Picker(L10n.tr("Capsule position"), selection: Binding(get: { model.settings.capsulePosition }, set: { model.settings.capsulePosition = $0; model.saveSettings() })) {
+                ForEach(CapsulePosition.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            Button(L10n.tr("Hide capsule"), action: model.hideIdleCapsule)
         }
     }
 
