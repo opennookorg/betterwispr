@@ -11,15 +11,15 @@ private func words(_ text: String, confidence: Float = 1, from start: TimeInterv
 
 private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven twelve"
 
-@Test func firstPassIsHypothesisAndThreeAgreeingPassesConfirmThroughTheThirdLastSentence() {
+@Test func firstPassIsHypothesisAndThreeAgreeingPassesConfirmThroughTheLastFinishedSentence() {
     var engine = WordAgreementEngine()
     #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "", hypothesis: spoken))
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.seekTime == 0)
-    #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "One two three four five six.", hypothesis: "Seven eight. Nine ten. Eleven twelve"))
-    #expect(engine.seekTime == 6)
-    #expect(engine.process(words("Seven eight. Nine ten. Eleven twelve.", from: 6)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)) == LiveTranscript(confirmed: "One two three four five six. Seven eight. Nine ten.", hypothesis: "Eleven twelve"))
+    #expect(engine.seekTime == 10)
+    #expect(engine.process(words("Eleven twelve.", from: 10)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func lowConfidencePassShowsAsHypothesisAndRestartsTheCount() {
@@ -29,7 +29,7 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     #expect(engine.process(words(spoken), passConfidence: 0.1) == LiveTranscript(confirmed: "", hypothesis: spoken))
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func disagreeingPassRestartsTheCount() {
@@ -40,7 +40,7 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
     #expect(engine.process(words(spoken)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func punctuationNeverBreaksAgreementButAMovedSentenceEndBlocksConfirmation() {
@@ -50,20 +50,20 @@ private let spoken = "One two three four five six. Seven eight. Nine ten. Eleven
     _ = engine.process(words(spoken))
     let moved = "One two three four five six Seven eight. Nine ten. Eleven twelve."
     #expect(engine.process(words(moved)).confirmed == "")
-    #expect(engine.process(words(moved)).confirmed == "One two three four five six Seven eight.")
+    #expect(engine.process(words(moved)).confirmed == "One two three four five six Seven eight. Nine ten.")
 }
 
 @Test func lowConfidenceWordsAtTheBoundaryBlockConfirmation() {
     var engine = WordAgreementEngine()
     for _ in 0..<3 { _ = engine.process(words(spoken, confidence: 0.5)) }
     #expect(engine.process(words(spoken, confidence: 0.5)).confirmed == "")
-    #expect(engine.process(words(spoken)).confirmed == "One two three four five six.")
+    #expect(engine.process(words(spoken)).confirmed == "One two three four five six. Seven eight. Nine ten.")
 }
 
 @Test func fragmentsShorterThanFiveWordsAreNeverConfirmed() {
     var engine = WordAgreementEngine()
     for _ in 0..<5 {
-        #expect(engine.process(words("One two. Three four. Five six. Seven eight.")).confirmed == "")
+        #expect(engine.process(words("One two. Three four. Five")).confirmed == "")
     }
 }
 
@@ -158,4 +158,91 @@ private final class PassLog {
     #expect(log.sliceCounts.isEmpty)
     transcriber.beginBuffering()
     #expect(transcriber.state == .stopped)
+}
+
+@Test func streamedRemainderStartsAtTheLastCutOnlyWhenTheFileMatchesTheLiveSamples() {
+    let rate = LiveTranscriber.sampleRate
+    let file = (0..<(10 * rate)).map(Float.init)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 6 * rate, receivedSamples: file.count)?.first == Float(6 * rate))
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 6 * rate, receivedSamples: 9 * rate) == nil)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: 0, receivedSamples: file.count) == nil)
+    #expect(StreamedDictation.remainder(of: file, segmentedSamples: file.count, receivedSamples: file.count)?.count == LiveTranscriber.minimumSamples)
+}
+
+@Test func piecesAreEditedSeparatelyUnlessTheyDifferFromTheWholeOrCorrectAnEarlierPiece() {
+    #expect(StreamedDictation.editsSeparately(["Send the report.", "Then book the room."], whole: "Send the report. Then book the room."))
+    #expect(!StreamedDictation.editsSeparately(["Send the report."], whole: "Send the report."))
+    #expect(!StreamedDictation.editsSeparately(["Send it to Tom.", "Actually, send it to Ann."], whole: "Send it to Tom. Actually, send it to Ann."))
+    #expect(!StreamedDictation.editsSeparately(["Send the report.", "Then book it."], whole: "Send the report. Then book the room."))
+}
+
+@MainActor
+@Test func streamedEditReusesEditsStartedWhileRecordingAndLaysOutTheWholeOnce() async {
+    let ahead = ["Send the report.": Task<String?, Never> { "Send the report!" }]
+    var polished: [String] = []
+    let result = await StreamedDictation.edit("Send the report. Then book the room.", pieces: ["Send the report.", "Then book the room."], ahead: ahead,
+                                              editingPiece: { polished.append($0); return $0.uppercased() },
+                                              editingWhole: { _ in Issue.record("edited whole"); return nil },
+                                              layingOut: { "[\($0)]" })
+    #expect(result.text == "[Send the report! THEN BOOK THE ROOM.]")
+    #expect(result.reused == 1)
+    #expect(polished == ["Then book the room."])
+    let failed = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: ["One two three.": Task { nil }],
+                                              editingPiece: { _ in nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
+    #expect(failed.text == nil)
+    let noneAhead = await StreamedDictation.edit("One two three. Four five six.", pieces: ["One two three.", "Four five six."], ahead: [:],
+                                                 editingPiece: { _ in Issue.record("edited a piece"); return nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
+    #expect(noneAhead.text == "whole" && noneAhead.reused == 0)
+}
+
+@Test func recognizedTextJoinsOnlyWhenItStartsAndEndsWithTheExpectedWords() {
+    #expect(StreamedDictation.joins("Hello, world.", startingWith: "hello", endingWith: "World!"))
+    #expect(StreamedDictation.joins("Hello world.", startingWith: nil))
+    #expect(!StreamedDictation.joins("world.", startingWith: "Hello", endingWith: "world."))
+    #expect(!StreamedDictation.joins("Hello world. Again", startingWith: "Hello", endingWith: "world."))
+    #expect(!StreamedDictation.joins("", startingWith: "Hello"))
+}
+
+@MainActor
+private func segmentFirstSentence(answering text: String) async throws -> (LiveTranscriber, calls: Int) {
+    let transcriber = LiveTranscriber(interval: .milliseconds(20))
+    transcriber.beginBuffering()
+    var calls = 0
+    transcriber.start(pass: { _ in LivePass(words: words("One two three four five six. Seven eight"), confidence: 1) }, segment: { _ in
+        calls += 1
+        return (text, 2)
+    })
+    let deadline = ContinuousClock.now + .seconds(3)
+    while calls == 0, ContinuousClock.now < deadline {
+        transcriber.append([Float](repeating: 0, count: 32_000))
+        try await Task.sleep(for: .milliseconds(30))
+    }
+    for _ in 0..<5 {
+        transcriber.append([Float](repeating: 0, count: 32_000))
+        try await Task.sleep(for: .milliseconds(30))
+    }
+    await transcriber.stop()
+    return (transcriber, calls)
+}
+
+@Test @MainActor func confirmedSentenceIsRecognizedAsAPieceWhenItsWordsMatchThePreview() async throws {
+    let (transcriber, calls) = try await segmentFirstSentence(answering: "One two three four five six.")
+    try #require(calls >= 1)
+    #expect(transcriber.segments.first == "One two three four five six.")
+    #expect(transcriber.segmentedSamples >= 6 * LiveTranscriber.sampleRate)
+    #expect(transcriber.vocabularyFixes == 2 * transcriber.segments.count)
+    #expect(transcriber.hasPieces)
+    #expect(transcriber.wordAfterPieces != nil)
+}
+
+@Test @MainActor func pieceRecognizedWithoutItsSentenceEndKeepsThePreviewsPunctuation() async throws {
+    let (transcriber, _) = try await segmentFirstSentence(answering: "One two three four five six")
+    #expect(transcriber.segments.first == "One two three four five six.")
+}
+
+@Test @MainActor func pieceThatLostAWordAtTheCutIsDroppedAndStopsFurtherPieces() async throws {
+    let (transcriber, calls) = try await segmentFirstSentence(answering: "two three four five six.")
+    #expect(calls == 1)
+    #expect(transcriber.segments.isEmpty && transcriber.segmentedSamples == 0 && transcriber.vocabularyFixes == 0)
+    #expect(!transcriber.hasPieces)
 }
