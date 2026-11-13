@@ -15,8 +15,8 @@ struct StylePreview {
         localized("um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic.")
     }
 
-    var spokenTitle: String { localized("You say (English example)") }
-    var cleanedTitle: String { localized("BetterWispr types (English example)") }
+    var spokenTitle: String { localized("You say") }
+    var cleanedTitle: String { localized("BetterWispr types") }
 
     var lightCleanupDetail: String {
         localized("Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”.")
@@ -47,13 +47,12 @@ struct StylePreview {
         case .email: "Hi Sam,\n\nThanks for the quick call today. Looking forward to working together.\n\nBest,\nAlex"
         case .other: "So far, the new plan is working well.\n\nTomorrow I want to finish the draft, especially the summary."
         }
-        // Applying punctuation to a fixed UI sample does not enable French dictation tones.
         let sample = StyleFormatter.apply(tone, to: localized(source))
         return isFrench && tone == .excited ? sample.replacingOccurrences(of: "!", with: " !") : sample
     }
 
     func accessibilityLabel(for sample: String) -> String {
-        L10n.localized("English example: %@", locale: locale, table: "StyleExamples", arguments: [sample])
+        L10n.localized("Example: %@", locale: locale, table: "StyleExamples", arguments: [sample])
     }
 
     private func localized(_ key: String) -> String {

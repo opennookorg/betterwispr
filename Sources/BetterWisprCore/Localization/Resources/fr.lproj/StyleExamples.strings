@@ -1,8 +1,8 @@
 /* Exemples de présentation, sans effet sur la langue de dictée. */
 "um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic." = "euh bonjour Sam, je je pense que nous nous retrouvons demain. Non, non, ne supprime rien.";
-"You say (English example)" = "Vous dites (exemple français)";
-"BetterWispr types (English example)" = "BetterWispr écrit (exemple français)";
-"English example: %@" = "Exemple français : %@";
+"You say" = "Vous dites (exemple français)";
+"BetterWispr types" = "BetterWispr écrit (exemple français)";
+"Example: %@" = "Exemple français : %@";
 "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”." = "Supprime les hésitations comme « um » et « you know », les répétitions comme « we we » et les autocorrections comme « at 5, no, at 6 », uniquement dans les dictées en anglais.";
 "Light and Medium cleanup only edit English dictation. This French example is left unchanged." = "Les nettoyages Léger et Moyen ne modifient que les dictées en anglais. Cet exemple français reste inchangé.";
 "French examples illustrate the presentation. Tones only change English dictation." = "Ces exemples français illustrent la présentation. Les tons ne modifient que les dictées en anglais.";

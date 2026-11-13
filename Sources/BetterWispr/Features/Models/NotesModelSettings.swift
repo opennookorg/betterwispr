@@ -20,7 +20,7 @@ struct NotesModelPicker: View {
                      : L10n.tr("%@ · Subscription", String(cli.name))).tag(NotesModelSelection?.some(.cli(cli)))
             }
             ForEach(ollamaModels, id: \.self) { name in
-                Text("Ollama · \(name)").tag(NotesModelSelection?.some(.ollama(name)))
+                Text(verbatim: "Ollama · \(name)").tag(NotesModelSelection?.some(.ollama(name)))
             }
             ForEach(model.settings.notesConnections) { connection in
                 Text("\(connection.name) · \(connection.modelID)").tag(NotesModelSelection?.some(.connection(connection.id)))
@@ -110,7 +110,7 @@ struct NotesModelSettings: View {
             }
             Button(L10n.tr("Refresh local models")) { Task { await model.meetings.refreshOllamaModels() } }
         }
-        Text(L10n.tr("Test sends only a short built-in English sample to the selected notes model."))
+        Text(L10n.tr("Test sends only a short built-in sample to the selected notes model."))
             .font(.caption).foregroundStyle(.secondary)
         if let result { Text(result).font(.callout).textSelection(.enabled) }
         if case .unavailable(let reason) = model.meetings.notesAvailability {

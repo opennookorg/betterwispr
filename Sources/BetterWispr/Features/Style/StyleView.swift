@@ -150,9 +150,8 @@ struct StyleView: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
-            .frame(maxWidth: 680, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .multilineTextAlignment(.leading)
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity)
         }
         .task { await model.meetings.refreshOllamaModels() }
     }

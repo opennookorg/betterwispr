@@ -76,12 +76,11 @@ struct HomeView: View {
                     Text(model.settings.saveHistory ? L10n.tr("Nothing here yet") : L10n.tr("History is off"))
                         .font(.headline)
                     if model.settings.saveHistory {
-                        Text(model.settings.dictationMode == .hold
-                            ? L10n.tr("Hold %@ in any app and your words will show up here.", model.settings.shortcut.displayName)
-                            : L10n.tr("Press %@ in any app and your words will show up here.", model.settings.shortcut.displayName))
-                            .accessibilityLabel(model.settings.dictationMode == .hold
-                                ? L10n.tr("Hold %@ in any app and your words will show up here.", model.settings.shortcut.spokenName)
-                                : L10n.tr("Press %@ in any app and your words will show up here.", model.settings.shortcut.spokenName))
+                        ShortcutSentence(
+                            format: model.settings.dictationMode == .hold
+                                ? L10n.tr("Hold %@ in any app and your words will show up here.")
+                                : L10n.tr("Press %@ in any app and your words will show up here."),
+                            shortcut: model.settings.shortcut)
                         .foregroundStyle(.secondary)
                     } else {
                         Text(L10n.tr("Turn on Save dictation history to find and reuse what you said."))
@@ -196,12 +195,11 @@ private struct DictationPanel: View {
             Text(L10n.tr("Download %@ once, then dictate offline.", String(model.selectedModel.localizedName)))
                 .foregroundStyle(.secondary)
         } else {
-            Text(model.settings.dictationMode == .hold
-                ? L10n.tr("Hold %@ in any app and start talking.", model.settings.shortcut.displayName)
-                : L10n.tr("Press %@ in any app and start talking.", model.settings.shortcut.displayName))
-                .accessibilityLabel(model.settings.dictationMode == .hold
-                    ? L10n.tr("Hold %@ in any app and start talking.", model.settings.shortcut.spokenName)
-                    : L10n.tr("Press %@ in any app and start talking.", model.settings.shortcut.spokenName))
+            ShortcutSentence(
+                format: model.settings.dictationMode == .hold
+                    ? L10n.tr("Hold %@ in any app and start talking.")
+                    : L10n.tr("Press %@ in any app and start talking."),
+                shortcut: model.settings.shortcut, spacing: 5)
             .foregroundStyle(.secondary)
         }
     }

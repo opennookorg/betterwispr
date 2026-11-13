@@ -698,7 +698,7 @@ final class AppModel {
         let finish = isHeldSession
             ? L10n.tr("Release %@ to finish.", settings.shortcut.displayName)
             : L10n.tr("Press %@ to finish.", settings.shortcut.displayName)
-        ToastWindow.shared.show(Toast(title: L10n.tr("Still recording"), message: hour == 1 ? L10n.tr("1 hour so far. %@ It stops by itself at about %@h.", finish, String(Int(limit / 3600))) : L10n.tr("%@ hours so far. %@ It stops by itself at about %@h.", String(hour), finish, String(Int(limit / 3600))), systemImage: "waveform"))
+        ToastWindow.shared.show(Toast(title: L10n.tr("Still recording"), message: hour == 1 ? L10n.tr("1h so far. %@ It stops by itself at about %@h.", finish, String(Int(limit / 3600))) : L10n.tr("%@h so far. %@ It stops by itself at about %@h.", String(hour), finish, String(Int(limit / 3600))), systemImage: "waveform"))
     }
 
     /// Finishes a recording whose file can't safely grow any longer; what was captured transcribes as usual.

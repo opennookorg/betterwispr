@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Validate native localizations, prepare an inactive translation, or package an app.
-
-Uses Python's standard library and macOS plutil for native .strings parsing.
-The source .lproj directories are the language declaration; there is no registry.
-"""
+"""Validate, scaffold or package the native .lproj localizations, which are the only language registry."""
 
 import argparse
 import os
@@ -80,7 +76,6 @@ def formats(text, context, variables=None):
     result = {}
     next_position = 1
     for match in FORMAT.finditer(text.replace("%%", "")):
-        # Width/precision stars consume integer arguments before the value.
         for star in re.finditer(r"\*(?:([1-9][0-9]*)\$)?", match.group()):
             index = int(star[1]) if star[1] else next_position
             if not star[1]:
@@ -118,7 +113,6 @@ def plural_formats(entry, context):
                 f"Plural rules need an 'other' branch and native categories: {context}/{name}")
         for category in categories:
             arguments = formats(rule[category], f"{context}/{name}/{category}")
-            # Native plural branches may spell out/omit the count (e.g. 'one minute').
             require(not arguments or arguments == {1: kind},
                     f"Plural branch format mismatch: {context}/{name}/{category}")
         variables[name] = kind
@@ -182,7 +176,6 @@ def initialize(root, code, destination):
         require(not destination.is_relative_to(active.resolve()),
                 f"Templates must be outside active resource directories: {destination}")
     require(destination.parent.is_dir(), f"Destination parent must already exist: {destination.parent}")
-    # Build the complete pair beside its final destination, then publish together.
     with tempfile.TemporaryDirectory(prefix=".localization-", dir=destination.parent) as temporary:
         staging = Path(temporary) / "translation"
         for relative in (CORE, PERMISSIONS):
@@ -197,18 +190,15 @@ def initialize(root, code, destination):
 def package(root, app):
     codes = check(root)
     app = app.absolute()
-    # Frameworks legitimately contain symlinks; inspect only paths we own below.
     no_symlinks(app, recursive=False)
     require(app.is_dir() and app.suffix == ".app", f"Expected an existing .app directory: {app}")
     resources = app / "Contents/Resources"
     bundle = resources / CORE_BUNDLE
     require(bundle.is_dir(), f"Missing packaged Core resources: {bundle}; rebuild and copy the SwiftPM bundle")
-    # SwiftPM can emit either a flat resource bundle or the native macOS layout.
     core_resources = bundle / "Contents/Resources" if (bundle / "Contents/Resources").is_dir() else bundle
     packaged = languages(core_resources)
     require(packaged == codes,
             f"Stale packaged Core localizations: found {packaged}, expected {codes}; rebuild SwiftPM resources")
-    # Validate actual copied content too; matching folder names do not prove a fresh build.
     for code in codes:
         source_folder = root / CORE / f"{code}.lproj"
         packaged_folder = core_resources / f"{code}.lproj"
@@ -225,7 +215,6 @@ def package(root, app):
     info_path = app / "Contents/Info.plist"
     info = load_plist(info_path)
     require(info.get("CFBundleDevelopmentRegion") == "en", "Packaged CFBundleDevelopmentRegion must remain en")
-    # Only these standalone permission files are ours. Preserve unrelated resources.
     for folder in resources.glob("*.lproj"):
         no_symlinks(folder)
         require(folder.is_dir(), f"Expected a packaged localization directory: {folder}")

@@ -300,7 +300,7 @@ struct SettingsView: View {
                         .accessibilityElement(children: .combine)
                     }
                 } footer: {
-                    Text(L10n.tr("Examples in English. Say these while dictating in English or Auto language. Words like “the Oxford comma” stay as written."))
+                    Text(L10n.tr("Say these while dictating in English or Auto language. Words like “the Oxford comma” stay as written."))
                 }
             }
             .padding(.horizontal, 28)

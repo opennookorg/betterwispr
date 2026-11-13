@@ -162,7 +162,7 @@
 			<string>%ld mots</string>
 		</dict>
 	</dict>
-	<key>About %ld words each</key>
+	<key>~%ld words each</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
 		<string>%#@count@</string>

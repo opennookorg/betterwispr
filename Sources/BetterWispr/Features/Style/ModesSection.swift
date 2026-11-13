@@ -42,7 +42,7 @@ struct ModesSection: View {
         let changed = ListFormatter.localizedString(byJoining: changes)
         return changed.isEmpty
             ? L10n.tr("%@ Keeps your default settings.", used)
-            : L10n.tr("%@ Changes: %@.", used, changed)
+            : L10n.tr("%@ %@.", used, changed.prefix(1).uppercased() + changed.dropFirst())
     }
 
     private func enabled(_ mode: WritingMode) -> Binding<Bool> {
@@ -135,11 +135,8 @@ private struct WritingModeEditor: View {
                         }
                     }
                     if (mode.cleanup ?? model.settings.cleanup) == .medium {
-                        TextField(L10n.tr("Instructions"), text: instructions, prompt: Text("Use British spelling."), axis: .vertical)
+                        TextField(L10n.tr("Instructions"), text: instructions, prompt: Text(L10n.tr("Use British spelling.")), axis: .vertical)
                             .lineLimit(3...8)
-                        Text(L10n.tr("English example"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text(L10n.tr("Writing"))

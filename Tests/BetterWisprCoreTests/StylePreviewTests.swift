@@ -27,8 +27,8 @@ private let englishStylePreview = StylePreview(locale: Locale(identifier: "en_US
     #expect(englishStylePreview.cleanedSample(for: .light) == TranscriptCleaner.clean(spoken, language: "en"))
     #expect(englishStylePreview.cleanedSample(for: .light) == "Hey Sam are we still on for lunch? I think we should leave early to beat the traffic.")
     #expect(englishStylePreview.cleanedSample(for: .medium) == "Hey Sam, are we still on for lunch? I think we should leave early to beat the traffic.")
-    #expect(englishStylePreview.spokenTitle == "You say (English example)")
-    #expect(englishStylePreview.cleanedTitle == "BetterWispr types (English example)")
+    #expect(englishStylePreview.spokenTitle == "You say")
+    #expect(englishStylePreview.cleanedTitle == "BetterWispr types")
 }
 
 @Test func frenchToneSamplesCoverEveryContextAndKeepTheirLimitsVisible() {
@@ -69,5 +69,5 @@ private let englishStylePreview = StylePreview(locale: Locale(identifier: "en_US
     }
     #expect(StylePreview(locale: Locale(identifier: "fr_CA")).spokenSample == frenchStylePreview.spokenSample)
     #expect(unsupported.spokenSample == englishStylePreview.spokenSample)
-    #expect(englishStylePreview.accessibilityLabel(for: "Hello") == "English example: Hello")
+    #expect(englishStylePreview.accessibilityLabel(for: "Hello") == "Example: Hello")
 }

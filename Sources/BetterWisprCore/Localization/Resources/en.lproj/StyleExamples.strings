@@ -1,8 +1,8 @@
 /* Fixed presentation samples, separate from dictation text and model prompts. */
 "um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic." = "um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic.";
-"You say (English example)" = "You say (English example)";
-"BetterWispr types (English example)" = "BetterWispr types (English example)";
-"English example: %@" = "English example: %@";
+"You say" = "You say";
+"BetterWispr types" = "BetterWispr types";
+"Example: %@" = "Example: %@";
 "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”." = "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”.";
 "Light and Medium cleanup only edit English dictation. This French example is left unchanged." = "Light and Medium cleanup only edit English dictation. This French example is left unchanged.";
 "French examples illustrate the presentation. Tones only change English dictation." = "French examples illustrate the presentation. Tones only change English dictation.";

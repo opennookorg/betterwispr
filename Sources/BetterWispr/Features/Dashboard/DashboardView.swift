@@ -16,13 +16,13 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .overview: L10n.tr("Home")
         case .meetings: L10n.tr("Notetaker")
         case .insights: L10n.tr("Insights")
-case .transcribe: L10n.tr("Transcribe")
-case .history: L10n.tr("History")
-case .models: L10n.tr("Models")
-case .vocabulary: L10n.tr("Vocabulary")
-case .style: L10n.tr("Style")
-case .settings: L10n.tr("Settings")
-case .about: L10n.tr("About")
+        case .transcribe: L10n.tr("Transcribe")
+        case .history: L10n.tr("History")
+        case .models: L10n.tr("Models")
+        case .vocabulary: L10n.tr("Vocabulary")
+        case .style: L10n.tr("Style")
+        case .settings: L10n.tr("Settings")
+        case .about: L10n.tr("About")
         }
     }
     var symbol: String {

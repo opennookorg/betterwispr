@@ -11,28 +11,18 @@ struct VocabularyView: View {
     var body: some View {
         Form {
             Section {
-                TextField(L10n.tr("Spoken phrase"), text: $phrase, prompt: Text(L10n.tr("English example: better whisper")))
+                TextField(L10n.tr("Spoken phrase"), text: $phrase, prompt: Text(L10n.tr("better whisper")))
                 TextField(L10n.tr("Write as"), text: $replacement, prompt: Text(L10n.tr("Optional, e.g. BetterWispr")))
-                HStack {
-                    Spacer()
-                    Button(L10n.tr("Add Word"), action: addEntry)
-                        .disabled(!canAdd)
-                }
             } header: {
                 Text(L10n.tr("Add a Word"))
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top) {
                     Text(L10n.tr("Leave “Write as” empty to add a spelling hint. To fix a misheard command, write the command, such as “Kocia mark” as “question mark”. Replacements apply to whole phrases, so unrelated words stay intact."))
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.secondary)
-                    Text(L10n.tr("Command examples are in English."))
-                        .font(.caption)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 20)
+                    Button(L10n.tr("Add Word"), action: addEntry)
+                        .disabled(!canAdd)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .onSubmit { if canAdd { addEntry() } }
 

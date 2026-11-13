@@ -41,8 +41,7 @@ cp .build/checkouts/swift-argument-parser/LICENSE.txt "$app/Contents/Resources/L
 cp .build/checkouts/Sparkle/LICENSE "$app/Contents/Resources/Licenses/Sparkle-MIT.txt"
 cp .build/checkouts/llama.swift/LICENSE.md "$app/Contents/Resources/Licenses/llama.swift-MIT.txt"
 cp Resources/Licenses/llama.cpp-MIT.txt "$app/Contents/Resources/Licenses/llama.cpp-MIT.txt"
-# SwiftPM localization and speech/tokenizer resources must travel with the app.
-# Core localization resolves in Contents/Resources; it needs no MacOS duplicate.
+# SwiftPM resources from speech/tokenizer dependencies must travel with the app.
 for resource in "$binary_dir"/*.bundle; do
     [[ -d "$resource" ]] || continue
     [[ "$(basename "$resource")" == BetterWispr_BetterWispr.bundle ]] && continue

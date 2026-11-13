@@ -183,7 +183,7 @@ private struct MetricTiles: View {
             MetricTile(
                 label: L10n.tr("Dictations"), value: now.dictations.formatted(),
                 current: Double(now.dictations), previous: before.map { Double($0.dictations) }, comparison: comparison,
-                note: Text(L10n.tr("About %ld words each", now.dictations > 0 ? now.words / now.dictations : 0))
+                note: Text(L10n.tr("~%ld words each", now.dictations > 0 ? now.words / now.dictations : 0))
             ),
         ]
         ViewThatFits(in: .horizontal) {
@@ -616,7 +616,7 @@ private struct StreakCard: View {
 
     private var activeNote: String {
         let days = L10n.tr("%ld days", insights.activeDays)
-        if let length = insights.period.days { return L10n.tr("Days with dictation: %@ of %@ in this period", String(insights.activeDays), String(length)) }
+        if let length = insights.period.days { return L10n.tr("Active on %@ of the last %@ days", String(insights.activeDays), String(length)) }
         return L10n.tr("Active on %@ since %@", String(days), String(insights.start.formatted(.dateTime.month(.abbreviated).day())))
     }
 }

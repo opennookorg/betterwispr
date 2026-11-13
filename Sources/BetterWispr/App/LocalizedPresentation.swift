@@ -1,53 +1,14 @@
 import BetterWisprCore
 import Foundation
 
-// Presentation stays separate from the canonical values used by prompts, exports and saved data.
 extension SpeechModel {
-    var localizedName: String {
-        guard engine != .api else { return name }
-        switch id {
-        case "apple": return L10n.tr("Apple on-device")
-        case "codex": return L10n.tr("Codex · Subscription")
-        case "parakeet-ja": return L10n.tr("Parakeet Japanese")
-        case "whisper-turbo-compressed": return L10n.tr("Whisper Large v3 Turbo (compressed)")
-        default: return name
-        }
-    }
+    var localizedName: String { engine == .api ? name : L10n.tr(name) }
 
     var localizedDetail: String {
-        // Connection names and endpoints are user data, even when they match a built-in label.
-        if let connection { return "\(connection.api.localizedName) · \(connection.endpoint)" }
-        switch id {
-        case "apple": return L10n.tr("Uses an available macOS language pack. No cloud fallback.")
-        case "codex": return L10n.tr("Transcribes with your Codex subscription through an unofficial ChatGPT endpoint. Requires internet access.")
-        case "parakeet-ultra": return L10n.tr("Parakeet TDT v3 further trained by Moondream for fewer mistakes, with punctuation, the same 25 European languages and the same speed.")
-        case "parakeet-v3": return L10n.tr("NVIDIA's multilingual model for 25 European languages, with punctuation. Fast on the Neural Engine.")
-        case "parakeet-v2": return L10n.tr("NVIDIA's English-only model, tuned for English accuracy, with punctuation.")
-        case "parakeet-110m": return L10n.tr("A small English-only model for Macs with less memory to spare.")
-        case "parakeet-ja": return L10n.tr("NVIDIA's Parakeet model for Japanese speech.")
-        case "whisper-turbo": return L10n.tr("Broadest language coverage, including languages Parakeet does not support.")
-        case "whisper-turbo-compressed": return L10n.tr("The languages of Whisper Large v3 Turbo in a compressed build that takes less disk space.")
-        case "whisper-small": return L10n.tr("A lighter multilingual Whisper model with a smaller download.")
-        default: return detail
-        }
+        connection.map { "\($0.api.localizedName) · \($0.endpoint)" } ?? L10n.tr(detail)
     }
 
-    var localizedSizeLabel: String {
-        if engine == .api { return L10n.tr("Uses your endpoint") }
-        switch id {
-        case "apple": return L10n.tr("System managed")
-        case "codex": return L10n.tr("ChatGPT subscription")
-        case "parakeet-ultra": return L10n.tr("~730 MB")
-        case "parakeet-v3": return L10n.tr("~580 MB")
-        case "parakeet-v2": return L10n.tr("~560 MB")
-        case "parakeet-110m": return L10n.tr("~330 MB")
-        case "parakeet-ja": return L10n.tr("~720 MB")
-        case "whisper-turbo": return L10n.tr("~1.6 GB")
-        case "whisper-turbo-compressed": return L10n.tr("~650 MB")
-        case "whisper-small": return L10n.tr("~490 MB")
-        default: return sizeLabel
-        }
-    }
+    var localizedSizeLabel: String { L10n.tr(sizeLabel) }
 
     var localizedLanguageNames: [String]? {
         languages?.map { L10n.locale.localizedString(forLanguageCode: $0) ?? $0 }.sorted()
@@ -55,7 +16,7 @@ extension SpeechModel {
 }
 
 extension BuiltInModel {
-    static var localizedSizeLabel: String { L10n.tr("1.28 GB") }
+    static var localizedSizeLabel: String { L10n.tr(sizeLabel) }
 }
 
 extension SpeechAPI {
@@ -106,7 +67,6 @@ extension Meeting {
 extension MeetingLine {
     func localizedLabel(in meeting: Meeting?) -> String {
         guard let segmentID else { return L10n.tr("My thoughts") }
-        // Resolve only labels whose provenance is known. A missing source keeps the saved citation.
         guard let meeting, let segment = meeting.segments.first(where: { $0.id == segmentID }) else { return label }
         return "\(segment.timestamp) \(segment.localizedLabel(names: meeting.participantNames))"
     }

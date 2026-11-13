@@ -162,7 +162,7 @@
 			<string>%ld words</string>
 		</dict>
 	</dict>
-	<key>About %ld words each</key>
+	<key>~%ld words each</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
 		<string>%#@count@</string>
@@ -173,9 +173,9 @@
 			<key>NSStringFormatValueTypeKey</key>
 			<string>ld</string>
 			<key>one</key>
-			<string>About %ld word each</string>
+			<string>~%ld word each</string>
 			<key>other</key>
-			<string>About %ld words each</string>
+			<string>~%ld words each</string>
 		</dict>
 	</dict>
 	<key>Answer from the last %ld minutes of the transcript</key>
