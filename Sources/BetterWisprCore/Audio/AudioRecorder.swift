@@ -66,7 +66,7 @@ public final class AudioRecorder {
     private var starting = false
     private var recordingID: UUID?
     private var meter = VoiceLevelMeter()
-    private var digitalSilence: TimeInterval?
+    private var digitalSilence = DigitalSilence()
     private var restartedSilentInput = false
     private var mainThreadLag: TimeInterval = 0
 
@@ -191,7 +191,7 @@ public final class AudioRecorder {
         let capture = progress.begin()
         let tap = tap
         inputObserver?.observeDevice(input.deviceID)
-        digitalSilence = 0
+        digitalSilence = DigitalSilence()
         try await input.start { @Sendable [weak self] buffer, time in
             let end = AudioCaptureProgress.endTime(time, frames: buffer.frameLength, sampleRate: sampleRate)
             let loudness = writer.write(buffer)
@@ -229,14 +229,11 @@ public final class AudioRecorder {
         mainThreadLag = max(mainThreadLag, lag)
     }
 
-    /// AirPods send only exact zeros for a whole recording when capture starts before macOS takes them over from
-    /// another device. A normal AirPods start sends zeros for about a second.
+    /// Restarts once when AirPods, taken over from another device just after capture starts, send only exact zeros.
     private func restartInputIfSilent(_ loudness: [Float], duration: TimeInterval, session id: UUID) {
-        guard !loudness.isEmpty, let silence = digitalSilence else { return }
-        digitalSilence = loudness.allSatisfy { $0 == 0 } ? silence + duration : nil
-        guard let silence = digitalSilence, silence >= 2, !restartedSilentInput else { return }
+        guard !restartedSilentInput, digitalSilence.reaches(2, after: loudness, over: duration) else { return }
         restartedSilentInput = true
-        Logger(subsystem: "org.betterwispr.app", category: "MicrophoneCapture").notice("Restarting input after \(silence)s of digital silence")
+        Logger(subsystem: "org.betterwispr.app", category: "MicrophoneCapture").notice("Restarting input after 2s of digital silence")
         Task { await followMicrophone(session: id, restarting: true) }
     }
 
@@ -274,7 +271,7 @@ public final class AudioRecorder {
         progress = nil
         recoveryAttempts = 0
         recoveryError = nil
-        digitalSilence = nil
+        digitalSilence = DigitalSilence()
         restartedSilentInput = false
         mainThreadLag = 0
         writer = nil
@@ -282,6 +279,17 @@ public final class AudioRecorder {
         recordingURL = nil
         recordingID = nil
         onLevel?(VoiceLevels())
+    }
+}
+
+/// Measures exact digital silence from an input's start; any real microphone's noise floor ends it for good.
+struct DigitalSilence {
+    private var elapsed: TimeInterval? = 0
+
+    mutating func reaches(_ limit: TimeInterval, after loudness: [Float], over duration: TimeInterval) -> Bool {
+        guard !loudness.isEmpty, let elapsed else { return false }
+        self.elapsed = loudness.allSatisfy { $0 == 0 } ? elapsed + duration : nil
+        return (self.elapsed ?? 0) >= limit
     }
 }
 

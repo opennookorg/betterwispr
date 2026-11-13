@@ -240,6 +240,16 @@ func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) thr
     try await finishing.value
 }
 
+@Test func digitalSilenceRestartsOnlyAnInputThatHasNeverSentSound() {
+    var silent = DigitalSilence()
+    let silentInput = [([], 5.0), ([0, 0], 1.9), ([0], 0.1)].map { silent.reaches(2, after: $0, over: $1) }
+    #expect(silentInput == [false, false, true])
+
+    var quiet = DigitalSilence()
+    let quietInput = [([0, 0.00001], 0.1), ([0, 0, 0], 10.0)].map { quiet.reaches(2, after: $0, over: $1) }
+    #expect(quietInput == [false, false])
+}
+
 @Test(arguments: [0.02, 0.1, 0.5])
 func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSeconds: Double) throws {
     let rate = 48_000.0

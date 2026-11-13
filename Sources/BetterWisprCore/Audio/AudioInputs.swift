@@ -99,6 +99,7 @@ public enum AudioInputs {
     }
 }
 
+/// Tracks delivered audio from the capture worker, so a busy main thread cannot make capture look stalled.
 final class AudioCaptureProgress: Sendable {
     private struct State {
         var generation = UUID()
