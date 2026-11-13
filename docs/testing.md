@@ -1981,6 +1981,14 @@ were not exercised in this UI pass.
   menu. Ask uses it while summaries keep the notes model; "Same as notes"
   follows the notes model again. Select a notes API connection for Ask, then
   remove it or change its URL; Ask returns to "Same as notes".
+- [ ] With Summary language set to Same as meeting, record a meeting in German
+  (Spoken language German, then again with Detect automatically) and let
+  Apple Intelligence, the built-in model and one cloud provider write notes.
+  The title, overview, key points, decisions and action items are in German.
+- [ ] Choose French as Summary language in the Notetaker settings menu and
+  generate a summary for a German meeting. The notes are in French. Choose a
+  language Apple Intelligence doesn't support on this Mac: Models and the
+  Generate summary card say so, and no English summary is written.
 - [ ] Choose an unavailable Ask provider (Apple Intelligence off, or a CLI with
   no model). The Ask field is disabled with the reason, and no other provider
   is asked.

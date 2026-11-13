@@ -392,7 +392,7 @@ final class MeetingModel {
         let sourceFingerprint = meeting.summarySourceFingerprint
         let modelName = notesSettings.notesModelName
         do {
-            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, names: meeting.participantNames, userNotes: meeting.notes, invite: meeting.calendarInvite, settings: notesSettings) { [weak self] step, total in
+            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, names: meeting.participantNames, userNotes: meeting.notes, invite: meeting.calendarInvite, language: meeting.language, settings: notesSettings) { [weak self] step, total in
                 guard let self, self.owns(run) else { return }
                 run.generationStep = (step, total)
             }

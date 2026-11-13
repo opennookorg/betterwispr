@@ -235,6 +235,8 @@ private struct NotetakerSettings: View {
                 .disabled(!model.meetings.runs.isEmpty)
             NotesModelPicker(model: model, title: "Ask provider", overrideSelection: \.askSelection)
                 .pickerStyle(.inline)
+            SummaryLanguagePicker(model: model)
+                .pickerStyle(.menu)
             Button("Configure and test notes models…") { model.selectedPage = .models }
 
         } label: {
