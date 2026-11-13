@@ -169,6 +169,13 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         segments[index].participant = participant
     }
 
+    /// Gives lines the speaker numbers found for them, leaving every other line as it is.
+    public mutating func number(_ speakers: [UUID: Int]) {
+        for index in segments.indices {
+            if let number = speakers[segments[index].id] { segments[index].participant = number }
+        }
+    }
+
     /// Relabels every line of one voice as another, keeping the source's name when the target has none.
     public mutating func mergeParticipant(_ source: Int, into target: Int) {
         guard source != target else { return }

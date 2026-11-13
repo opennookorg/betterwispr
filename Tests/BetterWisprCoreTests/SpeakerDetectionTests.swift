@@ -190,3 +190,61 @@ private func turn(_ voice: Int, _ start: Float, _ end: Float) -> SpeakerSegment 
     await #expect(throws: CancellationError.self) { try await waiting.value }
     #expect(clock.now - started < .seconds(5))
 }
+
+@MainActor
+@Test func aMicrophoneVoiceNearMyVoiceStaysMeEvenWhenSomeoneElseTalksMore() async throws {
+    let mine = MeetingSegment(speaker: .me, start: 0, duration: 3, text: "Shall we start?", rawText: "")
+    let room = MeetingSegment(speaker: .me, start: 3, duration: 9, text: "Yes, I have the numbers here.", rawText: "")
+    let turns = [mine.id: [VoiceTurn(voice: "A", start: 0, end: 3)], room.id: [VoiceTurn(voice: "B", start: 0, end: 9)]]
+    let embeddings: [String: [Float]] = ["A": [1, 0], "B": [0, 1]]
+    func participants(myVoice: [Float]?) async throws -> [Int?] {
+        try await SpeakerDetection.label([mine, room], turns: turns, embeddings: embeddings, myVoice: myVoice, audio: { _, _ in throw CocoaError(.fileReadUnknown) }) { _, _, _ in nil }
+            .segments.map(\.participant)
+    }
+
+    #expect(try await participants(myVoice: [0.9, 0.1]) == [nil, 1])
+    #expect(try await participants(myVoice: nil) == [1, nil])
+    #expect(try await participants(myVoice: [-1, -1]) == [1, nil])
+    #expect(try await participants(myVoice: [1, 0, 0]) == [1, nil])
+}
+
+@Test func provisionalSpeakersKeepTheirNumbersWhenALaterPassRenamesTheVoices() {
+    let lines = (0..<5).map { _ in UUID() }
+    var speakers = ProvisionalSpeakers()
+
+    #expect(speakers.number([(lines[0], "0", 5), (lines[1], "1", 4)]) == [lines[0]: 1, lines[1]: 2])
+    #expect(speakers.number([(lines[0], "1", 5), (lines[1], "0", 4), (lines[2], "2", 6), (lines[3], "0", 3)])
+        == [lines[0]: 1, lines[1]: 2, lines[2]: 3, lines[3]: 2])
+    #expect(speakers.number([(lines[0], "0", 5), (lines[1], "0", 4), (lines[2], "1", 6), (lines[3], "0", 3)])
+        == [lines[0]: 2, lines[1]: 2, lines[2]: 3, lines[3]: 2])
+    #expect(speakers.number([(lines[2], "0", 6), (lines[3], "1", 3), (lines[4], "2", 7)]) == [lines[2]: 3, lines[3]: 2, lines[4]: 1])
+}
+
+@MainActor
+@Test func thePassAfterTheMeetingKeepsTheNumbersShownDuringTheCall() async throws {
+    let first = MeetingSegment(speaker: .them, start: 0, duration: 5, text: "Hello.", rawText: "", participant: 2)
+    let second = MeetingSegment(speaker: .them, start: 5, duration: 6, text: "Hi there.", rawText: "", participant: 1)
+    let wrong = MeetingSegment(speaker: .them, start: 11, duration: 2, text: "Yes.", rawText: "", participant: 1)
+    let late = MeetingSegment(speaker: .them, start: 13, duration: 4, text: "Sorry I am late.", rawText: "", participant: 2)
+    let unheard = MeetingSegment(speaker: .them, start: 17, duration: 1, text: "Hm.", rawText: "", participant: 3)
+    let turns = [
+        first.id: [VoiceTurn(voice: "A", start: 0, end: 5)], second.id: [VoiceTurn(voice: "B", start: 0, end: 6)],
+        wrong.id: [VoiceTurn(voice: "A", start: 0, end: 2)], late.id: [VoiceTurn(voice: "C", start: 0, end: 4)],
+    ]
+
+    let labelled = try await SpeakerDetection.label([first, second, wrong, late, unheard], turns: turns, audio: { _, _ in throw CocoaError(.fileReadUnknown) }) { _, _, _ in nil }.segments
+
+    #expect(labelled.map(\.participant) == [2, 1, 2, 3, nil])
+}
+
+@Test func numberingAMeetingChangesOnlyTheLinesItNames() {
+    var meeting = Meeting(modelName: "Parakeet", language: "en")
+    let named = MeetingSegment(speaker: .them, start: 0, duration: 1, text: "One", rawText: "", participant: 1)
+    let other = MeetingSegment(speaker: .them, start: 1, duration: 1, text: "Two", rawText: "", participant: 4)
+    meeting.insert(named)
+    meeting.insert(other)
+
+    meeting.number([named.id: 2, UUID(): 9])
+
+    #expect(meeting.segments.map(\.participant) == [2, 4])
+}

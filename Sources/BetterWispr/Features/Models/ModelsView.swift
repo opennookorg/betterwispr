@@ -100,11 +100,29 @@ struct ModelsView: View {
 
             Section {
                 if model.speakerDetectionInstalled {
-                    Label(L10n.tr("Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript."), systemImage: "checkmark.circle")
+                    Label(L10n.tr("Speaker detection is on. BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. The labels are a first guess that can change while the meeting records, and a more careful pass replaces them when it ends. Rename them above the transcript."), systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
                     Toggle(isOn: setting(\.separateRoomVoices)) {
                         Text(L10n.tr("Tell apart people in the room"))
                         Text(L10n.tr("Also separates the voices on your microphone. The voice your microphone hears longest stays Me and the others get their own speaker numbers, so if someone near you talks more than you do, move your lines back to Me. Your microphone audio is kept on this Mac until the speakers are found, then deleted."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    LabeledContent {
+                        if model.meetings.isRecordingMyVoice {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            if model.meetings.hasMyVoice { Button(L10n.tr("Remove"), role: .destructive, action: model.meetings.forgetMyVoice) }
+                            Button(model.meetings.hasMyVoice ? L10n.tr("Record Again") : L10n.tr("Record My Voice")) {
+                                Task { await model.meetings.recordMyVoice() }
+                            }
+                            .disabled(model.isBusy || model.meetings.capturing != nil)
+                        }
+                    } label: {
+                        Text(L10n.tr("My voice"))
+                        Text(model.meetings.isRecordingMyVoice
+                            ? L10n.tr("Recording. Keep talking for 30 seconds.")
+                            : model.meetings.myVoiceMessage ?? L10n.tr("Record 30 seconds of yourself talking without long pauses. BetterWispr saves a profile of your voice on this Mac and deletes the recording. When it tells apart people in the room, the microphone voice closest to your profile stays Me, even if someone near you talks more. Without a profile, or when no voice is close to it, the voice heard longest stays Me. Your profile is never uploaded, but Time Machine backs it up. Forget Voices deletes it too."))
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }

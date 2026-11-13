@@ -56,6 +56,19 @@ public enum SpeakerDetection {
         return diarizer
     }
 
+    /// The least speech, in seconds, that gives a voice profile comparable with a meeting's voices.
+    public static let enoughVoice: Float = 20
+
+    /// The embedding of the voice that speaks longest in a recording, read with the installed speaker models, or nil when it speaks for less than `enoughVoice`.
+    public static func voice(inRecording url: URL) async throws -> [Float]? {
+        let options = PyannoteDiarizationOptions(clusterDistanceThreshold: sameVoiceDistance)
+        let result = try await installedDiarizer(from: directory).diarize(audioArray: ParakeetProvider.samples(of: url), options: options, progressCallback: nil)
+        let spoken = result.segments.reduce(into: [Int: Float]()) { spoken, segment in
+            if let voice = segment.speaker.speakerId { spoken[voice, default: 0] += segment.endTime - segment.startTime }
+        }
+        return spoken.filter { $0.value >= enoughVoice }.max { ($0.value, $1.key) < ($1.value, $0.key) }.flatMap { result.speakerCentroidEmbeddings[$0.key] }
+    }
+
     static func abandoningOnCancel<Value: Sendable>(_ work: @escaping @Sendable () async throws -> Value) async throws -> Value {
         try Task.checkCancellation()
         let (results, continuation) = AsyncThrowingStream<Value, any Error>.makeStream()
@@ -104,21 +117,31 @@ public enum SpeakerDetection {
         return result
     }
 
-    /// Numbers each segment's voice by first appearance, splitting segments several voices share, with each number's voice embedding; the microphone's most heard voice stays Me.
+    /// Numbers each segment's voice, splitting segments several voices share, with each number's voice embedding. A voice keeps the number most of its lines had during the call and the rest are numbered by first appearance. On the microphone, the voice that matches `myVoice` stays Me, or the most heard voice when none does.
     @MainActor
-    public static func label(_ segments: [MeetingSegment], voices: SpeakerRecording,
+    public static func label(_ segments: [MeetingSegment], voices: SpeakerRecording, myVoice: [Float]? = nil,
                              transcribe: (_ audio: URL, _ start: TimeInterval, _ duration: TimeInterval) async throws -> MeetingSegment?) async throws -> (segments: [MeetingSegment], voices: [Int: [Float]]) {
         let found = try await voices.voiceTurns()
-        return try await label(segments, turns: found.turns, embeddings: found.embeddings,
+        return try await label(segments, turns: found.turns, embeddings: found.embeddings, myVoice: myVoice,
                                audio: { try await voices.audio(of: $0, from: $1.start, to: $1.end) }, transcribe: transcribe)
     }
 
+    /// The microphone voice that is the user: the nearest to `myVoice` within `sameVoiceDistance`, otherwise the one heard longest.
+    static func me(among heard: [String: TimeInterval], embeddings: [String: [Float]], myVoice: [Float]?) -> String? {
+        let matches = heard.keys.compactMap { voice in
+            myVoice.flatMap { mine in embeddings[voice].flatMap { distance($0, mine) } }.map { (voice: voice, distance: $0) }
+        }.filter { $0.distance <= sameVoiceDistance }
+        return matches.min { ($0.distance, $0.voice) < ($1.distance, $1.voice) }?.voice
+            ?? heard.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key
+    }
+
     @MainActor
-    static func label(_ segments: [MeetingSegment], turns: [UUID: [VoiceTurn]], embeddings: [String: [Float]] = [:], audio: (UUID, VoiceTurn) async throws -> URL,
+    static func label(_ segments: [MeetingSegment], turns: [UUID: [VoiceTurn]], embeddings: [String: [Float]] = [:], myVoice: [Float]? = nil,
+                      audio: (UUID, VoiceTurn) async throws -> URL,
                       transcribe: (_ audio: URL, _ start: TimeInterval, _ duration: TimeInterval) async throws -> MeetingSegment?) async throws -> (segments: [MeetingSegment], voices: [Int: [Float]]) {
         let microphone = Set(MeetingTranscript.removingEchoes(from: segments).filter { $0.speaker == .me }.map(\.id))
         let heard = microphone.compactMap { turns[$0] }.joined().reduce(into: [String: TimeInterval]()) { $0[$1.voice, default: 0] += $1.length }
-        let me = heard.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key
+        let me = me(among: heard, embeddings: embeddings, myVoice: myVoice)
         var labelled: [(segment: MeetingSegment, voice: String?)] = []
         for segment in segments {
             guard segment.speaker == .them || microphone.contains(segment.id),
@@ -134,6 +157,7 @@ public enum SpeakerDetection {
                     defer { try? FileManager.default.removeItem(at: url) }
                     if var transcribed = try await transcribe(url, segment.start + piece.start, piece.length) {
                         transcribed.speaker = segment.speaker
+                        transcribed.participant = segment.participant
                         split.append((transcribed, piece.voice))
                     }
                 } catch {
@@ -144,16 +168,34 @@ public enum SpeakerDetection {
             try Task.checkCancellation()
             labelled += split.isEmpty ? [(segment, longest.voice)] : split
         }
-        var numbers: [String: Int] = [:]
+        var numbers = agreedNumbers(labelled.compactMap { segment, voice in
+            guard let voice, segment.speaker == .them || voice != me, let number = segment.participant else { return nil }
+            return (voice, number, segment.duration)
+        })
+        var next = 1
         let numbered = labelled.map { segment, voice in
             var segment = segment
             if let voice, segment.speaker == .them || voice != me {
-                segment.participant = numbers[voice] ?? numbers.count + 1
+                while numbers[voice] == nil, numbers.values.contains(next) { next += 1 }
+                segment.participant = numbers[voice] ?? next
                 numbers[voice] = segment.participant
+            } else if segment.speaker == .them {
+                segment.participant = nil
             }
             return segment
         }
         return (numbered, Dictionary(uniqueKeysWithValues: numbers.compactMap { voice, number in embeddings[voice].map { (number, $0) } }))
+    }
+
+    /// Gives each voice the number most of its lines already carry, longest agreement first, so a name given to a number stays with the voice.
+    static func agreedNumbers(_ lines: [(voice: String, number: Int, length: TimeInterval)]) -> [String: Int] {
+        var agreement: [String: [Int: TimeInterval]] = [:]
+        for line in lines { agreement[line.voice, default: [:]][line.number, default: 0] += line.length }
+        let pairs = agreement.flatMap { voice, numbers in numbers.map { (voice: voice, number: $0.key, length: $0.value) } }
+            .sorted { ($1.length, $0.number, $0.voice) < ($0.length, $1.number, $1.voice) }
+        var numbers: [String: Int] = [:]
+        for pair in pairs where numbers[pair.voice] == nil && !numbers.values.contains(pair.number) { numbers[pair.voice] = pair.number }
+        return numbers
     }
 
     static func recognise(_ voices: [Int: [Float]], among known: [KnownVoice]) -> [Int: KnownVoice] {

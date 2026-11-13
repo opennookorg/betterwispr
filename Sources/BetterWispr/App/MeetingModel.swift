@@ -28,6 +28,7 @@ final class MeetingRun {
     @ObservationIgnored var drain: Task<Void, Never>?
     @ObservationIgnored var work: Task<Void, Never>?
     @ObservationIgnored var voices: SpeakerRecording?
+    @ObservationIgnored var liveSpeakers: LiveSpeakerLabeller?
     @ObservationIgnored var separatesRoomVoices = false
     @ObservationIgnored var detection: Task<(segments: [MeetingSegment], voices: [Int: [Float]]), Error>?
 
@@ -51,6 +52,9 @@ final class MeetingModel {
     var message: String?
     var allMeetingsThread: [AskExchange] = []
     var voicesMessage: String?
+    private(set) var hasMyVoice = false
+    private(set) var isRecordingMyVoice = false
+    private(set) var myVoiceMessage: String?
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
     var microphoneMuted = false {
@@ -71,6 +75,7 @@ final class MeetingModel {
     @ObservationIgnored private let store: MeetingStore
     @ObservationIgnored private var writableAskStore: AllMeetingsAskStore?
     @ObservationIgnored private let voiceStore: VoiceStore
+    private static let myVoiceSample = Duration.seconds(30)
     private var heardVoices: [UUID: HeardVoices] = [:]
     @ObservationIgnored private let recorder = MeetingRecorder()
     /// The run that receives the recorder's chunks, including the last ones a stopped meeting hands off.
@@ -85,6 +90,7 @@ final class MeetingModel {
     init(store: MeetingStore? = nil) {
         self.store = store ?? MeetingStore()
         voiceStore = VoiceStore(url: self.store.directory.deletingLastPathComponent().appendingPathComponent("Voices.json"))
+        hasMyVoice = (try? voiceStore.myVoice()) != nil
         if store == nil { Self.removeLeftoverAudio() }
         let loaded = self.store.load()
         meetings = loaded.meetings
@@ -135,6 +141,7 @@ final class MeetingModel {
         showsCallAudioHint = false
         heard = (false, false)
         run.voices = SpeakerDetection.isInstalled() ? try? SpeakerRecording() : nil
+        run.liveSpeakers = run.voices == nil ? nil : LiveSpeakerLabeller()
         run.separatesRoomVoices = separateRoomVoices
         elapsed = 0
         let releasing = releasingRecorder
@@ -192,6 +199,7 @@ final class MeetingModel {
             self.saveNow(id)
             if let voices = run.voices {
                 run.voices = nil
+                run.liveSpeakers = nil
                 await self.findSpeakers(for: run, from: voices)
                 guard self.owns(run) else { return }
             }
@@ -356,8 +364,9 @@ final class MeetingModel {
         run.phase = .findingSpeakers
         let segments = meeting(id)?.segments ?? []
         let provider = run.provider
+        let myVoice = try? voiceStore.myVoice()
         let detection = Task {
-            try await SpeakerDetection.label(segments, voices: voices) { audio, start, duration in
+            try await SpeakerDetection.label(segments, voices: voices, myVoice: myVoice) { audio, start, duration in
                 guard let provider else { return nil }
                 return try await self.segment(of: audio, speaker: .them, start: start, duration: duration, with: provider, for: run)
             }
@@ -443,6 +452,13 @@ final class MeetingModel {
                 edit(id, save: false) { $0.insert(segment) }
                 saveNow(id)
                 if chunk.speaker == .them || run.separatesRoomVoices, let voices = run.voices { try? await voices.append(chunk.url, for: segment.id) }
+                if chunk.speaker == .them, let live = run.liveSpeakers {
+                    await live.add(chunk.url, for: segment.id)
+                    Task { [weak self] in
+                        guard let numbers = await live.speakers(), let self, self.owns(run), run.liveSpeakers != nil else { return }
+                        self.edit(id) { $0.number(numbers) }
+                    }
+                }
             } catch {
                 guard owns(run) else { return }
                 if !(error is CancellationError) {
@@ -502,6 +518,39 @@ final class MeetingModel {
     func forgetVoices() throws {
         heardVoices = [:]
         try voiceStore.forget()
+        hasMyVoice = false
+    }
+
+    /// Records the sample the user asked for, keeps only a profile of the voice in it and deletes the audio.
+    func recordMyVoice() async {
+        guard !isRecordingMyVoice else { return }
+        isRecordingMyVoice = true
+        defer { isRecordingMyVoice = false }
+        let recorder = AudioRecorder()
+        do {
+            try await recorder.start()
+            try await Task.sleep(for: Self.myVoiceSample)
+            let sample = try await recorder.finish()
+            defer { try? FileManager.default.removeItem(at: sample.url) }
+            guard let voice = try await SpeakerDetection.voice(inRecording: sample.url) else {
+                myVoiceMessage = L10n.tr("Not enough of your voice was heard. Try again and keep talking for the whole 30 seconds.")
+                return
+            }
+            try voiceStore.setMyVoice(voice)
+            hasMyVoice = true
+            myVoiceMessage = nil
+        } catch {
+            recorder.cancel()
+            myVoiceMessage = L10n.tr("Your voice couldn’t be saved. %@", String(error.localizedDescription))
+        }
+    }
+
+    func forgetMyVoice() {
+        do {
+            try voiceStore.setMyVoice(nil)
+            hasMyVoice = false
+            myVoiceMessage = nil
+        } catch { myVoiceMessage = voicesError(error) }
     }
 
     func suggestedName(for number: Int, in meeting: Meeting) -> String? {
