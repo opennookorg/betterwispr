@@ -147,6 +147,69 @@ other cleanup providers were not run.
 The structured layout is currently bounded to 20 items. Model output can vary; a likely list may take several seconds longer because it needs a separate layout call. A passing text trial does not establish general
 recognition accuracy or verify microphone, shortcut and paste permissions.
 
+## Microphone silence and stop stall check, 2026-10-31
+
+Diagnosis came from the installed 0.1.6 build with Codex transcription, macOS
+27.2, Mac15,6. On 2026-10-30 one AirPods dictation recorded 26 s of exact
+zeros. coreaudiod logged "HFPInputShimDevice StartIO without owning airpod" and
+took ownership about 100 ms later without restarting the input. A relaunch a
+minute later recorded normally. Fourteen healthy AirPods starts that day sent
+their first nonzero buffer between 0.66 and 1.13 s after the queue started. A
+separate 35 s dictation logged "Finished input" with no recognition, no network
+request and no transcript. The app did not log failures then, so its cause is
+unknown. Two macOS CPU reports from 2026-10-26 show 52% CPU for three minutes
+with the main thread in SwiftUI and Core Animation commits.
+
+The contributor reported that a test blocking the main actor for 0.7 s while
+the stop buffer arrived 40 ms after Stop failed with `inputStalled` before the
+capture worker recorded progress, and passed after. The suite keeps
+`stopBoundaryArrivesFromTheCaptureThreadWithoutTheMainActor` instead, because
+blocking the main actor made other timing tests flaky in a parallel run. The
+contributor also reported running the same changes on 0.1.6 from 2026-11-01 to
+2026-11-06: 53 finished dictations, no "stopped delivering audio" failure and no
+silent-input restart. These are contributor reports, not maintainer checks.
+
+Watch the app's log with
+`log stream --style compact --predicate 'subsystem == "org.betterwispr.app"'`.
+
+Still manual:
+
+- [ ] Play audio from an iPhone to AirPods that are also paired with the Mac,
+  then start a dictation on the Mac and keep speaking. The log shows
+  "Restarting input after 2s of digital silence" once, and words spoken after
+  the first 2 s are recognized.
+- [ ] With the built-in microphone, a USB interface, and AirPods already used by
+  the Mac, dictate several times, including a few seconds of silence before
+  speaking. No restart is logged.
+- [ ] Choose an input that sends exact zeros, such as a virtual device with
+  nothing playing. One restart is logged, not more, and the dictation ends with
+  no speech.
+- [ ] Stop a dictation while the app is busy, such as while the history window
+  scrolls a long list. The dictation is transcribed, and the log shows
+  "Main thread lag" for it rather than "Dictation failed".
+
+## Interfaces with more than two inputs, 2026-11-13
+
+Issue #71 reported "No microphone input is available" with a Focusrite Scarlett
+for both Automatic and the explicit device. `AVAudioFormat` returns nil for a
+float format with more than two channels and no channel layout, which this Mac
+confirmed for 3, 4 and 18 channels, and the capture path turned that into the
+error. Capture now asks the Audio Queue for at most the first two channels.
+`microphoneCaptureRecordsAtMostTheFirstTwoInputsOfAnInterface` covers the
+format. No interface with more than two inputs was available, so the Audio
+Queue's channel reduction has not been exercised on hardware.
+
+Still manual:
+
+- [ ] With a Scarlett or another interface with more than two inputs, dictate
+  with a microphone on input 1, then on input 2, with Automatic and with the
+  interface chosen. Both are transcribed, and the log shows
+  "Started input queue: ... channels=2".
+- [ ] With a Scarlett 4th gen, play audio on the Mac while dictating. The
+  loopback audio is not transcribed.
+- [ ] Dictate once with the built-in microphone and once with a 2-input
+  interface. Both behave as before.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,
@@ -1918,6 +1981,17 @@ were not exercised in this UI pass.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or
   "BetterWispr Meeting Audio", including while a meeting is recording.
+- [ ] Meeting prompt position: with Top center chosen, join a Zoom call and a
+  Google Meet call. "Meeting detected" appears top center below the menu bar
+  and the notch, on the display holding the call window (try a second display
+  and a full-screen call). After answering, the capsule returns to the bottom.
+  Bottom center matches the earlier placement.
+- [ ] Meeting prompt timeout: with 15, 30 and 60 seconds, the seconds left count
+  down beside Start notetaker; at zero the prompt closes, nothing records and it
+  doesn't return during that call, only after the app stops and starts a new
+  one. With Never it stays until answered. VoiceOver reads "Closes in N seconds
+  without recording", and with Reduce Motion on the digits change without
+  animating.
 - [ ] Start notetaker from the capsule and from the menu bar with another app
   focused. A card docks to the right edge of the current screen without stealing
   focus. The expand button opens the meeting in the dashboard and closes the

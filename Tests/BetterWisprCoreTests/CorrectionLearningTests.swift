@@ -209,3 +209,26 @@ private func replacing(_ heard: String, with corrected: String, action: String =
     #expect(model.vocabulary.first?.learned == true)
     #expect(try store.load().vocabulary == model.vocabulary)
 }
+
+@Test func learnedEntriesStayHintsWhenReplacementIsOff() throws {
+    let entries = [VocabularyEntry(phrase: "cloud", replacement: "Claude", learned: true),
+                   VocabularyEntry(phrase: "better whisper", replacement: "BetterWispr")]
+    var settings = AppSettings()
+    #expect(VocabularyProcessor.corrected(settings.replacements(entries), in: "Ask cloud about better whisper") == ("Ask Claude about BetterWispr", 2))
+    settings.replaceLearnedWords = false
+    #expect(VocabularyProcessor.corrected(settings.replacements(entries), in: "Ask cloud about better whisper") == ("Ask cloud about BetterWispr", 1))
+    #expect(VocabularyProcessor.hints(entries) == ["Claude", "BetterWispr"])
+}
+
+@Test func boosterAndReplacementSettingsDefaultOnForOlderSettings() throws {
+    var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettings())) as! [String: Any]
+    object["usePhraseBooster"] = nil
+    object["replaceLearnedWords"] = nil
+    let settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(settings.usePhraseBooster)
+    #expect(settings.replaceLearnedWords)
+    var off = AppSettings()
+    off.usePhraseBooster = false
+    off.replaceLearnedWords = false
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(off)) == off)
+}

@@ -31,11 +31,11 @@ final class MeetingRun {
     @ObservationIgnored var separatesRoomVoices = false
     @ObservationIgnored var detection: Task<(segments: [MeetingSegment], voices: [Int: [Float]]), Error>?
 
-    init(meetingID: UUID, phase: MeetingPhase, language: String? = nil, vocabulary: [VocabularyEntry] = []) {
+    init(meetingID: UUID, phase: MeetingPhase, language: String? = nil, vocabulary: [VocabularyEntry] = [], replacements: [VocabularyEntry]? = nil) {
         self.meetingID = meetingID
         self.phase = phase
         self.language = language
-        self.vocabulary = vocabulary
+        self.vocabulary = replacements ?? vocabulary
         hints = VocabularyProcessor.hints(vocabulary)
     }
 }
@@ -53,6 +53,9 @@ final class MeetingModel {
     var voicesMessage: String?
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
+    var microphoneMuted = false {
+        didSet { recorder.microphoneMuted = microphoneMuted }
+    }
     var showsCallAudioHint = false
     var notesSettings = AppSettings()
     var ollamaModels: [String] = []
@@ -114,13 +117,14 @@ final class MeetingModel {
     /// The meeting being recorded, otherwise the newest one still processing.
     var activeMeetingID: UUID? { meetings.first { runs[$0.id] != nil }?.id }
 
-    func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], silenceThreshold: Float, microphone: AudioInputDevice?,
+    func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], replacements: [VocabularyEntry]? = nil, usesPhraseBooster: Bool = true,
+               silenceThreshold: Float, microphone: AudioInputDevice?,
                event: CalendarEvent? = nil, separateRoomVoices: Bool = false) {
         guard capturing == nil else { return }
         var meeting = Meeting(title: event?.title ?? "", modelName: model.name, language: language ?? "auto")
         meeting.attendees = event?.attendees
         meeting.eventID = event?.id
-        let run = MeetingRun(meetingID: meeting.id, phase: .starting, language: language, vocabulary: vocabulary)
+        let run = MeetingRun(meetingID: meeting.id, phase: .starting, language: language, vocabulary: vocabulary, replacements: replacements)
         run.hints += (event?.attendees ?? []).filter { !$0.contains("@") }
         run.eventTitle = event?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         meetings.insert(meeting, at: 0)
@@ -139,9 +143,11 @@ final class MeetingModel {
                 if model.engine == .apple { try AppleSpeechProvider.checkAvailability(language: language) }
                 try model.connection?.validateLanguage(language)
                 let provider = model.makeProvider()
+                (provider as? ParakeetProvider)?.usesPhraseBooster = usesPhraseBooster
                 await releasing?.value
                 guard let self, self.owns(run) else { return }
                 self.recorderOwner = run
+                self.microphoneMuted = false
                 try await self.recorder.start(silenceThreshold: silenceThreshold, microphone: microphone)
                 guard self.owns(run) else { return }
                 self.systemAudioIssue = self.recorder.systemAudioIssue

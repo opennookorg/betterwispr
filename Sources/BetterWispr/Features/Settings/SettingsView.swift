@@ -131,6 +131,8 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(L10n.tr("After you speak")) {
+                    SettingToggle(L10n.tr("Write numbers as digits"), caption: L10n.tr("“Two tickets for PR forty-two” becomes “2 tickets for PR 42”, in any language. Turn off to keep numbers as spoken words."), isOn: setting(\.writesNumbersAsDigits))
+                    RowDivider()
                     SettingToggle(L10n.tr("Paste into the active app"), caption: L10n.tr("Needs Accessibility. Otherwise, text is copied."), isOn: setting(\.autoPaste))
                     RowDivider()
                     SettingToggle(L10n.tr("Add a space after pasting"), caption: L10n.tr("So the next dictation doesn’t run into this one. Skipped after Chinese or Japanese."), isOn: setting(\.appendTrailingSpace))
@@ -223,6 +225,28 @@ struct SettingsView: View {
                         .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
                     SettingToggle(L10n.tr("Detect meetings"), caption: L10n.tr("Offer the notetaker when Zoom, Google Meet, Teams, a Slack huddle or another call starts using the microphone. Calls in a browser need Accessibility."), isOn: setting(\.detectMeetings))
+                    if model.settings.detectMeetings {
+                        RowDivider()
+                        SettingRow(L10n.tr("Meeting prompt position"), caption: L10n.tr("Where “Meeting detected” appears, on the screen showing the call. At the top it sits below the menu bar and camera.")) {
+                            Picker(L10n.tr("Meeting prompt position"), selection: setting(\.meetingPromptPosition)) {
+                                Text(L10n.tr("Top center")).tag(MeetingPromptPosition.top)
+                                Text(L10n.tr("Bottom center")).tag(MeetingPromptPosition.bottom)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        RowDivider()
+                        SettingRow(L10n.tr("Close meeting prompt"), caption: L10n.tr("A countdown shows beside Start notetaker. When it ends, nothing is recorded and the prompt doesn’t return until that call ends.")) {
+                            Picker(L10n.tr("Close meeting prompt"), selection: setting(\.meetingPromptTimeout)) {
+                                Text(L10n.tr("After 15 seconds")).tag(MeetingPromptTimeout.fifteenSeconds)
+                                Text(L10n.tr("After 30 seconds")).tag(MeetingPromptTimeout.thirtySeconds)
+                                Text(L10n.tr("After 60 seconds")).tag(MeetingPromptTimeout.sixtySeconds)
+                                Text(L10n.tr("Never")).tag(MeetingPromptTimeout.never)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
                     RowDivider()
                     SettingToggle(L10n.tr("Open at login"), caption: L10n.tr("Have BetterWispr ready when your Mac starts."), isOn: setting(\.launchAtLogin))
                     RowDivider()
@@ -367,7 +391,7 @@ struct SettingsView: View {
     }
 
     private var vocabularyCaption: String {
-        guard model.selectedModel.engine == .parakeet else {
+        guard model.selectedModel.engine == .parakeet, model.settings.usePhraseBooster else {
             return L10n.tr("Add the names and terms you say often so they’re written your way.")
         }
         return model.phraseBoosterInstalled

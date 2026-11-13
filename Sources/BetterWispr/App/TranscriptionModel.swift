@@ -40,13 +40,15 @@ final class TranscriptionModel {
 
     func transcript(_ id: UUID) -> Meeting? { transcripts.first { $0.id == id } }
 
-    func transcribe(file: URL, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry], onSaved: @escaping () -> Void = {}) {
+    func transcribe(file: URL, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry],
+                    replacements: [VocabularyEntry]? = nil, onSaved: @escaping () -> Void = {}) {
         start(file.deletingPathExtension().lastPathComponent, model: model, provider: provider, language: language, onSaved: onSaved) { [weak self] id in
-            try await MediaTranscriber.transcribe(file, with: provider, language: language, vocabulary: vocabulary) { self?.update(id, stage: $0) }
+            try await MediaTranscriber.transcribe(file, with: provider, language: language, vocabulary: vocabulary, replacements: replacements) { self?.update(id, stage: $0) }
         }
     }
 
-    func transcribe(link text: String, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry]) {
+    func transcribe(link text: String, with model: SpeechModel, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry],
+                    replacements: [VocabularyEntry]? = nil) {
         let link: MediaLink
         do { link = try MediaLink(text) } catch {
             self.error = error.localizedDescription
@@ -55,7 +57,7 @@ final class TranscriptionModel {
         start(link.url.absoluteString, model: model, provider: provider, language: language) { [weak self] id in
             try await YTDLP.download(link, progress: { self?.update(id, stage: .downloading($0)) }) { audio, title in
                 self?.update(id, title: title, stage: .reading)
-                return try await MediaTranscriber.transcribe(audio, with: provider, language: language, vocabulary: vocabulary) { self?.update(id, stage: $0) }
+                return try await MediaTranscriber.transcribe(audio, with: provider, language: language, vocabulary: vocabulary, replacements: replacements) { self?.update(id, stage: $0) }
             }
         }
     }
@@ -203,12 +205,20 @@ extension AppModel {
 
     func transcribe(file: URL, onSaved: @escaping () -> Void = {}) {
         guard let (speechModel, language) = transcriptionSettings() else { return }
-        transcriptions.transcribe(file: file, with: speechModel, provider: speechModel.makeProvider(), language: language, vocabulary: vocabulary, onSaved: onSaved)
+        transcriptions.transcribe(file: file, with: speechModel, provider: transcriptionProvider(for: speechModel), language: language,
+                                  vocabulary: vocabulary, replacements: settings.replacements(vocabulary), onSaved: onSaved)
     }
 
     func transcribe(link: String) {
         guard let (speechModel, language) = transcriptionSettings() else { return }
-        transcriptions.transcribe(link: link, with: speechModel, provider: speechModel.makeProvider(), language: language, vocabulary: vocabulary)
+        transcriptions.transcribe(link: link, with: speechModel, provider: transcriptionProvider(for: speechModel), language: language,
+                                  vocabulary: vocabulary, replacements: settings.replacements(vocabulary))
+    }
+
+    private func transcriptionProvider(for speechModel: SpeechModel) -> any SpeechProvider {
+        let provider = speechModel.makeProvider()
+        (provider as? ParakeetProvider)?.usesPhraseBooster = settings.usePhraseBooster
+        return provider
     }
 
     private func transcriptionSettings() -> (SpeechModel, String?)? {

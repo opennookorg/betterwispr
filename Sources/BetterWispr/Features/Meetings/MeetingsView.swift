@@ -391,7 +391,8 @@ extension AppModel {
         }
         selectedPage = .meetings
         meetings.start(model: speechModel, language: settings.language == "auto" ? nil : settings.language,
-                       vocabulary: vocabulary, silenceThreshold: settings.silenceThreshold, microphone: settings.microphone, event: event,
+                       vocabulary: vocabulary, replacements: settings.replacements(vocabulary), usesPhraseBooster: settings.usePhraseBooster,
+                       silenceThreshold: settings.silenceThreshold, microphone: settings.microphone, event: event,
                        separateRoomVoices: settings.separateRoomVoices)
     }
 

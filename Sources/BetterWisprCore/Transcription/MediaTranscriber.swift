@@ -17,7 +17,7 @@ public struct MediaTranscript: Sendable {
 /// Transcribes every chunk of a media file in order with the meeting cleanup and vocabulary, then labels voices when speaker detection is installed.
 @MainActor
 public enum MediaTranscriber {
-    public static func transcribe(_ url: URL, with provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry],
+    public static func transcribe(_ url: URL, with provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry], replacements: [VocabularyEntry]? = nil,
                                   findSpeakers: Bool = SpeakerDetection.isInstalled(), progress: (MediaStage) -> Void = { _ in }) async throws -> MediaTranscript {
         progress(.reading)
         let audio = try await MediaAudio(url: url)
@@ -25,7 +25,7 @@ public enum MediaTranscriber {
         defer { voices?.discard() }
         func segment(of chunk: URL, start: TimeInterval, duration: TimeInterval) async throws -> MeetingSegment? {
             let raw = try await provider.transcribe(audioURL: chunk, language: language, vocabulary: VocabularyProcessor.hints(vocabulary))
-            let text = VocabularyProcessor.apply(vocabulary, to: TranscriptCleaner.clean(raw, language: language))
+            let text = VocabularyProcessor.apply(replacements ?? vocabulary, to: TranscriptCleaner.clean(raw, language: language))
             return text.isEmpty ? nil : MeetingSegment(speaker: .them, start: start, duration: duration, text: text, rawText: raw)
         }
         var transcript = MediaTranscript()

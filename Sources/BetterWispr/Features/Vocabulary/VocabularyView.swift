@@ -30,6 +30,15 @@ struct VocabularyView: View {
                 phraseBoosterSection
             }
 
+            if model.settings.learnCorrections || model.vocabulary.contains(where: \.learned) {
+                Section {
+                    Toggle(isOn: setting(\.replaceLearnedWords)) {
+                        Text(L10n.tr("Replace with learned words"))
+                        Text(L10n.tr("When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards."))
+                    }
+                }
+            }
+
             Section {
                 if model.vocabulary.isEmpty {
                     Text(L10n.tr("Add a name that often gets misspelled, a technical term or a phrase you use every day."))
@@ -84,8 +93,10 @@ struct VocabularyView: View {
     private var phraseBoosterSection: some View {
         Section {
             if model.phraseBoosterInstalled {
-                Label(L10n.tr("Phrase booster is on. When you speak English, it listens for these words and fixes the spelling where your voice matches one. It runs on this Mac."), systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
+                Toggle(isOn: setting(\.usePhraseBooster)) {
+                    Text(L10n.tr("Use phrase booster"))
+                    Text(L10n.tr("When you speak English, it listens for these words and fixes the spelling where your voice matches one. It runs on this Mac."))
+                }
             } else {
                 let installation = model.installation?.id == AppModel.phraseBoosterID ? model.installation : nil
                 let installing = installation != nil && installation?.failure == nil
@@ -108,6 +119,11 @@ struct VocabularyView: View {
                 }
             }
         }
+    }
+
+    private func setting(_ keyPath: WritableKeyPath<AppSettings, Bool>) -> Binding<Bool> {
+        Binding(get: { model.settings[keyPath: keyPath] },
+                set: { model.settings[keyPath: keyPath] = $0; model.saveSettings() })
     }
 
     private func addEntry() {

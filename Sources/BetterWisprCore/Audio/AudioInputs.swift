@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import CoreAudio
 import Foundation
+import os
 
 /// A microphone keyed by its Core Audio UID, so a saved choice survives unplugging and reconnecting.
 public struct AudioInputDevice: Codable, Hashable, Identifiable, Sendable {
@@ -47,10 +48,15 @@ public enum AudioInputs {
         var stream = AudioStreamBasicDescription()
         var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
         guard AudioObjectGetPropertyData(id, &property, 0, nil, &size, &stream) == noErr,
-              stream.mSampleRate > 0, stream.mChannelsPerFrame > 0,
-              let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: stream.mSampleRate,
-                                         channels: stream.mChannelsPerFrame, interleaved: true) else { throw AudioRecordingError.unavailable }
+              let format = captureFormat(stream) else { throw AudioRecordingError.unavailable }
         return (device, id, format)
+    }
+
+    /// Records an interface's first two inputs, where its microphone preamps are, and leaves out loopback channels.
+    static func captureFormat(_ stream: AudioStreamBasicDescription) -> AVAudioFormat? {
+        guard stream.mSampleRate > 0, stream.mChannelsPerFrame > 0 else { return nil }
+        return AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: stream.mSampleRate,
+                             channels: min(stream.mChannelsPerFrame, 2), interleaved: true)
     }
 
     private static let system = AudioObjectID(kAudioObjectSystemObject)
@@ -98,32 +104,41 @@ public enum AudioInputs {
     }
 }
 
-/// Tracks delivered audio on the main actor, rather than treating hardware startup as proof of capture.
-@MainActor
-final class AudioCaptureProgress {
-    private(set) var generation = UUID()
-    private var latestEnd: TimeInterval?
-    private var cancelled = false
+/// Tracks delivered audio from the capture worker, so a busy main thread cannot make capture look stalled.
+final class AudioCaptureProgress: Sendable {
+    private struct State {
+        var generation = UUID()
+        var latestEnd: TimeInterval?
+        var cancelled = false
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var generation: UUID { state.withLock { $0.generation } }
 
     @discardableResult
     func begin() -> UUID {
-        generation = UUID()
-        latestEnd = nil
-        return generation
+        state.withLock {
+            $0.generation = UUID()
+            $0.latestEnd = nil
+            return $0.generation
+        }
     }
 
     func receive(through end: TimeInterval, generation: UUID) {
-        guard !cancelled, self.generation == generation, end.isFinite else { return }
-        latestEnd = max(latestEnd ?? end, end)
+        state.withLock {
+            guard !$0.cancelled, $0.generation == generation, end.isFinite else { return }
+            $0.latestEnd = max($0.latestEnd ?? end, end)
+        }
     }
 
-    func cancel() { cancelled = true }
+    func cancel() { state.withLock { $0.cancelled = true } }
 
     /// Waits for the first buffer (silence counts), or for the buffer covering a stop boundary, never a fixed tail delay.
     func wait(through boundary: TimeInterval? = nil) async throws {
         let deadline = ContinuousClock.now + (boundary == nil ? .seconds(3) : .milliseconds(500))
         while true {
             try Task.checkCancellation()
+            let (cancelled, latestEnd) = state.withLock { ($0.cancelled, $0.latestEnd) }
             guard !cancelled else { throw CancellationError() }
             if let latestEnd, latestEnd >= (boundary ?? -.infinity) { return }
             guard ContinuousClock.now < deadline else { throw AudioRecordingError.inputStalled }
@@ -131,7 +146,7 @@ final class AudioCaptureProgress {
         }
     }
 
-    nonisolated static func endTime(_ time: AVAudioTime, frames: AVAudioFrameCount, sampleRate: Double) -> TimeInterval {
+    static func endTime(_ time: AVAudioTime, frames: AVAudioFrameCount, sampleRate: Double) -> TimeInterval {
         time.isHostTimeValid
             ? AVAudioTime.seconds(forHostTime: time.hostTime) + Double(frames) / sampleRate
             : ProcessInfo.processInfo.systemUptime

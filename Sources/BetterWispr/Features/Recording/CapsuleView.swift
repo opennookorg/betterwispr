@@ -15,9 +15,8 @@ struct CapsuleView: View {
             DictationFailure(title: L10n.tr("Notetaker needs attention"), message: $0)
         })
     }
-    private var meetingPrompt: DetectedMeeting? {
-        model.isBusy || isMeetingCapturing ? nil : model.meetingDetector.meeting
-    }
+    private var meetingPrompt: DetectedMeeting? { model.meetingPrompt }
+    private var atTop: Bool { model.showsCapsuleAtTop }
     private var showsCard: Bool {
         switch model.phase {
         case .cancelled, .completed, .unpasted, .failed, .sending, .asking: true
@@ -29,20 +28,25 @@ struct CapsuleView: View {
     }
     private var showsToolbar: Bool { !showsCard && !model.isBusy && !isMeetingCapturing && hover.isHovering }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
-    private var swap: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)) }
+    private var swap: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: atTop ? .top : .bottom)) }
 
     var body: some View {
         VStack(spacing: 6) {
-            Spacer(minLength: 0)
-            if !showsCard, let target = hover.target {
-                tooltip(for: target)
+            if atTop {
+                surface
+                Spacer(minLength: 0)
+            } else {
+                Spacer(minLength: 0)
+                if !showsCard, let target = hover.target {
+                    tooltip(for: target)
+                }
+                if model.isBusy, !model.liveTranscript.isEmpty {
+                    livePreview
+                }
+                surface
             }
-            if model.isBusy, !model.liveTranscript.isEmpty {
-                livePreview
-            }
-            surface
         }
-        .padding(.bottom, 16)
+        .padding(atTop ? .top : .bottom, atTop ? 8 : 16)
         .frame(width: 440, height: 240)
         .coordinateSpace(name: "capsule")
         .onPreferenceChange(CapsuleRegions.self) { hover.update(regions: $0) }
@@ -61,7 +65,11 @@ struct CapsuleView: View {
         }
         .onChange(of: meetingPrompt) {
             guard let meetingPrompt else { return }
-            AccessibilityNotification.Announcement(L10n.tr("%@ meeting detected. You can start the notetaker from the capsule.", String(meetingPrompt.platform.name))).post()
+            let platform = String(meetingPrompt.platform.name)
+            let announcement = model.meetingDetector.deadline.map {
+                L10n.tr("%@ meeting detected. You can start the notetaker from the capsule. It closes in %@ seconds.", platform, String(Int($0.timeIntervalSinceNow.rounded())))
+            } ?? L10n.tr("%@ meeting detected. You can start the notetaker from the capsule.", platform)
+            AccessibilityNotification.Announcement(announcement).post()
         }
         .onChange(of: model.unpasted) {
             guard model.unpasted != nil else { return }
@@ -363,6 +371,9 @@ struct CapsuleView: View {
             }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 6)
+            if let deadline = model.meetingDetector.deadline {
+                MeetingPromptCountdown(deadline: deadline)
+            }
             HStack(spacing: 0) {
                 Button {
                     model.meetingDetector.dismiss()
@@ -417,7 +428,7 @@ struct CapsuleView: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 12)
-        .frame(width: 384, height: 52)
+        .frame(width: model.meetingDetector.deadline == nil ? 384 : 412, height: 52)
     }
 
     private func dismissFailure() {
@@ -621,6 +632,26 @@ private struct CapsuleWaveform: View {
             return .listening(VoiceLevels(values: [max(model.meetings.levels.me, model.meetings.levels.them)]))
         }
         return model.phase == .recording ? .listening(model.voiceLevels) : .waiting
+    }
+}
+
+/// Seconds left before the meeting prompt closes by itself, read by VoiceOver as a sentence.
+private struct MeetingPromptCountdown: View {
+    let deadline: Date
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let seconds = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+            Text(verbatim: "\(seconds)s")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.6))
+                .contentTransition(reduceMotion ? .identity : .numericText(countsDown: true))
+                .animation(reduceMotion ? nil : .default, value: seconds)
+                .fixedSize()
+                .help(L10n.tr("Closes without recording when this reaches zero"))
+                .accessibilityLabel(L10n.tr("Closes in %@ seconds without recording", String(seconds)))
+        }
     }
 }
 

@@ -70,7 +70,10 @@ the policy immediately and persist through the existing workspace store.
    again before transcription. Model downloads are separate user actions.
 3. Record microphone audio locally and publish levels to the capsule. Stopping
    drains the in-flight input buffer and closes the file before preparing the
-   selected provider and recognizing it.
+   selected provider and recognizing it. The capture worker records which audio
+   has arrived, so a busy main thread cannot make the stop look stalled. If an
+   input sends only exact zeros for 2 s, the recorder restarts it once. AirPods do
+   that when capture starts just before macOS takes them over from another device.
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
    Entries written as a voice command ("question mark", "at the rate") are not
    hints, because boosting command words drops neighbouring words.
@@ -86,6 +89,11 @@ the policy immediately and persist through the existing workspace store.
    spell checking rejects, because a name on screen is no evidence it was said.
    With no vocabulary hints, the phrase booster pass runs only when the first
    pass has a misspelled word. Screen-term replacements are not vocabulary fixes.
+   With "Use phrase booster" off (`AppSettings.usePhraseBooster`), Parakeet
+   skips the booster pass and screen terms are not captured. With "Replace
+   with learned words" off (`AppSettings.replaceLearnedWords`), learned entries
+   are still hints, but `AppSettings.replacements` drops them before
+   `VocabularyProcessor` rewrites dictation, meeting and media text.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running. The Parakeet live preview is the
    one exception: `LiveTranscriber` re-recognizes the unconfirmed tail of the
@@ -645,10 +653,18 @@ local state and never records anything itself.
    0.25 second timeout. While an unmatched browser records, titles are checked
    again every 3 seconds.
 4. Each call is offered once. Starting the notetaker, choosing Not now or letting
-   the prompt expire after 30 seconds marks that app's call as answered. Calls
+   the prompt expire marks that app's call as answered. Expiry goes through the
+   same `dismiss()` as Not now and records nothing. `meetingPromptTimeout` picks
+   15, 30 (the default) or 60 seconds, or never; the card shows the seconds left
+   beside Start notetaker. Calls
    that run while the notetaker records are answered too. A new call is offered
    while an earlier meeting is still processing. An app's answer is forgotten
    when it stops recording.
+5. While the prompt is pending, the capsule moves to the screen holding the call
+   app's frontmost on-screen window (read from `CGWindowListCopyWindowInfo`,
+   which needs no Screen Recording access), falling back to the pointer's screen.
+   `meetingPromptPosition` keeps it at the bottom (the default) or places it top
+   center, below both the menu bar and the camera housing's safe-area inset.
 
 `AppSettings.notesSelection` resolves the legacy Ollama choice plus the new optional
 CLI or notes-connection selection. Old workspaces decode without changing providers.
