@@ -24,8 +24,7 @@ final class CapsuleHover {
     func move(to point: CGPoint?) {
         location = point
         guard let point, let surface = regions[.surface] else {
-            isHovering = false
-            target = nil
+            set(isHovering: false, target: nil)
             return
         }
         // Keep the activation area stable while the small resting pill expands.
@@ -33,10 +32,16 @@ final class CapsuleHover {
         let height = max(32, surface.height)
         let activation = CGRect(x: surface.midX - width / 2 - 6, y: surface.maxY - height - 8,
                                 width: width + 12, height: height + 16)
-        isHovering = activation.contains(point)
+        let inside = activation.contains(point)
         let hit = [Target.microphone, .notetaker, .meetingNotes, .dictation].first { regions[$0]?.contains(point) == true }
         // Crossing the narrow gap between controls must not flash the tooltip off.
-        target = hit ?? (isHovering && target.flatMap { regions[$0] } != nil ? target : nil)
+        set(isHovering: inside, target: hit ?? (inside && target.flatMap { regions[$0] } != nil ? target : nil))
+    }
+
+    /// Writes only changes, since every pointer move on screen lands here.
+    private func set(isHovering: Bool, target: Target?) {
+        if self.isHovering != isHovering { self.isHovering = isHovering }
+        if self.target != target { self.target = target }
     }
 }
 
@@ -72,12 +77,13 @@ private final class CapsuleHostingView: NSHostingView<CapsuleView> {
     @MainActor @preconcurrency required init(rootView: CapsuleView) { fatalError("init(rootView:) is unavailable") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseMoved(with event: NSEvent) { super.mouseMoved(with: event); track(event) }
-    override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); track(event) }
-    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); hover.move(to: nil) }
+    override func mouseMoved(with event: NSEvent) { super.mouseMoved(with: event); trackPointer() }
+    override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); trackPointer() }
+    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); trackPointer() }
 
-    private func track(_ event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
+    func trackPointer() {
+        guard let window else { return }
+        let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
         hover.move(to: CGPoint(x: point.x, y: isFlipped ? point.y : bounds.maxY - point.y))
     }
 }
@@ -93,9 +99,13 @@ extension AppModel {
 final class CapsuleController {
     private let panel: NSPanel
     private let model: AppModel
+    private let hover = CapsuleHover()
+    private let content: CapsuleHostingView
+    private var pointerMonitors: [Any] = []
 
     init(model: AppModel) {
         self.model = model
+        content = CapsuleHostingView(model: model, hover: hover)
         panel = RecordingPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = true
@@ -107,12 +117,22 @@ final class CapsuleController {
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
         panel.isReleasedWhenClosed = false
-        panel.contentView = CapsuleHostingView(model: model, hover: CapsuleHover())
+        panel.contentView = content
         NotificationCenter.default.addObserver(self, selector: #selector(reposition),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(reposition),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         observeMeetings()
+        observeHover()
+        pointerMonitors = [
+            NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+                MainActor.assumeIsolated { self?.content.trackPointer() }
+            },
+            NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+                MainActor.assumeIsolated { self?.content.trackPointer() }
+                return event
+            }
+        ].compactMap { $0 }
     }
 
     func update() {
@@ -132,8 +152,19 @@ final class CapsuleController {
         }
     }
 
+    /// Lets clicks outside the capsule's hover area reach the apps below the transparent panel.
+    private func observeHover() {
+        panel.ignoresMouseEvents = !hover.isHovering
+        withObservationTracking {
+            _ = hover.isHovering
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.observeHover() }
+        }
+    }
+
     func show() {
         reposition()
+        content.trackPointer()
         panel.orderFrontRegardless()
     }
 
@@ -145,6 +176,8 @@ final class CapsuleController {
     }
 
     func close() {
+        pointerMonitors.forEach(NSEvent.removeMonitor)
+        pointerMonitors = []
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         panel.close()
