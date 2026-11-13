@@ -383,7 +383,9 @@ struct MeetingDetailView: View {
 
     private func writeNotesCard(_ meeting: Meeting) -> some View {
         let unavailable: String? = switch meetings.notesAvailability {
-        case .available: meeting.hasContent ? nil : MeetingNotesError.nothingToSummarize.localizedDescription
+        case .available: meeting.hasContent
+            ? MeetingNotesGenerator.summaryLanguageProblem(settings: meetings.notesSettings, meetingLanguage: meeting.language)
+            : MeetingNotesError.nothingToSummarize.localizedDescription
         case .unavailable(let reason): reason
         }
         return VStack(alignment: .leading, spacing: 12) {

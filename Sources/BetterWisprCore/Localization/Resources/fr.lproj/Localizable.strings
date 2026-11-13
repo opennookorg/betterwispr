@@ -1127,3 +1127,7 @@
 "Closes in %@ seconds without recording" = "Se ferme dans %@ secondes sans enregistrer";
 "Replace with learned words" = "Remplacer par les mots appris";
 "When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards." = "Si désactivé, les entrées apprises aident seulement le modèle vocal à les reconnaître, et les mots prononcés ne sont plus remplacés par elles ensuite.";
+"Apple Intelligence can’t write notes in %@ on this Mac. Choose another Summary language or notes model in Models." = "Apple Intelligence ne peut pas rédiger de notes en %@ sur ce Mac. Choisissez une autre langue du résumé ou un autre modèle de notes dans Modèles.";
+"Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most." = "« Comme la réunion » rédige les notes dans la langue parlée définie lors de l’enregistrement. Avec la détection automatique, elles suivent la langue la plus parlée.";
+"Summary language" = "Langue du résumé";
+"Same as meeting" = "Comme la réunion";

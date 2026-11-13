@@ -1127,3 +1127,7 @@
 "Closes in %@ seconds without recording" = "Closes in %@ seconds without recording";
 "Replace with learned words" = "Replace with learned words";
 "When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards." = "When off, learned entries only help the speech model hear them, and words you said are no longer swapped for them afterwards.";
+"Apple Intelligence can’t write notes in %@ on this Mac. Choose another Summary language or notes model in Models." = "Apple Intelligence can’t write notes in %@ on this Mac. Choose another Summary language or notes model in Models.";
+"Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most." = "Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most.";
+"Summary language" = "Summary language";
+"Same as meeting" = "Same as meeting";

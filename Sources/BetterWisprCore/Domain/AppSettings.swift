@@ -175,6 +175,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Speaker detection keeps the voices the user names on this Mac and names them again in later meetings.
     public var rememberVoices: Bool = false
     public var notesModel: String?
+    /// Nil writes meeting notes in the meeting's spoken language.
+    public var summaryLanguage: String?
     /// Nil asks questions with the notes model.
     public var askSelection: NotesModelSelection?
     public var cleanupSelection: NotesModelSelection?
@@ -318,6 +320,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         styles = try container.decodeIfPresent([StyleContext: StyleTone].self, forKey: .styles) ?? [:]
         modes = try container.decodeIfPresent([WritingMode].self, forKey: .modes) ?? []
         notesModel = try container.decodeIfPresent(String.self, forKey: .notesModel)
+        summaryLanguage = try? container.decodeIfPresent(String.self, forKey: .summaryLanguage)
         askSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .askSelection)
         cleanupSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .cleanupSelection)
         notesBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .notesBuiltIn) ?? false
