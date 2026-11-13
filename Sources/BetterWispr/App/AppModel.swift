@@ -220,6 +220,7 @@ final class AppModel {
     var accessibilityGranted = AXIsProcessTrusted()
     var calendarGranted = CalendarEvents.isAuthorized
     var calendarAccounts: [CalendarAccount] = []
+    var upcomingEvents: [CalendarEvent] = []
     @ObservationIgnored let calendarEvents = CalendarEvents()
     var microphones: [AudioInputDevice] = []
     var automaticMicrophone: AudioInputDevice?
@@ -1990,7 +1991,16 @@ final class AppModel {
                 return
             }
             calendarAccounts = await calendarEvents.accounts()
+            await refreshUpcomingEvents()
         }
+    }
+
+    /// Re-reads the next seven days of events from the calendars meeting notes use.
+    func refreshUpcomingEvents() async {
+        calendarGranted = CalendarEvents.isAuthorized
+        guard settings.useCalendar, calendarGranted else { upcomingEvents = []; return }
+        calendarAccounts = await calendarEvents.accounts()
+        upcomingEvents = await calendarEvents.upcoming(excluding: settings.excludedCalendarIDs)
     }
 
     func refreshPermissions() {

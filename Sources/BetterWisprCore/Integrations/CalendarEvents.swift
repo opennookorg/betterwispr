@@ -1,3 +1,4 @@
+import CoreGraphics
 import EventKit
 import Foundation
 
@@ -13,9 +14,12 @@ public struct CalendarEvent: Equatable, Sendable {
     /// Invitees other than the user, by name, or by email when the invite gives no name.
     public var attendees: [String]
     public var videoURL: URL?
+    public var calendarTitle: String
+    /// The calendar's color as sRGB components, when Calendar gives one.
+    public var calendarColor: SIMD3<Double>?
 
     public init(id: String, title: String, start: Date, end: Date, isAllDay: Bool = false, isAttending: Bool = true, attendees: [String] = [],
-                videoURL: URL? = nil) {
+                videoURL: URL? = nil, calendarTitle: String = "", calendarColor: SIMD3<Double>? = nil) {
         self.id = id
         self.title = title
         self.start = start
@@ -24,6 +28,8 @@ public struct CalendarEvent: Equatable, Sendable {
         self.isAttending = isAttending
         self.attendees = attendees
         self.videoURL = videoURL
+        self.calendarTitle = calendarTitle
+        self.calendarColor = calendarColor
     }
 
     static let earlyStart: TimeInterval = 5 * 60
@@ -34,6 +40,11 @@ public struct CalendarEvent: Equatable, Sendable {
         events
             .filter { $0.isAttending && !$0.isAllDay && $0.start.addingTimeInterval(-earlyStart) <= now && now < $0.end }
             .max { ($0.videoURL == nil ? 0 : 1, $0.start) < ($1.videoURL == nil ? 0 : 1, $1.start) }
+    }
+
+    /// The events the user attends that have not ended at `now`, soonest first.
+    public static func upcoming(_ events: [CalendarEvent], at now: Date) -> [CalendarEvent] {
+        events.filter { $0.isAttending && now < $0.end }.sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
     }
 
     /// How a meeting lists an invitee: the name on the invite, else the email address, else nothing.
@@ -76,6 +87,9 @@ public actor CalendarEvents {
 
     public static var isAuthorized: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
 
+    /// Whether macOS will no longer show the Calendar prompt, so access can only be given in System Settings.
+    public static var isDenied: Bool { [.denied, .restricted, .writeOnly].contains(EKEventStore.authorizationStatus(for: .event)) }
+
     /// Shows the macOS Calendar permission prompt the first time; later calls return the saved answer.
     public func requestAccess() async -> Bool {
         (try? await store.requestFullAccessToEvents()) ?? false
@@ -100,6 +114,15 @@ public actor CalendarEvents {
         return CalendarEvent.current(store.events(matching: predicate).map(CalendarEvent.init), at: now)
     }
 
+    /// The events from now until the end of the `days`-th day, in the calendars the user did not exclude.
+    public func upcoming(excluding excluded: Set<String>, from now: Date = .now, days: Int = 7) -> [CalendarEvent] {
+        guard Self.isAuthorized else { return [] }
+        let calendars = freshCalendars().filter { !excluded.contains($0.calendarIdentifier) }
+        guard !calendars.isEmpty, let end = Calendar.current.date(byAdding: .day, value: days, to: Calendar.current.startOfDay(for: now)) else { return [] }
+        let predicate = store.predicateForEvents(withStart: now, end: end, calendars: calendars)
+        return CalendarEvent.upcoming(store.events(matching: predicate).map(CalendarEvent.init), at: now)
+    }
+
     /// The event calendars re-read from the Calendar database, so access granted again after a revoke takes effect without a relaunch.
     private func freshCalendars() -> [EKCalendar] {
         store.reset()
@@ -119,7 +142,15 @@ extension CalendarEvent {
             attendees: (event.attendees ?? [])
                 .filter { !$0.isCurrentUser && $0.participantType != .room && $0.participantType != .resource }
                 .compactMap { Self.invitee(name: $0.name, url: $0.url) },
-            videoURL: Self.videoURL(in: [event.url?.absoluteString, event.location, event.notes].compactMap { $0 })
+            videoURL: Self.videoURL(in: [event.url?.absoluteString, event.location, event.notes].compactMap { $0 }),
+            calendarTitle: event.calendar?.title ?? "",
+            calendarColor: event.calendar?.cgColor.flatMap(Self.sRGB)
         )
+    }
+
+    private static func sRGB(_ color: CGColor) -> SIMD3<Double>? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let parts = color.converted(to: space, intent: .defaultIntent, options: nil)?.components, parts.count >= 3 else { return nil }
+        return SIMD3(Double(parts[0]), Double(parts[1]), Double(parts[2]))
     }
 }

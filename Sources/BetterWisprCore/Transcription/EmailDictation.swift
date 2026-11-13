@@ -3,9 +3,19 @@ import Foundation
 public enum EmailDictation {
     private static let formalClosings = ["regards", "sincerely", "yours", "wishes"]
 
-    /// Whether the dictation opens by asking for an email, such as "write an email to Sam …".
-    public static func isRequest(_ text: String) -> Bool {
-        (try? #/^\s*(?:please\s+)?(?:write|draft|compose|send)\s+(?:an?\s+)?(?:quick\s+|short\s+)?e-?mail\b/#.ignoresCase().prefixMatch(in: text)) != nil
+    /// Whether the dictation opens by asking for an email, such as "can you write an email to Sam …".
+    public static func isRequest(_ text: String) -> Bool { request(in: text) != nil }
+
+    /// The text after the spoken email request's sentence, or the whole text when there is no request.
+    public static func afterRequest(_ text: String) -> Substring {
+        guard let request = request(in: text) else { return text[...] }
+        let rest = text[request.upperBound...]
+        return rest.firstIndex(where: { ".?!:".contains($0) }).map { rest[rest.index(after: $0)...] } ?? rest
+    }
+
+    private static func request(in text: String) -> Range<String.Index>? {
+        let lead = #/(?:^|[.?!,:]\s*|\b(?:please|you|so|now|just|and|then|okay|ok|uh|um)\s+)(?:please\s+)?(?:write|draft|compose|send)\s+(?:me\s+)?(?:an?\s+|this\s+|the\s+)?(?:quick\s+|short\s+)?e-?mail\b/#
+        return (try? lead.ignoresCase().firstMatch(in: text.prefix(160)))?.range
     }
 
     /// Lays out "write an email to Sam saying …" as a greeting, body and sign-off, or returns nil for any other text.

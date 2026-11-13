@@ -2,10 +2,10 @@ import BetterWisprCore
 import SwiftUI
 
 enum AppPage: String, CaseIterable, Identifiable {
-    case overview, insights, meetings, transcribe, history, models, vocabulary, style, settings, about
+    case overview, insights, meetings, calendar, transcribe, history, models, vocabulary, style, settings, about
 
     static let sections: [(title: String?, pages: [AppPage])] = [
-        (nil, [.overview, .insights, .meetings, .transcribe, .history]),
+        (nil, [.overview, .insights, .meetings, .calendar, .transcribe, .history]),
         (L10n.tr("Personalize"), [.models, .vocabulary, .style]),
         (L10n.tr("App"), [.settings, .about]),
     ]
@@ -15,6 +15,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         switch self {
         case .overview: L10n.tr("Home")
         case .meetings: L10n.tr("Notetaker")
+        case .calendar: L10n.tr("Calendar")
         case .insights: L10n.tr("Insights")
         case .transcribe: L10n.tr("Transcribe")
         case .history: L10n.tr("History")
@@ -30,6 +31,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .overview: "house"
         case .insights: "chart.bar"
         case .meetings: "note.text"
+        case .calendar: "calendar"
         case .transcribe: "waveform"
         case .history: "clock"
         case .models: "cpu"
@@ -111,6 +113,7 @@ struct DashboardView: View {
         case .overview: HomeView(model: model)
         case .insights: InsightsView(history: model.history, savesHistory: model.settings.saveHistory)
         case .meetings: MeetingsView(model: model)
+        case .calendar: CalendarView(model: model)
         case .transcribe: TranscribeView(model: model)
         case .history: HistoryView(model: model)
         case .models: ModelsView(model: model)

@@ -38,6 +38,17 @@ private func event(_ id: String, from start: TimeInterval, to end: TimeInterval,
     #expect(CalendarEvent.current(ignored + [standup, review, call], at: now) == call)
 }
 
+@Test func upcomingEventsKeepOnlyUnfinishedAttendedEventsSoonestFirst() {
+    let finished = event("finished", from: -60, to: 0)
+    let declined = event("declined", from: 30, to: 60, attending: false)
+    let ongoing = event("ongoing", from: -10, to: 20)
+    let allDay = event("all day", from: -600, to: 600, allDay: true)
+    let tomorrow = event("tomorrow", from: 1440, to: 1500, video: true)
+    let soon = event("soon", from: 10, to: 40)
+
+    #expect(CalendarEvent.upcoming([tomorrow, finished, soon, declined, ongoing, allDay], at: now).map(\.id) == ["all day", "ongoing", "soon", "tomorrow"])
+}
+
 @Test func videoLinksComeOnlyFromKnownCallHostsInTheURLLocationOrNotes() {
     let hosts = [
         ["https://us02web.zoom.us/j/123?pwd=abc"],

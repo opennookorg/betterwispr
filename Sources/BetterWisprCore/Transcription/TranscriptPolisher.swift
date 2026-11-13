@@ -371,7 +371,7 @@ public enum TranscriptPolisher {
         let before = text.split(whereSeparator: \.isWhitespace).count
         let after = words.split(whereSeparator: \.isWhitespace).count
         guard after >= max(1, before * 2 / 5), after <= before + max(2, before / 5) + extra else { return nil }
-        guard !text.contains("?") || edited.contains("?") else { return nil }
+        guard !EmailDictation.afterRequest(text).contains("?") || edited.contains("?") else { return nil }
         let said = Set(CorrectionLearner.tokenize(([text] + lines).joined(separator: "\n")).map { $0.lowercased() })
         let meaningful = CorrectionLearner.tokenize(words).map { $0.lowercased() }.filter { $0.count > 3 || $0.contains(where: \.isNumber) }
         guard meaningful.filter({ !said.contains($0) }).count * 4 <= meaningful.count else { return nil }
