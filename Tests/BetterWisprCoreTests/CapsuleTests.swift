@@ -444,3 +444,94 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
     try await Task.sleep(for: .milliseconds(150))
     #expect(!resolved && notSent == 0)
 }
+
+@Test @MainActor func expiredMeetingPromptRecordsNothingAndStaysDismissedForThatCall() async throws {
+    let model = AppModel(store: LocalStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
+                         startsServices: false)
+    let detector = model.meetingDetector
+    let zoom = DetectedMeeting(platform: .zoom, appID: "us.zoom.xos")
+    #expect(detector.timeout == 30)
+
+    detector.timeout = 0.05
+    detector.update([zoom], recording: [zoom.appID])
+    let deadline = try #require(detector.deadline)
+    #expect(deadline.timeIntervalSinceNow <= 0.05)
+    try await waitUntil { detector.meeting == nil }
+    #expect(detector.meeting == nil && detector.deadline == nil)
+    #expect(model.meetings.capturingID == nil && model.meetings.runs.isEmpty)
+    detector.update([zoom], recording: [zoom.appID])
+    #expect(detector.meeting == nil)
+
+    detector.update([], recording: [])
+    detector.timeout = MeetingPromptTimeout.never.seconds
+    detector.update([zoom], recording: [zoom.appID])
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(detector.meeting == zoom && detector.deadline == nil)
+
+    detector.timeout = 0.05
+    #expect(detector.deadline != nil)
+    try await waitUntil { detector.meeting == nil }
+    #expect(detector.meeting == nil)
+}
+
+@MainActor private func waitUntil(_ condition: () -> Bool) async throws {
+    let clock = ContinuousClock()
+    let limit = clock.now + .seconds(5)
+    while !condition(), clock.now < limit { try await Task.sleep(for: .milliseconds(20)) }
+}
+
+@Test @MainActor func savingSettingsAppliesTheMeetingPromptTimeout() {
+    let model = AppModel(store: LocalStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
+                         startsServices: false)
+    model.settings.meetingPromptTimeout = .sixtySeconds
+    model.saveSettings()
+    #expect(model.meetingDetector.timeout == 60)
+    model.settings.meetingPromptTimeout = .never
+    model.saveSettings()
+    #expect(model.meetingDetector.timeout == nil)
+}
+
+@Test func olderAndUnknownMeetingPromptSettingsDecodeToTodaysBehavior() throws {
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettings())) as? [String: Any])
+    json["meetingPromptPosition"] = nil
+    json["meetingPromptTimeout"] = nil
+    var settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(settings.meetingPromptPosition == .bottom && settings.meetingPromptTimeout == .thirtySeconds)
+
+    json["meetingPromptPosition"] = "left"
+    json["meetingPromptTimeout"] = 90
+    settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(settings.meetingPromptPosition == .bottom && settings.meetingPromptTimeout == .thirtySeconds)
+
+    json["meetingPromptPosition"] = "top"
+    json["meetingPromptTimeout"] = 0
+    settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(settings.meetingPromptPosition == .top && settings.meetingPromptTimeout == .never)
+}
+
+@Test @MainActor func meetingPromptSitsBelowTheMenuBarAndNotchOrAtTheBottom() {
+    let size = CGSize(width: 440, height: 240)
+    let frame = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let visible = CGRect(x: 0, y: 70, width: 1512, height: 875)
+    #expect(CapsuleController.origin(atTop: false, size: size, frame: frame, visibleFrame: visible, safeTop: 32) == CGPoint(x: 536, y: 82))
+    #expect(CapsuleController.origin(atTop: true, size: size, frame: frame, visibleFrame: visible, safeTop: 32) == CGPoint(x: 536, y: 701))
+
+    let fullScreen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    #expect(CapsuleController.origin(atTop: true, size: size, frame: frame, visibleFrame: fullScreen, safeTop: 32) == CGPoint(x: 536, y: 706))
+    #expect(CapsuleController.origin(atTop: true, size: size, frame: frame, visibleFrame: fullScreen, safeTop: 0) == CGPoint(x: 536, y: 738))
+
+    let side = CGRect(x: 1512, y: -200, width: 1920, height: 1080)
+    #expect(CapsuleController.origin(atTop: true, size: size, frame: side, visibleFrame: side.insetBy(dx: 0, dy: 12), safeTop: 0)
+            == CGPoint(x: 2252, y: 624))
+}
+
+@Test @MainActor func meetingPromptFollowsTheScreenHoldingTheCallWindow() {
+    let screens = [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: -200, width: 1920, height: 1080)]
+    #expect(CapsuleController.screenIndex(showing: [CGRect(x: 1600, y: 300, width: 1200, height: 800)], in: screens) == 1)
+    #expect(CapsuleController.screenIndex(showing: [CGRect(x: 100, y: 100, width: 900, height: 600)], in: screens) == 0)
+    #expect(CapsuleController.screenIndex(showing: [CGRect(x: 1600, y: 300, width: 80, height: 40),
+                                                    CGRect(x: 100, y: 100, width: 900, height: 600)], in: screens) == 0)
+    #expect(CapsuleController.screenIndex(showing: [CGRect(x: 1300, y: 100, width: 400, height: 300)], in: screens) == 0)
+    #expect(CapsuleController.screenIndex(showing: [CGRect(x: 9000, y: 9000, width: 900, height: 600)], in: screens) == nil)
+    #expect(CapsuleController.screenIndex(showing: [], in: screens) == nil)
+}

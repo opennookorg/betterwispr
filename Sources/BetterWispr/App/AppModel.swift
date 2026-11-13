@@ -305,6 +305,7 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
+        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
         mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: "Couldn’t mute other apps", $0)) }
@@ -937,7 +938,9 @@ final class AppModel {
                 let sharesContext = recording.settings.sharesContext(startedIn: recording.mode, trigger: trigger?.mode)
                 if !sharesContext { context?.cancel() }
                 let heard = VocabularyProcessor.correctedCommands(entries, in: cleaned)
-                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
+                let digits = recording.settings.writesNumbersAsDigits
+                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
+                if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
@@ -1769,6 +1772,7 @@ final class AppModel {
         }
         applyAppearance()
         if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
+        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         meetings.remembersVoices = settings.rememberVoices
         onPresentationChange?()
     }

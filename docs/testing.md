@@ -121,6 +121,28 @@ Still manual:
   scrolls a long list. The dictation is transcribed, and the log shows
   "Main thread lag" for it rather than "Dictation failed".
 
+## Interfaces with more than two inputs, 2026-11-13
+
+Issue #71 reported "No microphone input is available" with a Focusrite Scarlett
+for both Automatic and the explicit device. `AVAudioFormat` returns nil for a
+float format with more than two channels and no channel layout, which this Mac
+confirmed for 3, 4 and 18 channels, and the capture path turned that into the
+error. Capture now asks the Audio Queue for at most the first two channels.
+`microphoneCaptureRecordsAtMostTheFirstTwoInputsOfAnInterface` covers the
+format. No interface with more than two inputs was available, so the Audio
+Queue's channel reduction has not been exercised on hardware.
+
+Still manual:
+
+- [ ] With a Scarlett or another interface with more than two inputs, dictate
+  with a microphone on input 1, then on input 2, with Automatic and with the
+  interface chosen. Both are transcribed, and the log shows
+  "Started input queue: ... channels=2".
+- [ ] With a Scarlett 4th gen, play audio on the Mac while dictating. The
+  loopback audio is not transcribed.
+- [ ] Dictate once with the built-in microphone and once with a 2-input
+  interface. Both behave as before.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,
@@ -1892,6 +1914,17 @@ were not exercised in this UI pass.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or
   "BetterWispr Meeting Audio", including while a meeting is recording.
+- [ ] Meeting prompt position: with Top center chosen, join a Zoom call and a
+  Google Meet call. "Meeting detected" appears top center below the menu bar
+  and the notch, on the display holding the call window (try a second display
+  and a full-screen call). After answering, the capsule returns to the bottom.
+  Bottom center matches the earlier placement.
+- [ ] Meeting prompt timeout: with 15, 30 and 60 seconds, the seconds left count
+  down beside Start notetaker; at zero the prompt closes, nothing records and it
+  doesn't return during that call, only after the app stops and starts a new
+  one. With Never it stays until answered. VoiceOver reads "Closes in N seconds
+  without recording", and with Reduce Motion on the digits change without
+  animating.
 - [ ] Start notetaker from the capsule and from the menu bar with another app
   focused. A card docks to the right edge of the current screen without stealing
   focus. The expand button opens the meeting in the dashboard and closes the

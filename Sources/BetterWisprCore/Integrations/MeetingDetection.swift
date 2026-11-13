@@ -90,6 +90,20 @@ public enum MeetingPlatform: String, CaseIterable, Sendable {
             }
         }
     }
+
+    /// Bounds of an app's on-screen windows in Quartz coordinates, frontmost first; needs no Screen Recording access.
+    public static func windowBounds(of appID: String) -> [CGRect] {
+        let pids = Set(NSRunningApplication.runningApplications(withBundleIdentifier: appID).map(\.processIdentifier))
+        guard !pids.isEmpty,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return [] }
+        return windows.compactMap { window in
+            guard let pid = window[kCGWindowOwnerPID as String] as? pid_t, pids.contains(pid),
+                  window[kCGWindowLayer as String] as? Int == 0,
+                  let bounds = window[kCGWindowBounds as String] as? NSDictionary else { return nil }
+            return CGRect(dictionaryRepresentation: bounds)
+        }
+    }
 }
 
 /// A call recording from the microphone, keyed by the app running it so an answered prompt stays answered for that call.

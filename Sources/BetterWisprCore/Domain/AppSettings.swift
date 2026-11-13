@@ -29,6 +29,18 @@ public enum ModelIdleUnload: Int, Codable, CaseIterable, Sendable {
     public var delay: Duration? { self == .never ? nil : .seconds(rawValue * 60) }
 }
 
+/// Where the meeting-detected prompt appears on the screen showing the call.
+public enum MeetingPromptPosition: String, Codable, CaseIterable, Sendable {
+    case top, bottom
+}
+
+/// Seconds the meeting-detected prompt waits for an answer before it closes for that call.
+public enum MeetingPromptTimeout: Int, Codable, CaseIterable, Sendable {
+    case never = 0, fifteenSeconds = 15, thirtySeconds = 30, sixtySeconds = 60
+
+    public var seconds: TimeInterval? { self == .never ? nil : TimeInterval(rawValue) }
+}
+
 /// How long saved dictations are kept before BetterWispr deletes them.
 public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
     case forever, latest100, threeDays, twoWeeks, threeMonths
@@ -101,6 +113,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var historyClock = RetentionClock()
     /// Adds a space after pasted text so the next dictation doesn't run into it.
     public var appendTrailingSpace: Bool = false
+    /// Writes spoken numbers as digits, such as "forty-two" as "42", in every language.
+    public var writesNumbersAsDigits: Bool = true
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
@@ -118,6 +132,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var muteOtherAppsWhileDictating: Bool = false
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
+    public var meetingPromptPosition: MeetingPromptPosition = .bottom
+    public var meetingPromptTimeout: MeetingPromptTimeout = .thirtySeconds
     /// Names a meeting note after the Calendar event under way when recording starts and lists its invitees.
     public var useCalendar: Bool = false
     /// Calendars, by EventKit calendar identifier, that meeting notes ignore.
@@ -263,6 +279,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         historyRetention = try container.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention) ?? .forever
         historyClock = try container.decodeIfPresent(RetentionClock.self, forKey: .historyClock) ?? RetentionClock()
         appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
+        writesNumbersAsDigits = try container.decodeIfPresent(Bool.self, forKey: .writesNumbersAsDigits) ?? true
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
@@ -273,6 +290,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
         muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
+        meetingPromptPosition = (try? container.decodeIfPresent(MeetingPromptPosition.self, forKey: .meetingPromptPosition)) ?? .bottom
+        meetingPromptTimeout = (try? container.decodeIfPresent(MeetingPromptTimeout.self, forKey: .meetingPromptTimeout)) ?? .thirtySeconds
         useCalendar = try container.decodeIfPresent(Bool.self, forKey: .useCalendar) ?? false
         excludedCalendarIDs = try container.decodeIfPresent(Set<String>.self, forKey: .excludedCalendarIDs) ?? []
         mcpServer = try container.decodeIfPresent(Bool.self, forKey: .mcpServer) ?? false
