@@ -46,6 +46,20 @@ import Testing
     #expect(loaded.muteOtherAppsWhileDictating)
 }
 
+@Test func aWorkspaceSavedWithPausingAndMutingOffBeforeTheyDefaultedOnTurnsThemOnOnce() throws {
+    var old = AppSettings()
+    old.pauseMediaWhileDictating = false
+    old.muteOtherAppsWhileDictating = false
+    var saved = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+    saved["mediaDefaultsVersion"] = nil
+    let migrated = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: saved))
+    #expect(migrated.pauseMediaWhileDictating && migrated.muteOtherAppsWhileDictating)
+    var turnedOff = migrated
+    turnedOff.pauseMediaWhileDictating = false
+    turnedOff.muteOtherAppsWhileDictating = false
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(turnedOff)) == turnedOff)
+}
+
 @Test func settingsSavedBeforeDictationModesStillLoad() throws {
     let saved = #"{"autoPaste":true,"language":"auto","launchAtLogin":false,"saveHistory":true,"selectedModelID":"parakeet-v3","showCapsule":true,"silenceThreshold":0.002}"#
     let settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))

@@ -146,6 +146,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var pauseMediaWhileDictating: Bool = true
     /// Silences other apps while a dictation records, unless a known call app or a browser is using the microphone.
     public var muteOtherAppsWhileDictating: Bool = true
+    public static let mediaDefaultsVersion = 1
+    /// Workspaces saved before version 1 had pausing and muting off by default, so loading them turns both on once.
+    public var mediaDefaultsVersion: Int = AppSettings.mediaDefaultsVersion
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
     public var meetingPromptPosition: MeetingPromptPosition = .bottom
@@ -310,6 +313,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? true
         muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? true
+        mediaDefaultsVersion = try container.decodeIfPresent(Int.self, forKey: .mediaDefaultsVersion) ?? 0
+        if mediaDefaultsVersion < Self.mediaDefaultsVersion {
+            pauseMediaWhileDictating = true
+            muteOtherAppsWhileDictating = true
+            mediaDefaultsVersion = Self.mediaDefaultsVersion
+        }
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         meetingPromptPosition = (try? container.decodeIfPresent(MeetingPromptPosition.self, forKey: .meetingPromptPosition)) ?? .bottom
         meetingPromptTimeout = (try? container.decodeIfPresent(MeetingPromptTimeout.self, forKey: .meetingPromptTimeout)) ?? .thirtySeconds
