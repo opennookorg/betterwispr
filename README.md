@@ -16,17 +16,21 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 
 ## Features
 
-- **Dictate anywhere**: hold-to-talk or press-to-toggle, with a shortcut you choose.
-- **On-device models**: Apple speech, Parakeet v3 (25 European languages), Parakeet v2 (English) and Whisper large-v3 turbo.
+- **Dictate anywhere**: hold-to-talk or press-to-toggle, with a shortcut you choose (**⌥ Space** by default).
+- **Dictate and format**: hold **fn ⌃** instead and the text is shaped for the app it lands in: an email with a greeting and paragraphs in Mail, Outlook or Gmail, a short message in Slack or Teams, a casual reply in Messages or WhatsApp, your exact words in ChatGPT, Claude or Cursor, and paragraphs or lists in Notes, Pages or Notion. English only, using the cleanup provider you choose in Style. Your edits right after a formatted paste are kept on this Mac as style examples.
+- **Clean up selected text**: select text in any app and press your shortcut to have it tidied by your cleanup provider.
+- **On-device models**: Apple speech, Parakeet Ultra and Parakeet TDT v3 (25 European languages), Parakeet TDT v2 and 110M (English), Parakeet Japanese, Whisper Large v3 Turbo and Small, and Cohere Transcribe (14 languages, macOS 15+).
+- **Dictation languages**: with automatic detection, limit Whisper and Parakeet to the languages you speak.
 - **Vocabulary**: spelling hints and phrase replacements for names and jargon.
 - **Learns your corrections**: fix a misheard word once (in History, or right after it's pasted) and it's spelled right next time.
 - **Voice commands**: say "comma", "new line", "scratch that" or "sorry, remove that", and "at the rate KV" for "@KV".
-- **Meetings**: live transcript of you and the other side, plus on-device titles, summaries and action items with Apple Intelligence or a local Ollama model.
+- **Meetings**: live transcript of you and the other side with speaker labels, plus on-device titles, summaries and action items with Apple Intelligence, the built-in model or a local Ollama model.
 - **Transcribe files and links**: drop in an audio or video file or paste a video link and get a timestamped transcript with the model you choose, to copy or export as text or Markdown. Links use yt-dlp, which BetterWispr installs only when you click Install.
 - **Connected apps**: let Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. Off by default and read-only.
 - **Send to Claude**: optionally press Return after pasting, only into Claude Desktop or Claude Code in the VS Code panel, Terminal or iTerm2. Off by default.
 - **Send keys**: for any other app, add it under Settings > Send keys and record the key that submits there, such as Return, ⌘Return or Tab, and BetterWispr presses it after pasting. No rules by default. Terminal and iTerm2 aren't offered, since Send to Claude covers them.
 - **History**: raw and corrected transcripts, stored locally (can be turned off).
+- **Interface languages**: English and French, following your Mac's language.
 - **Bring your own model**: optional Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.
 
 ## Requirements
@@ -40,7 +44,7 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 2. Open it and follow the welcome guide.
 3. Pick a model in **Models**. Apple on-device needs no download; Parakeet and Whisper download once, then work offline.
 4. Grant **Microphone** access, and **Accessibility** access so BetterWispr can paste for you.
-5. Click into a text field in any app, hold **⌥ Space**, speak, and release.
+5. Click into a text field in any app, hold **⌥ Space**, speak, and release. Hold **fn ⌃** instead to format the text for the app, such as an email or a Slack message.
 
 If paste can't safely reach the previous app, the text is copied to your
 clipboard instead, so you never lose a dictation. A dictation records until you

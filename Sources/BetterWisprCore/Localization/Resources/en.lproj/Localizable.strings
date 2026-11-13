@@ -211,7 +211,6 @@
 "Chosen in Settings" = "Chosen in Settings";
 "Claude Desktop and Cursor" = "Claude Desktop and Cursor";
 "Clean up selected text" = "Clean up selected text";
-"Clean up selected text sends your selection to the cleanup provider. %@" = "Clean up selected text sends your selection to the cleanup provider. %@";
 "Cleaned up" = "Cleaned up";
 "Cleaning up…" = "Cleaning up…";
 "Cleanup" = "Cleanup";
@@ -1153,12 +1152,12 @@
 "Dictate and format sends your English dictation to the cleanup provider. %@" = "Dictate and format sends your English dictation to the cleanup provider. %@";
 "Dictate and format works in English. This dictation got the usual cleanup." = "Dictate and format works in English. This dictation got the usual cleanup.";
 "Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only." = "Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.";
+"%@ Hold both keys while you speak. Needs Accessibility." = "%@ Hold both keys while you speak. Needs Accessibility.";
 "Forget" = "Forget";
 "Formatting with %@…" = "Formatting with %@…";
 "New examples are kept only while Save dictation history is on." = "New examples are kept only while Save dictation history is on.";
 "Not formatted" = "Not formatted";
 "Pasted without formatting" = "Pasted without formatting";
-"Remove the Dictate and format shortcut" = "Remove the Dictate and format shortcut";
 "When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app." = "When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app.";
 "Writing examples" = "Writing examples";
 "Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept." = "Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept.";

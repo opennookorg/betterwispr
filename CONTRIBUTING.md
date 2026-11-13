@@ -37,12 +37,41 @@ swift run BetterWisprCLI --download-model parakeet-v3
 swift run BetterWisprCLI --transcribe-file audio.wav --model parakeet-v3 --language en
 ```
 
+Check cleanup and Dictate and format on recorded clips. Each line of the
+manifest is `{"id", "language", "audio", "reference"}`:
+
+```sh
+swift build -c release
+.build/release/BetterWisprCLI --bench clips.jsonl --model parakeet-v3 --language en --cleanup medium
+.build/release/BetterWisprCLI --bench clips.jsonl --model parakeet-v3 --language en --cleanup medium --format email
+```
+
+`--format` takes `email`, `work`, `personal`, `aiPrompts` or `documents`, the
+kinds of app Dictate and format recognizes. Add `--notes-model builtin` to use
+the built-in cleanup model instead of Apple Intelligence. Run
+`swift run BetterWisprCLI --help` for every option.
+
+## Checks
+
+`make test` runs all of these except the speaker check. Run the ones that match your change on their own while you work:
+
+| Command | When |
+| --- | --- |
+| `swift build` and `swift test --no-parallel` | Any Swift change |
+| `python3 scripts/localization.py check` | Any change to interface text or `.strings` files |
+| `python3 Tests/evaluate_check.py` | Evaluation or transcript normalization |
+| `python3 Tests/live_speakers_check.py` | Meeting speaker labels |
+| `python3 Tests/release_check.py` | Release scripts |
+
+New interface text goes through `L10n.tr` and needs an entry in both
+`en.lproj` and `fr.lproj` under `Sources/BetterWisprCore/Localization/Resources`.
+
 ## Project layout
 
 ```text
 Sources/BetterWispr/       App composition, SwiftUI features, design components
 Sources/BetterWisprCore/   Audio, speech providers, persistence, OS integrations
-Sources/BetterWisprCLI/    Model install and file transcription for smoke tests
+Sources/BetterWisprCLI/    Model install, file transcription and benchmarks for smoke tests
 Tests/                     Swift tests and Python evaluation checks
 scripts/                   Build, run, release and evaluation scripts
 docs/                      Architecture, testing, accuracy and OSS provenance
@@ -65,6 +94,8 @@ an interface language using staged native resource folders.
 - **Data.** Keep raw and corrected transcripts separate. Schema changes to saved
   data need a migration.
 - **No invented numbers.** Don't claim accuracy or benchmark results you haven't measured.
+- **Code style.** No code comments; names explain the code. Docstrings are one
+  line. Imports go at the top of the file.
 - **Never commit** models, recordings, transcripts, keys or signing assets.
 - **Third-party code** keeps its license and is recorded in [docs/oss-reuse.md](docs/oss-reuse.md).
 
@@ -78,6 +109,7 @@ an interface language using staged native resource folders.
 4. Add an entry to [CHANGELOG.md](CHANGELOG.md) for
    user-visible changes.
 5. Use conventional commit prefixes, e.g. `feat(core):`, `fix(app):`, `chore(web):`.
+6. Include before and after screenshots for UI changes.
 
 ## Releases (maintainers)
 

@@ -211,7 +211,6 @@
 "Chosen in Settings" = "Choisi dans les Réglages";
 "Claude Desktop and Cursor" = "Claude Desktop et Cursor";
 "Clean up selected text" = "Nettoyer le texte sélectionné";
-"Clean up selected text sends your selection to the cleanup provider. %@" = "Nettoyer le texte sélectionné envoie votre sélection au fournisseur de nettoyage. %@";
 "Cleaned up" = "Nettoyé";
 "Cleaning up…" = "Nettoyage…";
 "Cleanup" = "Nettoyage";
@@ -1153,12 +1152,12 @@
 "Dictate and format sends your English dictation to the cleanup provider. %@" = "Dicter et mettre en forme envoie votre dictée en anglais au fournisseur de nettoyage. %@";
 "Dictate and format works in English. This dictation got the usual cleanup." = "Dicter et mettre en forme fonctionne en anglais. Cette dictée a reçu le nettoyage habituel.";
 "Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only." = "Dicte, puis met en forme le texte pour l’app où vous êtes, comme un e-mail ou un message de discussion, avec votre fournisseur de nettoyage de Style. Anglais uniquement.";
+"%@ Hold both keys while you speak. Needs Accessibility." = "%@ Maintenez les deux touches pendant que vous parlez. Nécessite l’accessibilité.";
 "Forget" = "Oublier";
 "Formatting with %@…" = "Mise en forme avec %@…";
 "New examples are kept only while Save dictation history is on." = "Les nouveaux exemples ne sont conservés que lorsque Enregistrer l’historique des dictées est activé.";
 "Not formatted" = "Non mis en forme";
 "Pasted without formatting" = "Collé sans mise en forme";
-"Remove the Dictate and format shortcut" = "Supprimer le raccourci Dicter et mettre en forme";
 "When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app." = "Lorsque vous modifiez un texte de Dicter et mettre en forme, votre version est conservée sur ce Mac et guide les mises en forme suivantes dans ce type d’app.";
 "Writing examples" = "Exemples d’écriture";
 "Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept." = "Vos exemples d’écriture enregistrés n’ont pas pu être lus. Ils restent intacts et aucun nouvel exemple n’est conservé.";

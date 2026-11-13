@@ -386,7 +386,7 @@ final class AppModel {
     }
 
     /// The shortcut that started this dictation, for the hints that say how to finish it.
-    private var activeShortcut: DictationShortcut { formatsDictation ? settings.formatShortcut ?? settings.shortcut : settings.shortcut }
+    private var activeShortcut: DictationShortcut { formatsDictation ? settings.formatShortcut : settings.shortcut }
 
     func shortcutReleased() {
         guard let pressedAt = shortcutPressedAt else { return }
@@ -403,7 +403,7 @@ final class AppModel {
 
     func registerShortcut() {
         if let shortcut = settings.selectedTextShortcut { try? selectedTextShortcut.register(shortcut) }
-        if let shortcut = settings.formatShortcut { try? formatShortcut.register(shortcut) }
+        try? formatShortcut.register(settings.formatShortcut)
         do {
             try globalShortcut.register(settings.shortcut, withShift: wantsShiftShortcut(for: settings.shortcut))
             if statusMessage == shortcutWarning { statusMessage = "" }
@@ -573,21 +573,17 @@ final class AppModel {
         saveSettings()
     }
 
-    func changeFormatShortcut(_ shortcut: DictationShortcut?) {
+    func changeFormatShortcut(_ shortcut: DictationShortcut) {
         guard !isBusy else { return }
-        if let shortcut {
-            do {
-                if shortcut.isModifierOnly { throw ShortcutError.needsKey }
-                if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
-                if [settings.shortcut, settings.cancelShortcut, settings.selectedTextShortcut].contains(shortcut) { throw ShortcutError.alreadyAssigned(shortcut) }
-                try formatShortcut.register(shortcut)
-            } catch {
-                registerShortcut()
-                ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
-                return
-            }
-        } else {
-            formatShortcut.unregister()
+        do {
+            if shortcut.isModifierOnly, shortcut.modifiers.isEmpty { throw ShortcutError.needsKey }
+            if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
+            if [settings.shortcut, settings.cancelShortcut, settings.selectedTextShortcut].contains(shortcut) { throw ShortcutError.alreadyAssigned(shortcut) }
+            try formatShortcut.register(shortcut)
+        } catch {
+            registerShortcut()
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
+            return
         }
         settings.formatShortcut = shortcut
         saveSettings()
@@ -1974,7 +1970,7 @@ final class AppModel {
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         let previouslyGranted = accessibilityGranted
         accessibilityGranted = AXIsProcessTrusted()
-        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly, !isBusy { registerShortcut() }
+        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly || settings.formatShortcut.isModifierOnly, !isBusy { registerShortcut() }
     }
 
     private func refreshCalendars() {

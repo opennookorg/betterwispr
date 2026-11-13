@@ -166,8 +166,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Optional extra shortcut that cancels a dictation without pasting it; Escape always cancels.
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
-    /// Optional shortcut that dictates and writes the text in the shape of the app it lands in.
-    public var formatShortcut: DictationShortcut?
+    /// Shortcut that dictates and writes the text in the shape of the app it lands in.
+    public var formatShortcut: DictationShortcut = .fnControl
     public var learnCorrections: Bool = true
     /// Lets the Parakeet phrase booster rescore English dictation with vocabulary and screen names.
     public var usePhraseBooster: Bool = true
@@ -325,7 +325,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
         cancelShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .cancelShortcut)
         selectedTextShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .selectedTextShortcut)
-        formatShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .formatShortcut)
+        formatShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .formatShortcut) ?? .fnControl
         microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
         dismissedSpeakerDetectionOffer = try container.decodeIfPresent(Bool.self, forKey: .dismissedSpeakerDetectionOffer) ?? false
         separateRoomVoices = try container.decodeIfPresent(Bool.self, forKey: .separateRoomVoices) ?? false

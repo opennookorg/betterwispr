@@ -79,9 +79,10 @@ final class GlobalShortcut {
     }
 
     func handleModifierEvent(_ event: NSEvent, shortcut: DictationShortcut) {
-        guard event.type == .flagsChanged, event.keyCode == shortcut.keyCode,
+        let chord = shortcut.modifiers.contains(.function)
+        guard event.type == .flagsChanged, chord || event.keyCode == shortcut.keyCode,
               let mask = Self.modifierMasks[Int(shortcut.keyCode)] else { return }
-        let pressed = event.modifierFlags.rawValue & UInt(mask) != 0
+        let pressed = event.modifierFlags.rawValue & UInt(mask) != 0 && (!chord || event.modifierFlags.contains(.function))
         guard pressed != modifierPressed else { return }
         // Only start with this modifier alone; always deliver its matching release.
         if pressed {
@@ -94,7 +95,7 @@ final class GlobalShortcut {
             case .function: .function
             default: []
             }
-            guard flags == ownFlag else { return }
+            guard flags == ownFlag.union(chord ? .function : []) else { return }
         }
         modifierPressed = pressed
         (pressed ? onPress : onRelease)?()

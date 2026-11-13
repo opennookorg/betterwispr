@@ -1,3 +1,4 @@
+import ApplicationServices
 import Carbon.HIToolbox
 import Foundation
 import Testing
@@ -119,7 +120,7 @@ import Testing
     #expect(noExamples.contains("<FORMAT_RULES>") && !noExamples.contains("# Style References"))
 }
 
-@Test @MainActor func formatShortcutRefusesAModifierAloneEscapeAndTheOtherShortcutsThenHoldsAKeyUntilCleared() throws {
+@Test @MainActor func formatShortcutStartsAsFnControlRefusesAModifierAloneEscapeAndTheOtherShortcutsThenHoldsAKeyUntilReset() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
@@ -139,7 +140,7 @@ import Testing
     model.changeFormatShortcut(f15)
     model.changeSelectedTextShortcut(f14)
     model.changeFormatShortcut(f14)
-    #expect(model.settings.formatShortcut == nil)
+    #expect(model.settings.formatShortcut == .fnControl)
 
     model.changeFormatShortcut(f16)
     #expect(model.settings.formatShortcut == f16)
@@ -150,9 +151,13 @@ import Testing
     #expect(model.settings.cancelShortcut == f15)
     #expect(model.settings.selectedTextShortcut == f14)
 
-    model.changeFormatShortcut(nil)
-    #expect(model.settings.formatShortcut == nil)
-    try other.register(f16)
+    model.changeFormatShortcut(.fnControl)
+    if AXIsProcessTrusted() {
+        #expect(model.settings.formatShortcut == .fnControl)
+        try other.register(f16)
+    } else {
+        #expect(model.settings.formatShortcut == f16)
+    }
 }
 
 @Test func anEmailEditMayAddTheGreetingAndSignOffItsReferencesUse() {

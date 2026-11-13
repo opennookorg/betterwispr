@@ -299,12 +299,10 @@ struct SettingsView: View {
                             .fixedSize()
                         }
                     }
-                    if model.settings.formatShortcut != nil || model.styleExamples?.count ?? 0 > 0 {
-                        RowDivider()
-                        SettingRow(L10n.tr("Writing examples"), caption: styleExamplesCaption) {
-                            Button(L10n.tr("Forget"), role: .destructive) { model.forgetStyleExamples() }
-                                .disabled(model.styleExamples?.count ?? 0 == 0)
-                        }
+                    RowDivider()
+                    SettingRow(L10n.tr("Writing examples"), caption: styleExamplesCaption) {
+                        Button(L10n.tr("Forget"), role: .destructive) { model.forgetStyleExamples() }
+                            .disabled(model.styleExamples?.count ?? 0 == 0)
                     }
                 }
 
@@ -544,21 +542,28 @@ private struct ShortcutRecorder: View {
         }
     }
     private var placeholder: String { kind == .dictation ? "" : L10n.tr("Set Shortcut…") }
+    private var defaultShortcut: DictationShortcut? {
+        switch kind {
+        case .dictation: .optionSpace
+        case .format: .fnControl
+        case .cancel, .selectedText: nil
+        }
+    }
 
     var body: some View {
         SettingRow(title, caption: caption) {
             HStack(spacing: 6) {
-                if kind == .dictation, shortcut != .optionSpace, !isCapturing {
-                    Button(L10n.tr("Reset to %@", String(DictationShortcut.optionSpace.spokenName)), systemImage: "arrow.counterclockwise") {
+                if let defaultShortcut, shortcut != defaultShortcut, !isCapturing {
+                    Button(L10n.tr("Reset to %@", String(defaultShortcut.spokenName)), systemImage: "arrow.counterclockwise") {
                         stop()
-                        model.changeShortcut(.optionSpace)
+                        change(defaultShortcut)
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help(L10n.tr("Reset to %@", String(DictationShortcut.optionSpace.displayName)))
+                    .help(L10n.tr("Reset to %@", String(defaultShortcut.displayName)))
                     .transition(.opacity)
-                } else if kind != .dictation, shortcut != nil, !isCapturing {
+                } else if defaultShortcut == nil, shortcut != nil, !isCapturing {
                     Button(L10n.tr("Clear"), systemImage: "xmark.circle") { change(nil) }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
@@ -585,7 +590,6 @@ private struct ShortcutRecorder: View {
     private var clearHelp: String {
         switch kind {
         case .cancel: L10n.tr("Remove the cancel shortcut")
-        case .format: L10n.tr("Remove the Dictate and format shortcut")
         default: L10n.tr("Remove the clean up shortcut")
         }
     }
@@ -601,7 +605,10 @@ private struct ShortcutRecorder: View {
             return shortcut?.isModifierOnly == true ? L10n.tr("Needs Accessibility. Uses the left or right key you recorded.") : L10n.tr("Starts dictation from any app.")
         case .cancel: return L10n.tr("Also cancels a dictation from any app. Esc always does.")
         case .selectedText: return L10n.tr("Edits the text you select in any app with your cleanup provider from Style. English only.")
-        case .format: return L10n.tr("Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.")
+        case .format:
+            let shapes = L10n.tr("Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.")
+            guard shortcut?.isModifierOnly == true else { return shapes }
+            return L10n.tr("%@ Hold both keys while you speak. Needs Accessibility.", String(shapes))
         }
     }
 
@@ -640,7 +647,7 @@ private struct ShortcutRecorder: View {
         case .dictation: if let shortcut { model.changeShortcut(shortcut) }
         case .cancel: model.changeCancelShortcut(shortcut)
         case .selectedText: model.changeSelectedTextShortcut(shortcut)
-        case .format: model.changeFormatShortcut(shortcut)
+        case .format: if let shortcut { model.changeFormatShortcut(shortcut) }
         }
     }
 
