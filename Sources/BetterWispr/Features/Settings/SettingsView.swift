@@ -367,7 +367,7 @@ struct SettingsView: View {
     }
 
     private var vocabularyCaption: String {
-        guard model.selectedModel.engine == .parakeet else {
+        guard model.selectedModel.engine == .parakeet, model.settings.usePhraseBooster else {
             return "Add the names and terms you say often so they’re written your way."
         }
         return model.phraseBoosterInstalled

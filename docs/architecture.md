@@ -89,6 +89,11 @@ the policy immediately and persist through the existing workspace store.
    spell checking rejects, because a name on screen is no evidence it was said.
    With no vocabulary hints, the phrase booster pass runs only when the first
    pass has a misspelled word. Screen-term replacements are not vocabulary fixes.
+   With "Use phrase booster" off (`AppSettings.usePhraseBooster`), Parakeet
+   skips the booster pass and screen terms are not captured. With "Replace
+   with learned words" off (`AppSettings.replaceLearnedWords`), learned entries
+   are still hints, but `AppSettings.replacements` drops them before
+   `VocabularyProcessor` rewrites dictation, meeting and media text.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running. The Parakeet live preview is the
    one exception: `LiveTranscriber` re-recognizes the unconfirmed tail of the
