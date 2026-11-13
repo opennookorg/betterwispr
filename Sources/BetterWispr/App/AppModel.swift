@@ -803,10 +803,10 @@ final class AppModel {
         let audio = recording.audio
         let model = recording.model
         let language = recording.settings.language == "auto" ? nil : recording.settings.language
-        let entries = recording.vocabulary
-        let hints = VocabularyProcessor.hints(entries)
+        let hints = VocabularyProcessor.hints(recording.vocabulary)
+        let entries = recording.settings.replacements(recording.vocabulary)
         let context = recording.context
-        let spellsScreenNames = self.spellsScreenNames(with: model, language: recording.settings.language)
+        let spellsScreenNames = self.spellsScreenNames(with: model, settings: recording.settings)
         let appBundleID = recording.target?.bundleIdentifier
         phase = .transcribing
         statusMessage = !model.processingLocation.isOnDevice ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
@@ -823,6 +823,7 @@ final class AppModel {
                 try Task.checkCancellation()
                 guard self.generation == token, let provider = self.provider else { return }
                 (provider as? WhisperKitProvider)?.detectionLanguages = recording.settings.dictationLanguages
+                (provider as? ParakeetProvider)?.usesPhraseBooster = recording.settings.usePhraseBooster
                 let recognitionStarted = ContinuousClock.now
                 let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints, screenTerms: screenTerms)
                 Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recognition completed: elapsed=\(String(describing: recognitionStarted.duration(to: .now)), privacy: .public) empty=\(raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
@@ -1195,12 +1196,13 @@ final class AppModel {
     private func captureContext(for settings: AppSettings) -> Task<DictationContext, Never>? {
         guard settings.useScreenContext else { return nil }
         let showsNotesModel = settings.cleanup == .medium && MeetingNotesGenerator.availability(settings: settings.cleanupSettings) == .available
-        guard showsNotesModel || spellsScreenNames(with: selectedModel, language: settings.language) else { return nil }
+        guard showsNotesModel || spellsScreenNames(with: selectedModel, settings: settings) else { return nil }
         return targetApplication.map { DictationContext.capture(from: $0, recognizingScreen: settings.recognizeScreenText, readingClipboard: showsNotesModel) }
     }
 
-    private func spellsScreenNames(with model: SpeechModel, language: String) -> Bool {
-        phraseBoosterInstalled && model.engine == .parakeet && model.languages?.contains("en") == true
+    private func spellsScreenNames(with model: SpeechModel, settings: AppSettings) -> Bool {
+        let language = settings.language
+        return settings.usePhraseBooster && phraseBoosterInstalled && model.engine == .parakeet && model.languages?.contains("en") == true
             && (language == "auto" || language.hasPrefix("en"))
     }
 
