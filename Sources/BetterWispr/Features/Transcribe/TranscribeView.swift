@@ -18,7 +18,7 @@ struct TranscribeView: View {
                     Spacer(minLength: 0)
                     Button { transcriptions.error = nil } label: { Image(systemName: "xmark") }
                         .buttonStyle(.borderless)
-                        .accessibilityLabel("Dismiss transcription message")
+                        .accessibilityLabel(L10n.tr("Dismiss transcription message"))
                 }
                 .font(.callout)
                 .padding(12)
@@ -32,17 +32,17 @@ struct TranscribeView: View {
             }
         }
         .background(.pageFill)
-        .alert("Delete this transcript?", isPresented: Binding(
+        .alert(L10n.tr("Delete this transcript?"), isPresented: Binding(
             get: { transcriptToDelete != nil },
             set: { if !$0 { transcriptToDelete = nil } }
         )) {
-            Button("Cancel", role: .cancel) { transcriptToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(L10n.tr("Cancel"), role: .cancel) { transcriptToDelete = nil }
+            Button(L10n.tr("Delete"), role: .destructive) {
                 if let transcriptToDelete { transcriptions.delete(id: transcriptToDelete) }
                 transcriptToDelete = nil
             }
         } message: {
-            Text("This removes the transcript from this Mac. It cannot be undone.")
+            Text(L10n.tr("This removes the transcript from this Mac. It cannot be undone."))
         }
     }
 }
@@ -80,28 +80,28 @@ private struct TranscribeHome: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            Text("Transcribe").font(.system(size: 26, weight: .semibold))
+            Text(L10n.tr("Transcribe")).font(.system(size: 26, weight: .semibold))
             Spacer(minLength: 8)
             Menu {
-                Picker("Transcription model", selection: Binding(
+                Picker(L10n.tr("Transcription model"), selection: Binding(
                     get: { model.transcriptionModel.id },
                     set: { transcriptions.modelID = $0 }
                 )) {
                     ForEach(model.models.filter(model.isModelInstalled)) { speechModel in
-                        Text(speechModel.name).tag(speechModel.id)
+                        Text(speechModel.localizedName).tag(speechModel.id)
                     }
                 }
                 .pickerStyle(.inline)
                 Text(model.transcriptionModel.processingLocation.disclosure)
-                Button("Manage models…") { model.selectedPage = .models }
+                Button(L10n.tr("Manage models…")) { model.selectedPage = .models }
             } label: {
-                Label(model.transcriptionModel.name, systemImage: model.transcriptionModel.processingLocation.isOnDevice ? "cpu" : "network")
+                Label(model.transcriptionModel.localizedName, systemImage: model.transcriptionModel.processingLocation.isOnDevice ? "cpu" : "network")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
             .disabled(busy)
-            .help("Speech model for files and links")
-            .accessibilityLabel("Transcription model, \(model.transcriptionModel.name)")
+            .help(L10n.tr("Speech model for files and links"))
+            .accessibilityLabel(L10n.tr("Transcription model, %@", String(model.transcriptionModel.localizedName)))
         }
     }
 
@@ -111,8 +111,8 @@ private struct TranscribeHome: View {
                 .font(.system(size: 24))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text("Drop an audio or video file").font(.system(size: 15, weight: .medium))
-            Button("Choose File…") { importing = true }
+            Text(L10n.tr("Drop an audio or video file")).font(.system(size: 15, weight: .medium))
+            Button(L10n.tr("Choose File…")) { importing = true }
                 .disabled(busy)
             Text(MediaAudioError.formats)
                 .font(.caption)
@@ -141,11 +141,11 @@ private struct TranscribeHome: View {
 
     private var linkField: some View {
         HStack(spacing: 8) {
-            TextField("Paste a video link", text: $link)
+            TextField(L10n.tr("Paste a video link"), text: $link)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(transcribeLink)
-                .accessibilityLabel("Video link")
-            Button("Transcribe", action: transcribeLink)
+                .accessibilityLabel(L10n.tr("Video link"))
+            Button(L10n.tr("Transcribe"), action: transcribeLink)
                 .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty || transcriptions.ytDLP == nil || busy)
         }
     }
@@ -154,24 +154,24 @@ private struct TranscribeHome: View {
         VStack(alignment: .leading, spacing: 6) {
             if let ytDLP = transcriptions.ytDLP {
                 HStack(spacing: 8) {
-                    Text("Links use yt-dlp at \(ytDLP.path)")
+                    Text(L10n.tr("Links use yt-dlp at %@", String(ytDLP.path)))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
                     if ytDLP == YTDLP.installed {
-                        Button(transcriptions.isInstallingYTDLP ? "Updating…" : "Update") { transcriptions.installYTDLP() }
+                        Button(transcriptions.isInstallingYTDLP ? L10n.tr("Updating…") : L10n.tr("Update")) { transcriptions.installYTDLP() }
                             .buttonStyle(.link)
                             .disabled(transcriptions.isInstallingYTDLP || busy)
                     }
                 }
                 if javaScriptRuntime == nil {
-                    Text("If YouTube links fail, install Deno with brew install deno so yt-dlp can read YouTube fully.")
+                    Text(L10n.tr("If YouTube links fail, install Deno with brew install deno so yt-dlp can read YouTube fully."))
                         .textSelection(.enabled)
                 }
             } else {
-                Text("Links need yt-dlp, a free open-source downloader. BetterWispr downloads it from GitHub and checks it against the published checksum only when you install it.")
+                Text(L10n.tr("Links need yt-dlp, a free open-source downloader. BetterWispr downloads it from GitHub and checks it against the published checksum only when you install it."))
                     .fixedSize(horizontal: false, vertical: true)
-                Button(transcriptions.isInstallingYTDLP ? "Installing yt-dlp…" : "Install yt-dlp") { transcriptions.installYTDLP() }
+                Button(transcriptions.isInstallingYTDLP ? L10n.tr("Installing yt-dlp…") : L10n.tr("Install yt-dlp")) { transcriptions.installYTDLP() }
                     .disabled(transcriptions.isInstallingYTDLP)
             }
         }
@@ -181,7 +181,7 @@ private struct TranscribeHome: View {
 
     @ViewBuilder private var transcriptList: some View {
         if transcriptions.transcripts.isEmpty {
-            Text("Your transcripts appear here.")
+            Text(L10n.tr("Your transcripts appear here."))
                 .foregroundStyle(.secondary)
                 .padding(.top, 8)
         } else {
@@ -228,7 +228,7 @@ private struct JobCard: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Button("Cancel", action: onCancel)
+                Button(L10n.tr("Cancel"), action: onCancel)
             }
         }
     }
@@ -243,11 +243,11 @@ private struct JobCard: View {
 
     private var status: String {
         switch job.stage {
-        case nil: "Loading the speech model…"
-        case .downloading(let done): "Downloading audio…" + (done.map { " \(Int($0 * 100))%" } ?? "")
-        case .reading: "Reading audio…"
-        case .transcribing(let done): "Transcribing… \(Int(done * 100))%"
-        case .findingSpeakers: "Telling the voices apart…"
+        case nil: L10n.tr("Loading the speech model…")
+        case .downloading(let done): L10n.tr("Downloading audio…") + (done.map { " \(Int($0 * 100))%" } ?? "")
+        case .reading: L10n.tr("Reading audio…")
+        case .transcribing(let done): L10n.tr("Transcribing… %@%%", String(Int(done * 100)))
+        case .findingSpeakers: L10n.tr("Telling the voices apart…")
         }
     }
 }
@@ -266,7 +266,7 @@ private struct TranscriptionRow: View {
                 .frame(width: 38, height: 38)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(transcript.displayTitle).font(.system(size: 15)).lineLimit(1)
+                Text(transcript.localizedDisplayTitle).font(.system(size: 15)).lineLimit(1)
                 Text("\(transcript.createdAt.formatted(date: .omitted, time: .shortened)) • \(durationLabel(transcript.duration)) • \(transcript.modelName)")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -281,10 +281,10 @@ private struct TranscriptionRow: View {
         .onHover { hovering = $0 }
         .onTapGesture { transcriptions.selectedID = transcript.id }
         .contextMenu {
-            Button("Open") { transcriptions.selectedID = transcript.id }
-            Button("Copy transcript") { transcriptions.copy(transcript.id) }
+            Button(L10n.tr("Open")) { transcriptions.selectedID = transcript.id }
+            Button(L10n.tr("Copy transcript")) { transcriptions.copy(transcript.id) }
             Divider()
-            Button("Delete transcript…", role: .destructive) { onDelete(transcript.id) }
+            Button(L10n.tr("Delete transcript…"), role: .destructive) { onDelete(transcript.id) }
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -303,7 +303,7 @@ private struct TranscriptDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(transcript.displayTitle)
+                        Text(transcript.localizedDisplayTitle)
                             .font(.system(size: 34, weight: .regular, design: .serif))
                             .textSelection(.enabled)
                         Text("\(transcript.createdAt.noteDay) · \(durationLabel(transcript.duration)) · \(transcript.modelName)")
@@ -314,7 +314,7 @@ private struct TranscriptDetail: View {
                     }
                     LazyVStack(alignment: .leading, spacing: 18) {
                         ForEach(transcript.segments) { segment in
-                            SegmentRow(segment: segment, label: transcript.voiceLabel(segment), isCited: false, canChangeSpeaker: false) { EmptyView() }
+                            SegmentRow(segment: segment, label: transcript.localizedVoiceLabel(segment), isCited: false, canChangeSpeaker: false) { EmptyView() }
                         }
                     }
                 }
@@ -334,26 +334,26 @@ private struct TranscriptDetail: View {
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
-            .help("All transcripts")
-            .accessibilityLabel("All transcripts")
+            .help(L10n.tr("All transcripts"))
+            .accessibilityLabel(L10n.tr("All transcripts"))
             Spacer()
             Menu {
-                Button("Plain Text (.txt)…") { export(transcript.transcriptionText, as: .plainText) }
-                Button("Markdown (.md)…") {
+                Button(L10n.tr("Plain Text (.txt)…")) { export(transcript.transcriptionText, as: .plainText) }
+                Button(L10n.tr("Markdown (.md)…")) {
                     export(transcript.transcriptionMarkdown, as: UTType(filenameExtension: "md", conformingTo: .plainText) ?? .plainText)
                 }
             } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
+                Label(L10n.tr("Export"), systemImage: "square.and.arrow.up")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
             .padding(.horizontal, 8)
-            Button { transcriptions.copy(transcript.id) } label: { Label("Copy all", systemImage: "doc.on.doc") }
-                .help("Copy the whole transcript")
+            Button { transcriptions.copy(transcript.id) } label: { Label(L10n.tr("Copy all"), systemImage: "doc.on.doc") }
+                .help(L10n.tr("Copy the whole transcript"))
             Button { onDelete(transcript.id) } label: { Image(systemName: "trash") }
                 .frame(width: 30, height: 30)
-                .help("Delete transcript…")
-                .accessibilityLabel("Delete transcript")
+                .help(L10n.tr("Delete transcript…"))
+                .accessibilityLabel(L10n.tr("Delete transcript"))
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 20)
@@ -369,7 +369,7 @@ private struct TranscriptDetail: View {
         do {
             try Data(text.utf8).write(to: url, options: .atomic)
         } catch {
-            transcriptions.error = "Couldn’t export the transcript. \(error.localizedDescription)"
+            transcriptions.error = L10n.tr("Couldn’t export the transcript. %@", String(error.localizedDescription))
         }
     }
 }

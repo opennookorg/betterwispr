@@ -6,25 +6,25 @@ import SwiftUI
 private extension InsightsPeriod {
     var title: String {
         switch self {
-        case .week: "7 days"
-        case .month: "30 days"
-        case .allTime: "All time"
+        case .week: L10n.tr("7 days")
+        case .month: L10n.tr("30 days")
+        case .allTime: L10n.tr("All time")
         }
     }
 
     var comparison: String {
         switch self {
-        case .week: "prior 7 days"
-        case .month: "prior 30 days"
+        case .week: L10n.tr("prior 7 days")
+        case .month: L10n.tr("prior 30 days")
         case .allTime: ""
         }
     }
 
     var shareOpening: String {
         switch self {
-        case .week: "In the last 7 days I dictated"
-        case .month: "In the last 30 days I dictated"
-        case .allTime: "I’ve dictated"
+        case .week: L10n.tr("In the last 7 days I dictated")
+        case .month: L10n.tr("In the last 30 days I dictated")
+        case .allTime: L10n.tr("I’ve dictated")
         }
     }
 }
@@ -40,11 +40,11 @@ struct InsightsView: View {
             ScrollView {}
                 .overlay {
                     ContentUnavailableView(
-                        "No Insights Yet",
+                        L10n.tr("No Insights Yet"),
                         systemImage: "chart.bar",
                         description: Text(savesHistory
-                            ? "Dictate a few times and your pace, time saved and top apps appear here."
-                            : "Insights are built from saved dictations. Turn on Save history in Settings to see them.")
+                            ? L10n.tr("Dictate a few times and your pace, time saved and top apps appear here.")
+                            : L10n.tr("Insights are built from saved dictations. Turn on Save history in Settings to see them."))
                     )
                 }
         } else {
@@ -57,7 +57,7 @@ struct InsightsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(insights)
                 if !savesHistory {
-                    Label("History is off, so new dictations are not counted.", systemImage: "info.circle")
+                    Label(L10n.tr("History is off, so new dictations are not counted."), systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
                 MetricTiles(insights: insights)
@@ -80,7 +80,7 @@ struct InsightsView: View {
         .toolbar {
             ToolbarItem {
                 ShareLink(item: shareText(insights)) {
-                    Label("Share Insights", systemImage: "square.and.arrow.up")
+                    Label(L10n.tr("Share Insights"), systemImage: "square.and.arrow.up")
                 }
             }
         }
@@ -92,7 +92,7 @@ struct InsightsView: View {
                 .font(.title3.weight(.semibold))
                 .contentTransition(.opacity)
             Spacer(minLength: 12)
-            Picker("Period", selection: $period) {
+            Picker(L10n.tr("Period"), selection: $period) {
                 ForEach(InsightsPeriod.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -108,7 +108,7 @@ struct InsightsView: View {
 
     private func shareText(_ insights: UsageInsights) -> String {
         let totals = insights.current
-        return "\(insights.period.shareOpening) \(totals.words.formatted()) words with BetterWispr at \(totals.wordsPerMinute) words per minute, about \(formattedTime(totals.timeSaved)) faster than typing."
+        return L10n.tr("%@ %ld words with BetterWispr at %@ words per minute, about %@ faster than typing.", insights.period.shareOpening, totals.words, String(totals.wordsPerMinute), formattedTime(totals.timeSaved))
     }
 }
 
@@ -162,28 +162,28 @@ private struct MetricTiles: View {
         let ratio = Double(now.wordsPerMinute) / Double(typing)
         let tiles = [
             MetricTile(
-                label: "Words dictated", value: now.words.formatted(),
+                label: L10n.tr("Words dictated"), value: now.words.formatted(),
                 current: Double(now.words), previous: before.map { Double($0.words) }, comparison: comparison,
-                note: Text("^[\(now.dictations) dictation](inflect: true)")
+                note: Text(L10n.tr("%ld dictations", now.dictations))
             ),
             MetricTile(
-                label: "Time saved", value: formattedTime(now.timeSaved),
+                label: L10n.tr("Time saved"), value: formattedTime(now.timeSaved),
                 current: now.timeSaved, previous: before?.timeSaved, comparison: comparison,
-                note: Text("vs typing at \(typing) wpm"),
-                help: "Estimate: the time these words take to type at \(typing) wpm, the mean of 168,000 typists in Dhakal et al., CHI 2018, minus the time you spent speaking."
+                note: Text(L10n.tr("vs typing at %@ wpm", String(typing))),
+                help: L10n.tr("Estimate: the time these words take to type at %@ wpm, the mean of 168,000 typists in Dhakal et al., CHI 2018, minus the time you spent speaking.", String(typing))
             ),
             MetricTile(
-                label: "Speaking pace", value: now.wordsPerMinute.formatted(), unit: "wpm",
+                label: L10n.tr("Speaking pace"), value: now.wordsPerMinute.formatted(), unit: L10n.tr("wpm"),
                 current: 0, previous: nil, comparison: comparison,
                 note: ratio >= 1.1
-                    ? Text("\(ratio.formatted(.number.precision(.fractionLength(1))))× typing speed")
-                    : Text("Pauses count toward pace"),
-                help: "Words divided by recording time, pauses included."
+                    ? Text(L10n.tr("%@× typing speed", String(ratio.formatted(.number.precision(.fractionLength(1))))))
+                    : Text(L10n.tr("Pauses count toward pace")),
+                help: L10n.tr("Words divided by recording time, pauses included.")
             ),
             MetricTile(
-                label: "Dictations", value: now.dictations.formatted(),
+                label: L10n.tr("Dictations"), value: now.dictations.formatted(),
                 current: Double(now.dictations), previous: before.map { Double($0.dictations) }, comparison: comparison,
-                note: Text("~\(now.dictations > 0 ? now.words / now.dictations : 0) words each")
+                note: Text(L10n.tr("~%ld words each", now.dictations > 0 ? now.words / now.dictations : 0))
             ),
         ]
         ViewThatFits(in: .horizontal) {
@@ -234,17 +234,17 @@ private struct MetricTile: View {
         if let previous, previous > 0 {
             let delta = (current - previous) / previous
             if abs(delta) < 0.005 {
-                Text("Same as \(comparison)").foregroundStyle(.secondary)
+                Text(L10n.tr("Same as %@", String(comparison))).foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 3) {
                     Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
                         .font(.caption.weight(.bold))
-                    Text("\(abs(delta).formatted(.percent.precision(.fractionLength(0)))) vs \(comparison)")
+                    Text(L10n.tr("%@ vs %@", String(abs(delta).formatted(.percent.precision(.fractionLength(0)))), String(comparison)))
                 }
                 .foregroundStyle(delta > 0 ? Color.green : .secondary)
             }
         } else if previous != nil, current > 0 {
-            Text("None in \(comparison)").foregroundStyle(.secondary)
+            Text(L10n.tr("None in %@", String(comparison))).foregroundStyle(.secondary)
         } else {
             note.foregroundStyle(.secondary)
         }
@@ -263,30 +263,30 @@ private struct ActivityCard: View {
         let step = buckets.count <= 12 ? 1 : Int((Double(buckets.count) / 6).rounded(.up))
         Card(padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
-                CardTitle(title: "Words per \(unitName)") {
+                CardTitle(title: L10n.tr("Words per %@", String(unitName))) {
                     if let selected {
-                        Text("\(label(selected.start)): \(selected.words.formatted()) words").foregroundStyle(.primary)
+                        Text(L10n.tr("%@: %ld words", label(selected.start), selected.words)).foregroundStyle(.primary)
                     } else if let busiest, busiest.words > 0 {
-                        Text("Busiest \(unitName): \(label(busiest.start)), \(busiest.words.formatted()) words")
+                        Text(L10n.tr("Busiest %@: %@, %ld words", unitName, label(busiest.start), busiest.words))
                     }
                 }
                 Chart {
                     ForEach(buckets, id: \.start) { bucket in
                         BarMark(
-                            x: .value("Date", bucket.start, unit: insights.granularity),
-                            y: .value("Words", bucket.words)
+                            x: .value(L10n.tr("Date"), bucket.start, unit: insights.granularity),
+                            y: .value(L10n.tr("Words"), bucket.words)
                         )
                         .foregroundStyle(Color.accentColor.opacity(selected == nil || selected == bucket ? 1 : 0.35))
                         .cornerRadius(3)
                         .accessibilityLabel(label(bucket.start))
-                        .accessibilityValue("\(bucket.words) words")
+                        .accessibilityValue(L10n.tr("%ld words", bucket.words))
                     }
                     if average > 0 {
-                        RuleMark(y: .value("Average", average))
+                        RuleMark(y: .value(L10n.tr("Average"), average))
                             .foregroundStyle(Color.secondary.opacity(0.6))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                             .annotation(position: .top, alignment: .leading, spacing: 2) {
-                                Text("avg \(Int(average.rounded()).formatted())")
+                                Text(L10n.tr("avg %@", String(Int(average.rounded()).formatted())))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -307,7 +307,7 @@ private struct ActivityCard: View {
                 .frame(height: 180)
                 .overlay {
                     if insights.current.dictations == 0 {
-                        Text("No dictations in this period").foregroundStyle(.secondary)
+                        Text(L10n.tr("No dictations in this period")).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -316,9 +316,9 @@ private struct ActivityCard: View {
 
     private var unitName: String {
         switch insights.granularity {
-        case .weekOfYear: "week"
-        case .month: "month"
-        default: "day"
+        case .weekOfYear: L10n.tr("week")
+        case .month: L10n.tr("month")
+        default: L10n.tr("day")
         }
     }
 
@@ -332,7 +332,7 @@ private struct ActivityCard: View {
 
     private func label(_ date: Date) -> String {
         switch insights.granularity {
-        case .weekOfYear: "Week of \(date.formatted(.dateTime.month(.abbreviated).day()))"
+        case .weekOfYear: L10n.tr("Week of %@", String(date.formatted(.dateTime.month(.abbreviated).day())))
         case .month: date.formatted(.dateTime.month(.wide).year())
         default: date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         }
@@ -348,13 +348,13 @@ private struct TopAppsCard: View {
         let otherWords = others.reduce(0) { $0 + $1.words }
         Card(padding: 18) {
             VStack(alignment: .leading, spacing: 12) {
-                CardTitle(title: "Top apps") {
-                    if !insights.apps.isEmpty { Text("^[\(insights.apps.count) app](inflect: true)") }
+                CardTitle(title: L10n.tr("Top apps")) {
+                    if !insights.apps.isEmpty { Text(L10n.tr("%ld apps", insights.apps.count)) }
                 }
                 if insights.apps.isEmpty {
                     Text(insights.current.dictations == 0
-                        ? "No dictations in this period."
-                        : "Dictations record the app they went to, so this fills in as you dictate.")
+                        ? L10n.tr("No dictations in this period.")
+                        : L10n.tr("Dictations record the app they went to, so this fills in as you dictate."))
                         .foregroundStyle(.secondary)
                 }
                 ForEach(insights.apps.prefix(4), id: \.bundleID) { app in
@@ -362,10 +362,10 @@ private struct TopAppsCard: View {
                 }
                 if !others.isEmpty {
                     AppRow(bundleID: nil, words: otherWords, share: Double(otherWords) / total,
-                           fallbackName: others.count == 1 ? "1 other app" : "\(others.count) other apps")
+                           fallbackName: others.count == 1 ? L10n.tr("1 other app") : L10n.tr("%@ other apps", String(others.count)))
                 }
                 if insights.dictationsWithoutApp > 0, !insights.apps.isEmpty {
-                    Text("Not counted: ^[\(insights.dictationsWithoutApp) dictation](inflect: true) with no app recorded.")
+                    Text(L10n.tr("Not counted: %ld dictations with no app recorded.", insights.dictationsWithoutApp))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -402,7 +402,7 @@ private struct AppRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(name).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 4)
-                    Text("\(words.formatted()) words").foregroundStyle(.secondary)
+                    Text(L10n.tr("%ld words", words)).foregroundStyle(.secondary)
                     Text(percent)
                         .foregroundStyle(.secondary)
                         .frame(width: 38, alignment: .trailing)
@@ -420,7 +420,7 @@ private struct AppRow: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name), \(words) words, \(percent)")
+        .accessibilityLabel(L10n.tr("%@, %ld words, %@", name, words, percent))
         .task(id: bundleID) {
             guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
             app = (FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: ""),
@@ -443,10 +443,10 @@ private enum DayPart: CaseIterable {
 
     var headline: String {
         switch self {
-        case .morning: "Mostly mornings"
-        case .afternoon: "Mostly afternoons"
-        case .evening: "Mostly evenings"
-        case .night: "Mostly late at night"
+        case .morning: L10n.tr("Mostly mornings")
+        case .afternoon: L10n.tr("Mostly afternoons")
+        case .evening: L10n.tr("Mostly evenings")
+        case .night: L10n.tr("Mostly late at night")
         }
     }
 
@@ -464,25 +464,25 @@ private struct TimeOfDayCard: View {
         let part = DayPart.allCases.max { $0.words(hours) < $1.words(hours) } ?? .morning
         Card(padding: 18) {
             VStack(alignment: .leading, spacing: 12) {
-                CardTitle(title: "When you dictate") {
-                    if total > 0 { Text("Peak around \(hour(peak).formatted(.dateTime.hour()))") }
+                CardTitle(title: L10n.tr("When you dictate")) {
+                    if total > 0 { Text(L10n.tr("Peak around %@", String(hour(peak).formatted(.dateTime.hour())))) }
                 }
                 if total > 0 {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(part.headline).font(.title3.weight(.semibold))
-                        Text("\((Double(part.words(hours)) / Double(total)).formatted(.percent.precision(.fractionLength(0)))) of your words")
+                        Text(L10n.tr("%@ of your words", String((Double(part.words(hours)) / Double(total)).formatted(.percent.precision(.fractionLength(0))))))
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("No dictations in this period.").foregroundStyle(.secondary)
+                    Text(L10n.tr("No dictations in this period.")).foregroundStyle(.secondary)
                 }
                 Chart {
                     ForEach(0..<24, id: \.self) { index in
-                        BarMark(x: .value("Hour", hour(index), unit: .hour), y: .value("Words", hours[index]))
+                        BarMark(x: .value(L10n.tr("Hour"), hour(index), unit: .hour), y: .value(L10n.tr("Words"), hours[index]))
                             .foregroundStyle(Color.accentColor.opacity(index == peak && total > 0 ? 1 : 0.55))
                             .cornerRadius(2)
                             .accessibilityLabel(hour(index).formatted(.dateTime.hour()))
-                            .accessibilityValue("\(hours[index]) words")
+                            .accessibilityValue(L10n.tr("%ld words", hours[index]))
                     }
                 }
                 .chartXAxis {
@@ -509,18 +509,20 @@ private struct CleanupCard: View {
         let share = Double(insights.wordsCleaned) / Double(max(insights.spokenWords, 1))
         Card(padding: 18) {
             VStack(alignment: .leading, spacing: 12) {
-                CardTitle(title: "Cleanup") { EmptyView() }
+                CardTitle(title: L10n.tr("Cleanup")) { EmptyView() }
                 VStack(alignment: .leading, spacing: 2) {
-                    BigFigure(value: insights.wordsCleaned.formatted(), caption: insights.wordsCleaned == 1 ? "word removed" : "words removed")
+                    BigFigure(value: insights.wordsCleaned.formatted(), caption: L10n.tr("Removed word unit", insights.wordsCleaned))
                     Text(insights.wordsCleaned == 0
-                        ? "Nothing needed cleaning in this period."
-                        : "\(share.formatted(.percent.precision(.fractionLength(0)))) of the \(insights.spokenWords.formatted()) words you said")
+                        ? L10n.tr("Nothing needed cleaning in this period.")
+                        : (insights.spokenWords <= 1
+                            ? L10n.tr("%@ of the %@ word you said", share.formatted(.percent.precision(.fractionLength(0))), insights.spokenWords.formatted())
+                            : L10n.tr("%@ of the %@ words you said", share.formatted(.percent.precision(.fractionLength(0))), insights.spokenWords.formatted())))
                         .foregroundStyle(.secondary)
                 }
-                .help("Words in the original transcription that cleanup, rewriting or Vocabulary removed or replaced.")
+                .help(L10n.tr("Words in the original transcription that cleanup, rewriting or Vocabulary removed or replaced."))
                 if !insights.mostRemoved.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Removed most often")
+                        Text(L10n.tr("Removed most often"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ViewThatFits(in: .horizontal) {
@@ -532,11 +534,11 @@ private struct CleanupCard: View {
                 }
                 Divider()
                 HStack {
-                    Label("Vocabulary fixes", systemImage: "character.book.closed")
+                    Label(L10n.tr("Vocabulary fixes"), systemImage: "character.book.closed")
                     Spacer()
                     Text(insights.vocabularyFixes.formatted()).monospacedDigit()
                 }
-                .help("Words respelled from your Vocabulary, counted from version 0.1.1.")
+                .help(L10n.tr("Words respelled from your Vocabulary, counted from version 0.1.1."))
             }
         }
     }
@@ -569,13 +571,13 @@ private struct StreakCard: View {
         let streak = insights.currentStreak
         Card(padding: 18) {
             VStack(alignment: .leading, spacing: 12) {
-                CardTitle(title: "Streak") {
-                    Text("Longest: ^[\(insights.longestStreak) day](inflect: true)")
+                CardTitle(title: L10n.tr("Streak")) {
+                    Text(L10n.tr("Longest: %ld days", insights.longestStreak))
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    BigFigure(value: streak.formatted(), caption: streak == 1 ? "day in a row" : "days in a row")
+                    BigFigure(value: streak.formatted(), caption: L10n.tr("Consecutive day unit", streak))
                     if !insights.activeDates.contains(today) {
-                        Text(streak > 0 ? "Dictate today to keep it going." : "Dictate today to start a streak.")
+                        Text(streak > 0 ? L10n.tr("Dictate today to keep it going.") : L10n.tr("Dictate today to start a streak."))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -602,7 +604,7 @@ private struct StreakCard: View {
                         }
                         .frame(maxWidth: .infinity)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide))), \(active ? "dictated" : "no dictation")")
+                        .accessibilityLabel(L10n.tr("%@, %@", String(day.formatted(.dateTime.weekday(.wide))), String(active ? L10n.tr("dictated") : L10n.tr("no dictation"))))
                     }
                 }
                 Text(activeNote)
@@ -613,8 +615,8 @@ private struct StreakCard: View {
     }
 
     private var activeNote: String {
-        let days = insights.activeDays == 1 ? "1 day" : "\(insights.activeDays) days"
-        if let length = insights.period.days { return "Active on \(insights.activeDays) of the last \(length) days" }
-        return "Active on \(days) since \(insights.start.formatted(.dateTime.month(.abbreviated).day()))"
+        let days = L10n.tr("%ld days", insights.activeDays)
+        if let length = insights.period.days { return L10n.tr("Active on %@ of the last %@ days", String(insights.activeDays), String(length)) }
+        return L10n.tr("Active on %@ since %@", String(days), String(insights.start.formatted(.dateTime.month(.abbreviated).day())))
     }
 }

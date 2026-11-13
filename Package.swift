@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "BetterWispr",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "BetterWispr", targets: ["BetterWispr"]),
@@ -21,7 +22,7 @@ let package = Package(
             .product(name: "SpeakerKit", package: "argmax-oss-swift"),
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "LlamaSwift", package: "llama.swift")
-        ]),
+        ], resources: [.process("Localization/Resources")]),
         .executableTarget(
             name: "BetterWispr",
             dependencies: ["BetterWisprCore", .product(name: "Sparkle", package: "Sparkle")],

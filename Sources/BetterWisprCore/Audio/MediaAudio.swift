@@ -5,12 +5,12 @@ public enum MediaAudioError: LocalizedError, Equatable {
     case unreadable(String)
     case noAudio(String)
 
-    public static let formats = "MP3, M4A, AAC, WAV, AIFF, CAF, FLAC, MP4, MOV or M4V"
+    public static let formats = L10n.tr("MP3, M4A, AAC, WAV, AIFF, CAF, FLAC, MP4, MOV or M4V")
 
     public var errorDescription: String? {
         switch self {
-        case .unreadable(let name): "BetterWispr can’t read the audio in “\(name)”. Choose an \(Self.formats) file."
-        case .noAudio(let name): "“\(name)” has no audio track. Choose an \(Self.formats) file."
+        case .unreadable(let name): L10n.tr("BetterWispr can’t read the audio in “%@”. Choose an %@ file.", String(name), String(Self.formats))
+        case .noAudio(let name): L10n.tr("“%@” has no audio track. Choose an %@ file.", String(name), String(Self.formats))
         }
     }
 }

@@ -37,7 +37,7 @@ public enum StoreError: LocalizedError {
     case unsupportedVersion(Int)
     public var errorDescription: String? {
         switch self {
-        case .unsupportedVersion(let version): "This workspace uses version \(version). Update BetterWispr before opening it."
+        case .unsupportedVersion(let version): L10n.tr("This workspace uses version %@. Update BetterWispr before opening it.", String(version))
         }
     }
 }

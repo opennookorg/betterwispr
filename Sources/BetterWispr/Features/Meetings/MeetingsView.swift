@@ -11,8 +11,8 @@ struct MeetingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            banner(\.message, dismissal: "Dismiss meeting message")
-            banner(\.voicesMessage, dismissal: "Dismiss remembered voices message")
+            banner(\.message, dismissal: L10n.tr("Dismiss meeting message"))
+            banner(\.voicesMessage, dismissal: L10n.tr("Dismiss remembered voices message"))
             if let meeting = meetings.selectedID.flatMap(meetings.meeting) {
                 noteBar(meeting)
                 MeetingDetailView(model: model, id: meeting.id, citation: $citation).id(meeting.id)
@@ -29,17 +29,19 @@ struct MeetingsView: View {
         }
         .background(.pageFill)
         .answering($asking, in: .allMeetings, model: model)
-        .alert("Delete this meeting?", isPresented: Binding(
+        .alert(L10n.tr("Delete this meeting?"), isPresented: Binding(
             get: { meetingToDelete != nil },
             set: { if !$0 { meetingToDelete = nil } }
         )) {
-            Button("Cancel", role: .cancel) { meetingToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(L10n.tr("Cancel"), role: .cancel) { meetingToDelete = nil }
+            Button(L10n.tr("Delete"), role: .destructive) {
                 if let meetingToDelete { meetings.delete(meetingToDelete) }
                 meetingToDelete = nil
             }
         } message: {
-            Text("This removes the meeting, its notes and transcript from this Mac\(meetings.remembersVoices ? " and forgets the voices named in it" : ""). It cannot be undone.")
+            Text(meetings.remembersVoices
+                ? L10n.tr("This removes the meeting, its notes and transcript from this Mac and forgets the voices named in it. It cannot be undone.")
+                : L10n.tr("This removes the meeting, its notes and transcript from this Mac. It cannot be undone."))
         }
     }
 
@@ -73,21 +75,21 @@ struct MeetingsView: View {
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
-            .help("All notes")
-            .accessibilityLabel("All notes")
+            .help(L10n.tr("All notes"))
+            .accessibilityLabel(L10n.tr("All notes"))
             Spacer()
             Menu {
                 Button { meetings.generateNotes(meeting.id) } label: {
-                    Label(meeting.summary == nil ? "Generate summary" : "Regenerate summary", systemImage: "sparkles")
+                    Label(meeting.summary == nil ? L10n.tr("Generate summary") : L10n.tr("Regenerate summary"), systemImage: "sparkles")
                 }
                 .disabled(!meeting.hasContent || meetings.isActive(meeting.id) || meetings.notesAvailability != .available)
                 Button { meetings.copy(meeting.id, transcriptOnly: true) } label: {
-                    Label("Copy transcript", systemImage: "text.quote")
+                    Label(L10n.tr("Copy transcript"), systemImage: "text.quote")
                 }
                 .disabled(meeting.segments.isEmpty)
                 Divider()
                 Button(role: .destructive) { meetingToDelete = meeting.id } label: {
-                    Label("Delete meeting…", systemImage: "trash")
+                    Label(L10n.tr("Delete meeting…"), systemImage: "trash")
                 }
                 .disabled(meetings.isActive(meeting.id))
             } label: {
@@ -97,22 +99,22 @@ struct MeetingsView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .padding(.horizontal, 8)
-            .help("More meeting actions")
-            .accessibilityLabel("More meeting actions")
-            Button { meetings.copy(meeting.id) } label: { Label("Copy", systemImage: "doc.on.doc") }
-                .help("Copy notes and transcript")
+            .help(L10n.tr("More meeting actions"))
+            .accessibilityLabel(L10n.tr("More meeting actions"))
+            Button { meetings.copy(meeting.id) } label: { Label(L10n.tr("Copy"), systemImage: "doc.on.doc") }
+                .help(L10n.tr("Copy notes and transcript"))
             Group {
                 Button { meetings.selectedID = index.map { meetings.meetings[$0 - 1].id } } label: { Image(systemName: "chevron.left") }
                     .disabled(index.map { $0 == 0 } ?? true)
-                    .help("Newer note")
-                    .accessibilityLabel("Newer note")
+                    .help(L10n.tr("Newer note"))
+                    .accessibilityLabel(L10n.tr("Newer note"))
                 Button { meetings.selectedID = index.map { meetings.meetings[$0 + 1].id } } label: { Image(systemName: "chevron.right") }
                     .disabled(index.map { $0 + 1 == meetings.meetings.count } ?? true)
-                    .help("Older note")
-                    .accessibilityLabel("Older note")
+                    .help(L10n.tr("Older note"))
+                    .accessibilityLabel(L10n.tr("Older note"))
                 Button { model.onShowNotetaker?(meeting.id) } label: { Image(systemName: "rectangle.righthalf.inset.filled") }
-                    .help("Open beside your call")
-                    .accessibilityLabel("Open beside your call")
+                    .help(L10n.tr("Open beside your call"))
+                    .accessibilityLabel(L10n.tr("Open beside your call"))
             }
             .frame(width: 30, height: 30)
         }
@@ -140,18 +142,18 @@ private struct NotesHome: View {
             VStack(alignment: .leading, spacing: 28) {
                 header
                 if searching {
-                    TextField("Search notes", text: $query)
+                    TextField(L10n.tr("Search notes"), text: $query)
                         .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Search meeting notes")
+                        .accessibilityLabel(L10n.tr("Search meeting notes"))
                 }
                 if !meetings.meetings.isEmpty {
-                    AskPanel(model: model, thread: .allMeetings, placeholder: "Ask about all your meetings", asking: $asking, onCite: onCite)
+                    AskPanel(model: model, thread: .allMeetings, placeholder: L10n.tr("Ask about all your meetings"), asking: $asking, onCite: onCite)
                 }
                 if filtered.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(query.isEmpty ? "Be in the conversation." : "No matching notes")
+                        Text(query.isEmpty ? L10n.tr("Be in the conversation.") : L10n.tr("No matching notes"))
                             .font(.system(size: 26, design: .serif))
-                        Text(query.isEmpty ? "Keep your thoughts, follow the transcript, and leave with a summary." : "Try another title or phrase.")
+                        Text(query.isEmpty ? L10n.tr("Keep your thoughts, follow the transcript, and leave with a summary.") : L10n.tr("Try another title or phrase."))
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 20)
@@ -182,17 +184,17 @@ private struct NotesHome: View {
     private var header: some View {
         let capturing = meetings.capturingID != nil
         return HStack(spacing: 14) {
-            Text("Notetaker").font(.system(size: 26, weight: .semibold))
+            Text(L10n.tr("Notetaker")).font(.system(size: 26, weight: .semibold))
             Spacer(minLength: 8)
             Button { searching.toggle(); query = "" } label: { Image(systemName: "magnifyingglass") }
                 .buttonStyle(.borderless)
-                .help("Search notes")
-                .accessibilityLabel("Search notes")
+                .help(L10n.tr("Search notes"))
+                .accessibilityLabel(L10n.tr("Search notes"))
             NotetakerSettings(model: model)
             Button {
                 if capturing { meetings.stop() } else { model.startNotetaker() }
             } label: {
-                Label(capturing ? "Stop Notetaker" : "Start Notetaker", systemImage: capturing ? "stop.circle" : "record.circle")
+                Label(capturing ? L10n.tr("Stop Notetaker") : L10n.tr("Start Notetaker"), systemImage: capturing ? "stop.circle" : "record.circle")
                     .font(.system(size: 14, weight: .medium))
                     .padding(.horizontal, 14)
                     .frame(height: 34)
@@ -210,14 +212,14 @@ private struct NotetakerSettings: View {
 
     var body: some View {
         Menu {
-            Picker("Transcription model", selection: Binding(
+            Picker(L10n.tr("Transcription model"), selection: Binding(
                 get: { model.selectedModel.id },
                 set: { id in
                     if let speechModel = model.models.first(where: { $0.id == id }) { model.selectModel(speechModel) }
                 }
             )) {
                 ForEach(model.models) { speechModel in
-                    Text(speechModel.name + (model.isModelInstalled(speechModel) ? "" : " · Download in Models"))
+                    Text(speechModel.localizedName + (model.isModelInstalled(speechModel) ? "" : L10n.tr(" · Download in Models")))
                         .tag(speechModel.id)
                         .disabled(!model.isModelInstalled(speechModel))
                 }
@@ -225,19 +227,19 @@ private struct NotetakerSettings: View {
             .pickerStyle(.inline)
             .disabled(model.isBusy || !model.meetings.runs.isEmpty)
             Text(model.selectedModel.processingLocation.disclosure)
-            Button("Manage models…") { model.selectedPage = .models }
+            Button(L10n.tr("Manage models…")) { model.selectedPage = .models }
             Divider()
-            MicrophonePicker(model: model) { Text("Microphone") }
+            MicrophonePicker(model: model) { Text(L10n.tr("Microphone")) }
                 .pickerStyle(.inline)
             Divider()
             NotesModelPicker(model: model)
                 .pickerStyle(.inline)
                 .disabled(!model.meetings.runs.isEmpty)
-            NotesModelPicker(model: model, title: "Ask provider", overrideSelection: \.askSelection)
+            NotesModelPicker(model: model, title: L10n.tr("Ask provider"), overrideSelection: \.askSelection)
                 .pickerStyle(.inline)
             SummaryLanguagePicker(model: model)
                 .pickerStyle(.menu)
-            Button("Configure and test notes models…") { model.selectedPage = .models }
+            Button(L10n.tr("Configure and test notes models…")) { model.selectedPage = .models }
 
         } label: {
             Image(systemName: "gearshape")
@@ -246,8 +248,8 @@ private struct NotetakerSettings: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .task { await model.meetings.refreshOllamaModels() }
-        .help("Transcription model, microphone and notes model")
-        .accessibilityLabel("Notetaker settings")
+        .help(L10n.tr("Transcription model, microphone and notes model"))
+        .accessibilityLabel(L10n.tr("Notetaker settings"))
     }
 
 
@@ -267,7 +269,7 @@ private struct NoteRow: View {
                 .frame(width: 38, height: 38)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(meeting.displayTitle).font(.system(size: 15)).lineLimit(1)
+                Text(meeting.localizedDisplayTitle).font(.system(size: 15)).lineLimit(1)
                 HStack(spacing: 5) {
                     Text(meeting.createdAt.formatted(date: .omitted, time: .shortened))
                     if let status {
@@ -275,7 +277,7 @@ private struct NoteRow: View {
                         Text(status).foregroundStyle(meetings.capturingID == meeting.id ? .green : .secondary)
                     } else if canSummarize {
                         Text("•")
-                        Button("Generate summary") { meetings.generateNotes(meeting.id) }
+                        Button(L10n.tr("Generate summary")) { meetings.generateNotes(meeting.id) }
                             .buttonStyle(.plain)
                             .underline()
                     }
@@ -292,10 +294,10 @@ private struct NoteRow: View {
         .onHover { hovering = $0 }
         .onTapGesture { meetings.selectedID = meeting.id }
         .contextMenu {
-            Button("Open") { meetings.selectedID = meeting.id }
-            Button("Copy notes and transcript") { meetings.copy(meeting.id) }
+            Button(L10n.tr("Open")) { meetings.selectedID = meeting.id }
+            Button(L10n.tr("Copy notes and transcript")) { meetings.copy(meeting.id) }
             Divider()
-            Button("Delete meeting…", role: .destructive) { onDelete(meeting.id) }
+            Button(L10n.tr("Delete meeting…"), role: .destructive) { onDelete(meeting.id) }
                 .disabled(meetings.isActive(meeting.id))
         }
         .accessibilityElement(children: .combine)
@@ -305,11 +307,11 @@ private struct NoteRow: View {
 
     private var status: String? {
         switch meetings.runs[meeting.id]?.phase {
-        case .recording: "Recording"
-        case .starting: "Starting"
-        case .finishing: "Transcribing"
-        case .findingSpeakers: "Finding speakers"
-        case .generating: "Writing summary"
+        case .recording: L10n.tr("Recording")
+        case .starting: L10n.tr("Starting")
+        case .finishing: L10n.tr("Transcribing")
+        case .findingSpeakers: L10n.tr("Finding speakers")
+        case .generating: L10n.tr("Writing summary")
         case nil: nil
         }
     }
@@ -329,22 +331,22 @@ private struct CurrentNote: View {
         VStack(alignment: .leading, spacing: 12) {
             if let meeting = (meetings.activeMeetingID ?? meetings.meetings.first?.id).flatMap(meetings.meeting) {
                 Button { meetings.selectedID = meeting.id } label: {
-                    Text(meeting.displayTitle)
+                    Text(meeting.localizedDisplayTitle)
                         .font(.system(size: 20, weight: .semibold))
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
-                .help("Open note")
+                .help(L10n.tr("Open note"))
                 Text("\(meeting.createdAt.noteDay) • \(meeting.createdAt.formatted(date: .omitted, time: .shortened))")
                     .foregroundStyle(.secondary)
                 if meetings.capturingID == meeting.id {
                     HStack(spacing: 8) {
                         Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
-                        Text("Recording · \(durationLabel(meetings.elapsed))").monospacedDigit()
+                        Text(L10n.tr("Recording · %@", String(durationLabel(meetings.elapsed)))).monospacedDigit()
                     }
                     .font(.callout)
                     .padding(.top, 6)
-                    Button("Open beside your call") { model.onShowNotetaker?(meeting.id) }
+                    Button(L10n.tr("Open beside your call")) { model.onShowNotetaker?(meeting.id) }
                         .buttonStyle(.link)
                 } else if !meeting.snippet.isEmpty {
                     Text(meeting.snippet)
@@ -354,7 +356,7 @@ private struct CurrentNote: View {
                         .padding(.top, 6)
                 }
             } else {
-                Text("Your current note appears here.").foregroundStyle(.secondary)
+                Text(L10n.tr("Your current note appears here.")).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -367,7 +369,7 @@ private struct CurrentNote: View {
 extension Date {
     /// "Today" for today's notes, otherwise a short day such as "Oct 6".
     var noteDay: String {
-        Calendar.current.isDateInToday(self) ? "Today"
+        Calendar.current.isDateInToday(self) ? L10n.tr("Today")
             : formatted(Calendar.current.isDate(self, equalTo: .now, toGranularity: .year) ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
     }
 }
@@ -386,7 +388,7 @@ extension AppModel {
         let speechModel = selectedModel
         guard isModelInstalled(speechModel) else {
             selectedPage = .models
-            statusMessage = "Download \(speechModel.name) in Models before starting meeting notes."
+            statusMessage = L10n.tr("Download %@ in Models before starting meeting notes.", String(speechModel.localizedName))
             return
         }
         selectedPage = .meetings

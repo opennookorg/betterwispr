@@ -30,11 +30,11 @@ public enum AudioRecordingError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .permissionDenied: "Allow Microphone access for BetterWispr in System Settings → Privacy & Security."
-        case .unavailable: "No microphone input is available. Check your input device in Sound settings."
-        case .inputStalled: "The microphone stopped delivering audio. Reconnect it or choose another input in Settings."
-        case .alreadyRecording: "A recording is already running."
-        case .notRecording: "No recording is running."
+        case .permissionDenied: L10n.tr("Allow Microphone access for BetterWispr in System Settings → Privacy & Security.")
+        case .unavailable: L10n.tr("No microphone input is available. Check your input device in Sound settings.")
+        case .inputStalled: L10n.tr("The microphone stopped delivering audio. Reconnect it or choose another input in Settings.")
+        case .alreadyRecording: L10n.tr("A recording is already running.")
+        case .notRecording: L10n.tr("No recording is running.")
         }
     }
 }

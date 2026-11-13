@@ -52,13 +52,13 @@ public enum MeetingQuestion {
         let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
         let sources = sources(for: question, in: meetings, budget: budget)
         guard !sources.isEmpty else {
-            throw MeetingNotesError.unavailable("There’s nothing to ask about yet. Record a meeting or write a few thoughts first.")
+            throw MeetingNotesError.unavailable(L10n.tr("There’s nothing to ask about yet. Record a meeting or write a few thoughts first."))
         }
         try Task.checkCancellation()
         let reply = try await model.respond(to: prompt(question, sources: sources, meetings: meetings))
         try Task.checkCancellation()
         guard !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw MeetingNotesError.unavailable("The model returned an empty answer. Try again or choose another model.")
+            throw MeetingNotesError.unavailable(L10n.tr("The model returned an empty answer. Try again or choose another model."))
         }
         return answer(reply, sources: sources, modelName: modelName)
     }

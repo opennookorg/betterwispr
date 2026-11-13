@@ -7,19 +7,19 @@ enum OnboardingStep: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .welcome: "Talk instead of type"
-        case .permissions: "Two quick permissions"
-        case .model: "Get the speech model"
-        case .practice: "Try it now"
+        case .welcome: L10n.tr("Talk instead of type")
+        case .permissions: L10n.tr("Two quick permissions")
+        case .model: L10n.tr("Get the speech model")
+        case .practice: L10n.tr("Try it now")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .welcome: "Speak in any app and your words appear where your cursor is."
-        case .permissions: "BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you."
-        case .model: "Choose a speech model. Downloaded models run offline."
-        case .practice: "Say a sentence and watch it turn into text."
+        case .welcome: L10n.tr("Speak in any app and your words appear where your cursor is.")
+        case .permissions: L10n.tr("BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you.")
+        case .model: L10n.tr("Choose a speech model. Downloaded models run offline.")
+        case .practice: L10n.tr("Say a sentence and watch it turn into text.")
         }
     }
 
@@ -125,9 +125,11 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("\(model.settings.dictationMode == .hold ? "Hold" : "Press") \(shortcut) to start dictating", systemImage: "keyboard")
-            Label("Built-in models keep your audio on this Mac", systemImage: "lock.fill")
-            Label("Add names and terms in Vocabulary", systemImage: "character.book.closed")
+            Label(model.settings.dictationMode == .hold
+                ? L10n.tr("Hold %@ to start dictating", shortcut)
+                : L10n.tr("Press %@ to start dictating", shortcut), systemImage: "keyboard")
+            Label(L10n.tr("Built-in models keep your audio on this Mac"), systemImage: "lock.fill")
+            Label(L10n.tr("Add names and terms in Vocabulary"), systemImage: "character.book.closed")
         }
         .font(.body)
         .foregroundStyle(.secondary)
@@ -136,8 +138,8 @@ struct OnboardingView: View {
 
     private var permissions: some View {
         Form {
-            PermissionRow(title: "Microphone", detail: "Required to dictate.", granted: model.microphoneGranted, action: model.requestMicrophone)
-            PermissionRow(title: "Paste into apps", detail: "Optional. Without it, text is copied to your clipboard.", granted: model.accessibilityGranted, action: model.requestAccessibility)
+            PermissionRow(title: L10n.tr("Microphone"), detail: L10n.tr("Required to dictate."), granted: model.microphoneGranted, action: model.requestMicrophone)
+            PermissionRow(title: L10n.tr("Paste into apps"), detail: L10n.tr("Optional. Without it, text is copied to your clipboard."), granted: model.accessibilityGranted, action: model.requestAccessibility)
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
@@ -178,23 +180,23 @@ struct OnboardingView: View {
             if let installation, installation.failure == nil {
                 HStack {
                     ProgressView(value: installation.progress).frame(width: 120)
-                    Button("Cancel", action: model.cancelInstallation)
+                    Button(L10n.tr("Cancel"), action: model.cancelInstallation)
                 }
             } else if installed && selected {
                 ready
             } else if installed {
-                Button("Use") { model.selectModel(speechModel) }
+                Button(L10n.tr("Use")) { model.selectModel(speechModel) }
                     .disabled(model.isBusy)
             } else {
-                Button(installation == nil ? "Download \(speechModel.sizeLabel)" : "Retry") {
+                Button(installation == nil ? L10n.tr("Download %@", String(speechModel.localizedSizeLabel)) : L10n.tr("Retry")) {
                     model.installModel(speechModel)
                 }
                 .disabled(model.isInstalling)
             }
         } label: {
             HStack(spacing: 6) {
-                Text(speechModel.name)
-                if speechModel.id == "parakeet-ultra" { Text("Recommended").font(.caption).foregroundStyle(.secondary) }
+                Text(speechModel.localizedName)
+                if speechModel.id == "parakeet-ultra" { Text(L10n.tr("Recommended")).font(.caption).foregroundStyle(.secondary) }
             }
             Text(modelDetail(for: speechModel, installation: installation))
         }
@@ -208,30 +210,30 @@ struct OnboardingView: View {
             } else if let installation, installation.failure == nil {
                 HStack {
                     ProgressView(value: installation.progress).frame(width: 120)
-                    Button("Cancel", action: model.cancelInstallation)
+                    Button(L10n.tr("Cancel"), action: model.cancelInstallation)
                 }
             } else if model.speakerDetectionQueued {
-                Button("Cancel") { model.speakerDetectionQueued = false }
+                Button(L10n.tr("Cancel")) { model.speakerDetectionQueued = false }
             } else {
-                Button(installation == nil ? "Download" : "Retry", action: model.installSpeakerDetection)
+                Button(installation == nil ? L10n.tr("Download") : L10n.tr("Retry"), action: model.installSpeakerDetection)
             }
         } label: {
-            Text("Speaker detection")
+            Text(L10n.tr("Speaker detection"))
             Text(speakerDetectionDetail(installation))
         }
     }
 
     private func speakerDetectionDetail(_ installation: ModelInstallation?) -> String {
         if let installation, !model.speakerDetectionInstalled {
-            return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
+            return installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel
         }
-        if model.speakerDetectionQueued { return "Downloads when the speech model is ready." }
-        return "Optional. Tells the voices in your meetings apart, on this Mac."
+        if model.speakerDetectionQueued { return L10n.tr("Downloads when the speech model is ready.") }
+        return L10n.tr("Optional. Tells the voices in your meetings apart, on this Mac.")
     }
 
     private var ready: some View {
         Label {
-            Text("Ready")
+            Text(L10n.tr("Ready"))
         } icon: {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         }
@@ -240,17 +242,17 @@ struct OnboardingView: View {
 
     private func modelDetail(for speechModel: SpeechModel, installation: ModelInstallation?) -> String {
         if let installation {
-            return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
+            return installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel
         }
-        if speechModel.id == "apple" { return "Uses macOS on-device speech recognition. No download." }
+        if speechModel.id == "apple" { return L10n.tr("Uses macOS on-device speech recognition. No download.") }
         let selected = model.selectedModel
-        return Self.selectedModelNote(selected: selected, isInstalled: model.isModelInstalled(selected), choices: speechChoices) ?? speechModel.detail
+        return Self.selectedModelNote(selected: selected, isInstalled: model.isModelInstalled(selected), choices: speechChoices) ?? speechModel.localizedDetail
     }
 
     static func selectedModelNote(selected: SpeechModel, isInstalled: Bool, choices: [SpeechModel]) -> String? {
         guard !choices.contains(where: { $0.id == selected.id }) else { return nil }
-        if selected.engine == .apple { return "Apple on-device speech isn’t available for your language on this Mac. Pick a model here to continue." }
-        return isInstalled ? "You’re using \(selected.name). Parakeet Ultra is recommended." : nil
+        if selected.engine == .apple { return L10n.tr("Apple on-device speech isn’t available for your language on this Mac. Pick a model here to continue.") }
+        return isInstalled ? L10n.tr("You’re using %@. Parakeet Ultra is recommended.", String(selected.localizedName)) : nil
     }
 
     private var practice: some View {
@@ -281,24 +283,24 @@ struct OnboardingView: View {
     private var practiceText: String {
         if !model.partialTranscript.isEmpty { return model.partialTranscript }
         if model.isBusy { return model.statusMessage }
-        if model.settings.dictationMode == .hold { return "Hold \(shortcut), say something, then let go." }
-        return "Press \(shortcut), say something, then press it again."
+        if model.settings.dictationMode == .hold { return L10n.tr("Hold %@, say something, then let go.", String(shortcut)) }
+        return L10n.tr("Press %@, say something, then press it again.", String(shortcut))
     }
 
     private var bottomBar: some View {
         HStack {
             if step == .welcome {
-                Button("Skip", action: model.finishOnboarding)
+                Button(L10n.tr("Skip"), action: model.finishOnboarding)
             } else {
-                Button("Back") { go(to: OnboardingStep(rawValue: step.rawValue - 1)) }
+                Button(L10n.tr("Back")) { go(to: OnboardingStep(rawValue: step.rawValue - 1)) }
             }
             Spacer()
             if step == .practice {
-                Button("Done", action: model.finishOnboarding)
+                Button(L10n.tr("Done"), action: model.finishOnboarding)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             } else {
-                Button("Continue") { go(to: OnboardingStep(rawValue: step.rawValue + 1)) }
+                Button(L10n.tr("Continue")) { go(to: OnboardingStep(rawValue: step.rawValue + 1)) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!Self.canContinue(from: step, selected: model.selectedModel, appleSpeechAvailable: appleSpeechAvailable))
@@ -318,7 +320,7 @@ struct OnboardingView: View {
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Step \(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
+        .accessibilityLabel(L10n.tr("Step %@ of %@", String(step.rawValue + 1), String(OnboardingStep.allCases.count)))
     }
 
     private func go(to target: OnboardingStep?) {

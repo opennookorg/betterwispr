@@ -11,23 +11,23 @@ struct SendKeysSection: View {
     @State private var refusal: String?
 
     var body: some View {
-        SettingsSection("Send keys") {
+        SettingsSection(L10n.tr("Send keys")) {
             ForEach(model.settings.sendRules) { rule in
                 SettingRow(AppChoice(rule.bundleID)?.name ?? rule.bundleID, caption: caption(rule)) {
                     SendKeystrokeRecorder(model: model, rule: rule, refusal: $refusal)
-                    Toggle("Send in \(AppChoice(rule.bundleID)?.name ?? rule.bundleID)", isOn: enabled(rule))
+                    Toggle(L10n.tr("Send in %@", AppChoice(rule.bundleID)?.name ?? rule.bundleID), isOn: enabled(rule))
                         .labelsHidden()
                         .controlSize(.small)
-                    Button("Remove", systemImage: "minus.circle") { remove(rule) }
+                    Button(L10n.tr("Remove"), systemImage: "minus.circle") { remove(rule) }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
-                        .help("Stop sending in this app")
+                        .help(L10n.tr("Stop sending in this app"))
                 }
                 RowDivider()
             }
             HStack {
-                Menu("Add App…") {
+                Menu(L10n.tr("Add App…")) {
                     ForEach(choices.filter { choice in !model.settings.sendRules.contains { $0.bundleID == choice.id } }) { choice in
                         Button { add(choice.id) } label: { choice.label }
                     }
@@ -39,7 +39,7 @@ struct SendKeysSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
         } footer: {
-            Text("BetterWispr presses the key you record after pasting into these apps, so a dictation submits instead of sitting in the field. Lists apps that are open or that you dictated into recently. Unlike Send to Claude, a send key fires wherever you are in the app, so pick one that can’t do damage in the app’s other fields, and hold Shift while dictating to paste only. Terminal and iTerm2 aren’t listed, because a key there could run a shell command; Send to Claude covers Claude Code in them. Needs Accessibility.")
+            Text(L10n.tr("BetterWispr presses the key you record after pasting into these apps, so a dictation submits instead of sitting in the field. Lists apps that are open or that you dictated into recently. Unlike Send to Claude, a send key fires wherever you are in the app, so pick one that can’t do damage in the app’s other fields, and hold Shift while dictating to paste only. Terminal and iTerm2 aren’t listed, because a key there could run a shell command; Send to Claude covers Claude Code in them. Needs Accessibility."))
         }
         .onAppear { choices = AppChoice.offered(recent: model.history.compactMap(\.appBundleID)).filter { SendAfterPaste.allowsRule(for: $0.id) } }
         .onChange(of: refusal) { _, text in
@@ -48,16 +48,16 @@ struct SendKeysSection: View {
     }
 
     private func caption(_ rule: AppSendRule) -> String {
-        if model.capturingRecorder == rule.id, let refusal { return "\(refusal) Press another key, or Esc to cancel." }
+        if model.capturingRecorder == rule.id, let refusal { return L10n.tr("%@ Press another key, or Esc to cancel.", refusal) }
         guard SendAfterPaste.allowsRule(for: rule.bundleID) else {
-            return "Nothing is pressed here, because a key could run a shell command. Send to Claude covers Claude Code here."
+            return L10n.tr("Nothing is pressed here, because a key could run a shell command. Send to Claude covers Claude Code here.")
         }
         if let refused = SendAfterPaste.refusal(of: rule.keystroke, shortcut: model.settings.shortcut) {
-            return "\(refused) Nothing is pressed until you record another key."
+            return L10n.tr("%@ Nothing is pressed until you record another key.", refused)
         }
-        let key = "Presses \(rule.keystroke.displayName) after pasting."
-        guard AppChoice(rule.bundleID) != nil else { return "\(key) This app isn’t installed on this Mac." }
-        return rule.isEnabled ? key : "\(key) Turned off."
+        let key = L10n.tr("Presses %@ after pasting.", rule.keystroke.displayName)
+        guard AppChoice(rule.bundleID) != nil else { return L10n.tr("%@ This app isn’t installed on this Mac.", key) }
+        return rule.isEnabled ? key : L10n.tr("%@ Turned off.", key)
     }
 
     private func enabled(_ rule: AppSendRule) -> Binding<Bool> {
@@ -97,14 +97,14 @@ private struct SendKeystrokeRecorder: View {
         let button = Button {
             if isCapturing { stop() } else { start() }
         } label: {
-            Text(isCapturing ? (held.isEmpty ? "Press a key…" : held.symbols + " …") : rule.keystroke.displayName)
+            Text(isCapturing ? (held.isEmpty ? L10n.tr("Press a key…") : held.symbols + " …") : rule.keystroke.displayName)
                 .frame(minWidth: 72)
                 .contentTransition(.opacity)
         }
         .disabled(model.isBusy)
-        .accessibilityLabel(isCapturing ? "Send key, waiting for a key" : "Send key, \(rule.keystroke.spokenName)")
-        .accessibilityHint("Click, then press the key that submits in this app, such as Return.")
-        .help(isCapturing ? "Press the key that submits in this app. Esc cancels." : "Record the key to press after pasting")
+        .accessibilityLabel(isCapturing ? L10n.tr("Send key, waiting for a key") : L10n.tr("Send key, %@", rule.keystroke.spokenName))
+        .accessibilityHint(L10n.tr("Click, then press the key that submits in this app, such as Return."))
+        .help(isCapturing ? L10n.tr("Press the key that submits in this app. Esc cancels.") : L10n.tr("Record the key to press after pasting"))
         .onDisappear(perform: stop)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
         .onChange(of: model.capturingRecorder) { _, recorder in

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Sparkle
+import BetterWisprCore
 
 @MainActor @Observable
 final class AppUpdater: NSObject {
@@ -51,8 +52,8 @@ extension AppUpdater: SPUUpdaterDelegate {
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
         relaunch = immediateInstallHandler
         pendingVersion = item.displayVersionString
-        ToastWindow.shared.show(Toast(title: "Update ready", message: "Restart BetterWispr to finish updating to \(item.displayVersionString).",
-                                      systemImage: "arrow.down.circle", action: Toast.Action(title: "Restart", perform: installUpdate)))
+        ToastWindow.shared.show(Toast(title: L10n.tr("Update ready"), message: L10n.tr("Restart BetterWispr to finish updating to %@.", String(item.displayVersionString)),
+                                      systemImage: "arrow.down.circle", action: Toast.Action(title: L10n.tr("Restart"), perform: installUpdate)))
         return true
     }
 }
@@ -67,8 +68,8 @@ extension AppUpdater: @preconcurrency SPUStandardUserDriverDelegate {
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         guard !handleShowingUpdate else { return }
         pendingVersion = update.displayVersionString
-        ToastWindow.shared.show(Toast(title: "Update available", message: "BetterWispr \(update.displayVersionString) is ready to install.",
-                                      systemImage: "arrow.down.circle", action: Toast.Action(title: "Update", perform: installUpdate)))
+        ToastWindow.shared.show(Toast(title: L10n.tr("Update available"), message: L10n.tr("BetterWispr %@ is ready to install.", String(update.displayVersionString)),
+                                      systemImage: "arrow.down.circle", action: Toast.Action(title: L10n.tr("Update"), perform: installUpdate)))
     }
 
     func standardUserDriverWillFinishUpdateSession() {

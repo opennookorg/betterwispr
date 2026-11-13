@@ -20,18 +20,22 @@ struct ModelsView: View {
                     modelRow(speechModel)
                 }
             } header: {
-                Text("On this Mac")
+                Text(L10n.tr("On this Mac"))
             } footer: {
-                Label("These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared.", systemImage: "internaldrive")
+                Label(L10n.tr("These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared."), systemImage: "internaldrive")
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 modelRow(.codex)
             } header: {
-                Text("Subscription transcription")
+                Text(L10n.tr("Subscription transcription"))
             } footer: {
-                Text("Audio goes to ChatGPT using your Codex subscription through an unofficial endpoint. Sign in with codex login in Terminal. Account access and limits can change.")
+                Text(L10n.tr("Audio goes to ChatGPT using your Codex subscription through an unofficial endpoint. Sign in with codex login in Terminal. Account access and limits can change."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
@@ -39,8 +43,8 @@ struct ModelsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         modelRow(connection.speechModel)
                         HStack {
-                            Button("Edit…") { editingNotes = false; editing = connection }
-                            Button("Remove", role: .destructive) {
+                            Button(L10n.tr("Edit…")) { editingNotes = false; editing = connection }
+                            Button(L10n.tr("Remove"), role: .destructive) {
                                 do { try model.deleteConnection(connection) }
                                 catch { self.error = error.localizedDescription }
                             }
@@ -48,12 +52,14 @@ struct ModelsView: View {
                         .disabled(!model.canEditConnections)
                     }
                 }
-                Button("Add connection…", systemImage: "plus") { editingNotes = false; editing = SpeechConnection() }
+                Button(L10n.tr("Add connection…"), systemImage: "plus") { editingNotes = false; editing = SpeechConnection() }
                     .disabled(!model.canEditConnections)
             } header: {
-                Text("Bring your own model")
+                Text(L10n.tr("Bring your own model"))
             } footer: {
-                Text("Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API.")
+                Text(L10n.tr("Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
@@ -67,17 +73,17 @@ struct ModelsView: View {
                             Text(connection.endpoint).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("Edit…") { editingNotes = true; editing = connection }
-                        Button("Remove", role: .destructive) {
+                        Button(L10n.tr("Edit…")) { editingNotes = true; editing = connection }
+                        Button(L10n.tr("Remove"), role: .destructive) {
                             do { try model.deleteConnection(connection, forNotes: true) }
                             catch { self.error = error.localizedDescription }
                         }
                     }
                     .disabled(!model.canEditConnections)
                 }
-                Button("Add notes API connection…", systemImage: "plus") {
+                Button(L10n.tr("Add notes API connection…"), systemImage: "plus") {
                     var connection = SpeechConnection(api: .openAICompatible)
-                    connection.name = "My notes model"
+                    connection.name = L10n.tr("My notes model")
                     connection.endpoint = "https://api.openai.com/v1/chat/completions"
                     connection.modelID = ""
                     editingNotes = true
@@ -85,37 +91,45 @@ struct ModelsView: View {
                 }
                 .disabled(!model.canEditConnections)
             } header: {
-                Text("Meeting notes · Bring your own LLM")
+                Text(L10n.tr("Meeting notes · Bring your own LLM"))
             } footer: {
-                Text("The selected notes model processes the transcript and your thoughts after recording, and whenever you generate a summary. The built-in model runs on this Mac and needs an internet connection only to download. Claude Code and Codex use their signed-in subscriptions. For meeting notes only, you can allow any Claude Code sign-in and confirm where it sends text. API connections use your key and provider billing. Cloud choices send meeting text to that provider; speech recognition is selected separately. When Auto cleanup in Style is Medium, this model also edits your English dictation unless you choose another cleanup provider in Style, and Claude Code then needs a subscription.")
+                Text(L10n.tr("The selected notes model processes the transcript and your thoughts after recording, and whenever you generate a summary. The built-in model runs on this Mac and needs an internet connection only to download. Claude Code and Codex use their signed-in subscriptions. For meeting notes only, you can allow any Claude Code sign-in and confirm where it sends text. API connections use your key and provider billing. Cloud choices send meeting text to that provider; speech recognition is selected separately. When Auto cleanup in Style is Medium, this model also edits your English dictation unless you choose another cleanup provider in Style, and Claude Code then needs a subscription."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
                 if model.speakerDetectionInstalled {
-                    Label("Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript.", systemImage: "checkmark.circle")
+                    Label(L10n.tr("Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript."), systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
                     Toggle(isOn: setting(\.separateRoomVoices)) {
-                        Text("Tell apart people in the room")
-                        Text("Also separates the voices on your microphone. The voice your microphone hears longest stays Me and the others get their own speaker numbers, so if someone near you talks more than you do, move your lines back to Me. Your microphone audio is kept on this Mac until the speakers are found, then deleted.")
+                        Text(L10n.tr("Tell apart people in the room"))
+                        Text(L10n.tr("Also separates the voices on your microphone. The voice your microphone hears longest stays Me and the others get their own speaker numbers, so if someone near you talks more than you do, move your lines back to Me. Your microphone audio is kept on this Mac until the speakers are found, then deleted."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Toggle(isOn: setting(\.rememberVoices)) {
-                        Text("Remember named voices")
-                        Text("When you name a speaker, a profile of that voice is saved on this Mac. In later meetings, a speaker who sounds like a saved voice shows that name as a suggestion in its name menu, and no name is filled in until you choose one. Name speakers before you quit BetterWispr, because a meeting’s voices are held only in memory until then. A voice profile can identify a person, so ask people before you name them. Profiles are never uploaded, but Time Machine backs them up. Suggestions use SpeakerKit’s cutoff for grouping voices within one meeting, which wasn’t tuned for matching across meetings.")
+                        Text(L10n.tr("Remember named voices"))
+                        Text(L10n.tr("When you name a speaker, a profile of that voice is saved on this Mac. In later meetings, a speaker who sounds like a saved voice shows that name as a suggestion in its name menu, and no name is filled in until you choose one. Name speakers before you quit BetterWispr, because a meeting’s voices are held only in memory until then. A voice profile can identify a person, so ask people before you name them. Profiles are never uploaded, but Time Machine backs them up. Suggestions use SpeakerKit’s cutoff for grouping voices within one meeting, which wasn’t tuned for matching across meetings."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     LabeledContent {
-                        Button("Forget Voices…", role: .destructive) { forgettingVoices = true }
+                        Button(L10n.tr("Forget Voices…"), role: .destructive) { forgettingVoices = true }
                     } label: {
-                        Text("Remembered voices")
-                        Text(forgetFailure ?? "Deletes every saved voice profile. Names already in your meetings stay. Deleting a meeting deletes the profiles named in it.")
+                        Text(L10n.tr("Remembered voices"))
+                        Text(forgetFailure ?? L10n.tr("Deletes every saved voice profile. Names already in your meetings stay. Deleting a meeting deletes the profiles named in it."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .foregroundStyle(forgetFailure == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                     }
-                    .confirmationDialog("Forget every remembered voice?", isPresented: $forgettingVoices) {
-                        Button("Forget Voices", role: .destructive) {
+                    .confirmationDialog(L10n.tr("Forget every remembered voice?"), isPresented: $forgettingVoices) {
+                        Button(L10n.tr("Forget Voices"), role: .destructive) {
                             do {
                                 try model.meetings.forgetVoices()
                                 forgetFailure = nil
                             } catch {
-                                forgetFailure = "Couldn’t forget voices. \(error.localizedDescription)"
+                                forgetFailure = L10n.tr("Couldn’t forget voices. %@", String(error.localizedDescription))
                             }
                         }
                     }
@@ -124,34 +138,40 @@ struct ModelsView: View {
                     let installing = installation != nil && installation?.failure == nil
                     LabeledContent {
                         if installing {
-                            Button("Cancel", action: model.cancelInstallation)
+                            Button(L10n.tr("Cancel"), action: model.cancelInstallation)
                         } else {
-                            Button(installation == nil ? "Download" : "Retry") { model.installSpeakerDetection() }
+                            Button(installation == nil ? L10n.tr("Download") : L10n.tr("Retry")) { model.installSpeakerDetection() }
                                 .disabled(model.isInstalling)
                         }
                     } label: {
-                        Text("Speaker detection")
-                        Text("Tells the voices on the other side of a call apart after each meeting, so the transcript and notes show who said what. Runs on this Mac.")
+                        Text(L10n.tr("Speaker detection"))
+                        Text(L10n.tr("Tells the voices on the other side of a call apart after each meeting, so the transcript and notes show who said what. Runs on this Mac."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if let installation {
                         if installing { ProgressView(value: installation.progress) }
-                        Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
+                        Text(installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel)
                             .font(.caption)
                             .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                     }
                 }
             } header: {
-                Text("Meeting speakers")
+                Text(L10n.tr("Meeting speakers"))
             } footer: {
-                Text("Your microphone is Me. People in the room with you stay part of Me unless speaker detection tells them apart.")
+                Text(L10n.tr("Your microphone is Me. People in the room with you stay part of Me unless speaker detection tells them apart."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
                 LabeledContent {
-                    Button("Open Vocabulary") { model.selectedPage = .vocabulary }
+                    Button(L10n.tr("Open Vocabulary")) { model.selectedPage = .vocabulary }
                 } label: {
-                    Text("Improve accuracy")
-                    Text("Larger models handle accents and challenging audio better, but use more memory and take longer. A quiet microphone, the correct language and your personal vocabulary also make a difference.")
+                    Text(L10n.tr("Improve accuracy"))
+                    Text(L10n.tr("Larger models handle accents and challenging audio better, but use more memory and take longer. A quiet microphone, the correct language and your personal vocabulary also make a difference."))
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -165,8 +185,8 @@ struct ModelsView: View {
         .sheet(item: $editing) { connection in
             SpeechConnectionEditor(model: model, connection: connection, forNotes: editingNotes)
         }
-        .alert("Couldn’t complete action", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-            Button("OK") { error = nil }
+        .alert(L10n.tr("Couldn’t complete action"), isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            Button(L10n.tr("OK")) { error = nil }
         } message: { Text(error ?? "") }
     }
 
@@ -175,21 +195,23 @@ struct ModelsView: View {
         let installing = installation != nil && installation?.failure == nil
         LabeledContent {
             if installing {
-                Button("Cancel", action: model.cancelInstallation)
+                Button(L10n.tr("Cancel"), action: model.cancelInstallation)
             } else if model.meetings.builtInModelInstalled {
-                Button("Remove", role: .destructive, action: model.removeBuiltInModel)
+                Button(L10n.tr("Remove"), role: .destructive, action: model.removeBuiltInModel)
                     .disabled(model.isInstalling || !model.canEditConnections)
             } else {
-                Button(installation == nil ? "Download" : "Retry", action: model.installBuiltInModel)
+                Button(installation == nil ? L10n.tr("Download") : L10n.tr("Retry"), action: model.installBuiltInModel)
                     .disabled(model.isInstalling)
             }
         } label: {
-            Text("Built-in model · \(BuiltInModel.displayName)")
-            Text("Writes meeting notes and edits Medium dictation on this Mac, with no app or account to set up. \(BuiltInModel.sizeLabel) download. Uses about 1.5 GB of memory while it works and frees it after five idle minutes.")
+            Text(L10n.tr("Built-in model · %@", String(BuiltInModel.displayName)))
+            Text(L10n.tr("Writes meeting notes and edits Medium dictation on this Mac, with no app or account to set up. %@ download. Uses about 1.5 GB of memory while it works and frees it after five idle minutes.", String(BuiltInModel.localizedSizeLabel)))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         if let installation {
             if installing { ProgressView(value: installation.progress) }
-            Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
+            Text(installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel)
                 .font(.caption)
                 .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
         }
@@ -216,38 +238,38 @@ struct ModelsView: View {
             )
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(speechModel.name).fontWeight(.medium)
+                    Text(speechModel.localizedName).fontWeight(.medium)
                     if selected {
-                        badge(signInMissing ? "Selected · Setup required" : unavailable ? "Selected · Unavailable" : "Active",
+                        badge(signInMissing ? L10n.tr("Selected · Setup required") : unavailable ? L10n.tr("Selected · Unavailable") : L10n.tr("Active"),
                               color: signInMissing || unavailable ? .orange : .green)
                     } else if speechModel.id == "parakeet-ultra" {
-                        badge("Recommended", color: .accentColor)
+                        badge(L10n.tr("Recommended"), color: .accentColor)
                     }
                 }
-                Text(speechModel.detail)
+                Text(speechModel.localizedDetail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(speechModel.sizeLabel) · \(engineLabel(speechModel.engine))")
+                Text("\(speechModel.localizedSizeLabel) · \(engineLabel(speechModel.engine))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 if signInMissing {
-                    Text("Sign in with codex login in Terminal.")
+                    Text(L10n.tr("Sign in with codex login in Terminal."))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
                 if unavailable {
-                    Text("Isn’t available for your language on this Mac. Choose another model to dictate.")
+                    Text(L10n.tr("Isn’t available for your language on this Mac. Choose another model to dictate."))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                if let names = speechModel.languageNames {
+                if let names = speechModel.localizedLanguageNames {
                     if names.count == 1 {
                         Text(names[0])
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        DisclosureGroup("\(names.count) languages") {
+                        DisclosureGroup(L10n.tr("%ld languages", names.count)) {
                             Text(names.formatted(.list(type: .and)))
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
@@ -258,21 +280,22 @@ struct ModelsView: View {
                 }
                 if let installation {
                     if installing { ProgressView(value: installation.progress).padding(.top, 4) }
-                    Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
+                    Text(installation.failure.map { L10n.tr("Download stopped: %@", String($0)) } ?? installation.progressLabel)
                         .font(.caption)
                         .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 }
             }
+            .multilineTextAlignment(.leading)
             Spacer(minLength: 8)
             if installing {
-                Button("Cancel", action: model.cancelInstallation)
+                Button(L10n.tr("Cancel"), action: model.cancelInstallation)
             } else if selected && installed && !signInMissing && !unavailable {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
                     .foregroundStyle(.green)
-                    .accessibilityLabel("Active model")
+                    .accessibilityLabel(L10n.tr("Active model"))
             } else if installed {
-                Button("Use") {
+                Button(L10n.tr("Use")) {
                     if speechModel.engine == .codex {
                         preparingSubscription = true
                         let selection = model.selectedModel.id
@@ -295,7 +318,7 @@ struct ModelsView: View {
                 }
                     .disabled(model.isBusy || preparingSubscription || unavailable)
             } else {
-                Button(installation == nil ? "Download" : "Retry") { model.installModel(speechModel) }
+                Button(installation == nil ? L10n.tr("Download") : L10n.tr("Retry")) { model.installModel(speechModel) }
                     .disabled(model.isInstalling)
             }
         }
@@ -313,11 +336,11 @@ struct ModelsView: View {
 
     private func engineLabel(_ engine: SpeechEngine) -> String {
         switch engine {
-        case .apple: "System speech"
+        case .apple: L10n.tr("System speech")
         case .whisperKit: "WhisperKit · Apple Silicon"
         case .parakeet: "Parakeet · Neural Engine"
-        case .api: "API connection"
-        case .codex: "Codex subscription"
+        case .api: L10n.tr("API connection")
+        case .codex: L10n.tr("Codex subscription")
         }
     }
 }
@@ -358,53 +381,59 @@ private struct SpeechConnectionEditor: View {
                 Section {
                     if forNotes {
                         if original == nil {
-                            Picker("Provider", selection: preset) {
-                                Text("Custom").tag(String?.none)
+                            Picker(L10n.tr("Provider"), selection: preset) {
+                                Text(L10n.tr("Custom")).tag(String?.none)
                                 ForEach(NotesAPIPreset.all) { Text($0.name).tag(String?.some($0.id)) }
                             }
                         }
-                        LabeledContent("API format", value: "OpenAI-compatible chat completions")
+                        LabeledContent(L10n.tr("API format"), value: L10n.tr("OpenAI-compatible chat completions"))
                     } else {
-                        Picker("Provider", selection: $connection.api) {
-                            ForEach(SpeechAPI.allCases, id: \.self) { Text($0.name).tag($0) }
+                        Picker(L10n.tr("Provider"), selection: $connection.api) {
+                            ForEach(SpeechAPI.allCases, id: \.self) { Text($0.localizedName).tag($0) }
                         }
                     }
-                    TextField("Name", text: $connection.name)
-                    TextField("Model ID", text: $connection.modelID)
+                    TextField(L10n.tr("Name"), text: $connection.name)
+                    TextField(L10n.tr("Model ID"), text: $connection.modelID)
                     if connection.api == .openAICompatible {
-                        TextField(forNotes ? "Chat completions URL" : "Transcription URL", text: $connection.endpoint)
-                        Text(forNotes ? "Enter a full /chat/completions endpoint and any model ID your provider supports. Works with OpenAI-compatible services and local servers. API keys use Bearer authentication." : "Enter the full endpoint, for example http://localhost:8000/v1/audio/transcriptions. It must accept a WAV file and return JSON with a text field. API keys use Bearer authentication.")
+                        TextField(forNotes ? L10n.tr("Chat completions URL") : L10n.tr("Transcription URL"), text: $connection.endpoint)
+                        Text(forNotes ? L10n.tr("Enter a full /chat/completions endpoint and any model ID your provider supports. Works with OpenAI-compatible services and local servers. API keys use Bearer authentication.") : L10n.tr("Enter the full endpoint, for example http://localhost:8000/v1/audio/transcriptions. It must accept a WAV file and return JSON with a text field. API keys use Bearer authentication."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
-                        LabeledContent("Endpoint") { Text(connection.endpoint).textSelection(.enabled) }
+                        LabeledContent(L10n.tr("Endpoint")) { Text(connection.endpoint).textSelection(.enabled) }
                     }
-                    SecureField(canKeepKey ? "New API key (blank keeps saved key)" : "API key", text: $key)
+                    SecureField(canKeepKey ? L10n.tr("New API key (blank keeps saved key)") : L10n.tr("API key"), text: $key)
                         .disabled(removeKey)
                     if connection.api == .openAICompatible {
-                        Toggle("Use without an API key", isOn: $removeKey)
+                        Toggle(L10n.tr("Use without an API key"), isOn: $removeKey)
                     }
                     if connection.api == .smallest {
-                        Picker("Spoken language", selection: spokenLanguage) {
+                        Picker(L10n.tr("Spoken language"), selection: spokenLanguage) {
                             ForEach(SettingsView.spokenLanguages.filter { (try? connection.validateLanguage($0.code)) != nil }, id: \.code) {
                                 Text($0.name).tag($0.code)
                             }
                         }
-                        Text("Smallest AI can’t detect the language automatically. Saving sets Spoken language in Settings, which every model uses. Use pulse for multilingual speech or pulse-pro for English.")
+                        Text(L10n.tr("Smallest AI can’t detect the language automatically. Saving sets Spoken language in Settings, which every model uses. Use pulse for multilingual speech or pulse-pro for English."))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text(forNotes ? "Notes API connection" : original == nil ? "Add speech connection" : "Edit speech connection")
+                    Text(forNotes ? L10n.tr("Notes API connection") : original == nil ? L10n.tr("Add speech connection") : L10n.tr("Edit speech connection"))
                 } footer: {
-                    Text(forNotes ? "Saving makes no network request. Select this connection under Notes model to send meeting text to it. Keys stay in macOS Keychain. Changing an active endpoint resets the notes choice to Apple Intelligence; select the connection again to use the new URL." : "Saving makes no network request. Choose Use in Models to send future dictation and meeting audio to this endpoint. Keys are stored only in macOS Keychain.")
+                    Text(forNotes ? L10n.tr("Saving makes no network request. Select this connection under Notes model to send meeting text to it. Keys stay in macOS Keychain. Changing an active endpoint resets the notes choice to Apple Intelligence; select the connection again to use the new URL.") : L10n.tr("Saving makes no network request. Choose Use in Models to send future dictation and meeting audio to this endpoint. Keys are stored only in macOS Keychain."))
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             }
             .formStyle(.grouped)
             Divider()
             HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L10n.tr("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save connection") { save() }
+                Button(L10n.tr("Save connection")) { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!model.canEditConnections)
             }

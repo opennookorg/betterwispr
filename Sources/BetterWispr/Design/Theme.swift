@@ -130,6 +130,30 @@ struct KeyCap: View {
     }
 }
 
+/// A localized sentence that draws its `%@` placeholder as the shortcut's key cap.
+struct ShortcutSentence: View {
+    let format: String
+    let shortcut: DictationShortcut
+    var spacing: CGFloat = 4
+
+    var body: some View {
+        if let marker = format.range(of: "%@") {
+            HStack(spacing: spacing) {
+                part(format[..<marker.lowerBound])
+                KeyCap(shortcut: shortcut)
+                part(format[marker.upperBound...])
+            }
+        } else {
+            Text(verbatim: format)
+        }
+    }
+
+    @ViewBuilder private func part(_ text: Substring) -> some View {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        if !text.isEmpty { Text(verbatim: text) }
+    }
+}
+
 /// Gives custom buttons an immediate press response; reduced motion keeps only the dimming.
 struct PressableButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -152,13 +176,13 @@ struct PermissionRow: View {
         LabeledContent {
             if granted {
                 Label {
-                    Text("Allowed")
+                    Text(L10n.tr("Allowed"))
                 } icon: {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 }
                 .foregroundStyle(.secondary)
             } else {
-                Button("Allow…", action: action)
+                Button(L10n.tr("Allow…"), action: action)
             }
         } label: {
             Text(title)

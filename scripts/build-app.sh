@@ -7,6 +7,7 @@ if [[ $# -gt 2 || ( "$configuration" != debug && "$configuration" != release ) |
     echo 'Usage: scripts/build-app.sh [debug|release] [arm64|x86_64]' >&2
     exit 2
 fi
+python3 scripts/localization.py check
 swift build -c "$configuration" --arch "$architecture" --product BetterWispr
 binary_dir="$(swift build -c "$configuration" --arch "$architecture" --show-bin-path)"
 app="$binary_dir/BetterWispr.app"
@@ -28,7 +29,7 @@ if [[ ! -f "$icon" || "${icon_sources[0]}" -nt "$icon" || "${icon_sources[1]}" -
     iconutil -c icns "$iconset" -o "$icon"
 fi
 cp "$icon" "$app/Contents/Resources/AppIcon.icns"
-rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/Resources/BetterWispr_BetterWispr.bundle" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle" "$app/Contents/MacOS/BetterWispr_BetterWispr.bundle" "$app/Contents/Frameworks/Sparkle.framework" "$app/Contents/Frameworks/llama.framework"
+rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/Resources/BetterWispr_BetterWispr.bundle" "$app/Contents/Resources/BetterWispr_BetterWisprCore.bundle" "$app/Contents/MacOS/BetterWispr_BetterWisprCore.bundle" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle" "$app/Contents/MacOS/BetterWispr_BetterWispr.bundle" "$app/Contents/Frameworks/Sparkle.framework" "$app/Contents/Frameworks/llama.framework"
 ditto "$binary_dir/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
 ditto "$binary_dir/llama.framework" "$app/Contents/Frameworks/llama.framework"
 rm -rf "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$app/Contents/Frameworks/Sparkle.framework/XPCServices"
@@ -47,9 +48,10 @@ for resource in "$binary_dir"/*.bundle; do
     [[ -d "$resource" ]] || continue
     [[ "$(basename "$resource")" == BetterWispr_BetterWispr.bundle ]] && continue
     cp -R "$resource" "$app/Contents/Resources/"
-    [[ "$(basename "$resource")" == FluidAudio_* ]] && continue
+    [[ "$(basename "$resource")" == FluidAudio_* || "$(basename "$resource")" == BetterWispr_BetterWisprCore.bundle ]] && continue
     cp -R "$resource" "$app/Contents/MacOS/"
 done
+python3 scripts/localization.py package "$app"
 identity="${CODESIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null | awk '/\)/ {print $2; exit}' || true)}"
 if [[ -z "$identity" ]]; then
     identity=-
