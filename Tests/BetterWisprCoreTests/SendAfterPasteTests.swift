@@ -172,7 +172,7 @@ import Testing
 @Test @MainActor func theGenericPosterReproducesTheCommandVThePastePathSends() throws {
     let commandV = try #require(SendKeystroke(keyCode: 9, modifiers: [.command], key: "V"))
     let generic = try #require(FocusedAppIntegration.keystrokeEvents(for: commandV))
-    let paste = try #require(FocusedAppIntegration.pasteKeystroke())
+    let paste = try #require(FocusedAppIntegration.pasteKeystroke(vKey: 9))
     #expect(generic.map(\.type) == paste.map(\.type))
     #expect(generic.map(\.flags.rawValue) == paste.map(\.flags.rawValue))
     #expect(generic.map { $0.getIntegerValueField(.keyboardEventKeycode) }

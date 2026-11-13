@@ -199,11 +199,30 @@ import Testing
 }
 
 @MainActor @Test func pastePressesCommandAsItsOwnKeyAroundV() throws {
-    let events = try #require(FocusedAppIntegration.pasteKeystroke())
+    let events = try #require(FocusedAppIntegration.pasteKeystroke(vKey: 9))
     #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
     #expect(events.map { $0.getIntegerValueField(.keyboardEventKeycode) } == [0x37, 9, 9, 0x37])
     #expect(events.map { $0.flags.contains(.maskCommand) } == [true, true, true, false])
     #expect(events.map { $0.flags.contains(FocusedAppIntegration.leftCommandDeviceFlag) } == [true, true, true, false])
+}
+
+@MainActor @Test func pastePressesTheKeyThatTypesVInTheCurrentLayout() throws {
+    let dvorakV = CGKeyCode(kVK_ANSI_Period)
+    let events = try #require(FocusedAppIntegration.pasteKeystroke(vKey: dvorakV))
+    #expect(events.map { $0.getIntegerValueField(.keyboardEventKeycode) } == [0x37, Int64(dvorakV), Int64(dvorakV), 0x37])
+}
+
+@Test func theKeyThatTypesACharacterFollowsTheLayout() {
+    let dvorak: [CGKeyCode: String] = [CGKeyCode(kVK_ANSI_V): "k", CGKeyCode(kVK_ANSI_Period): "v", CGKeyCode(kVK_ANSI_I): "c"]
+    #expect(FocusedAppIntegration.keyCode(typing: "v") { dvorak[$0] } == CGKeyCode(kVK_ANSI_Period))
+    #expect(FocusedAppIntegration.keyCode(typing: "c") { dvorak[$0] } == CGKeyCode(kVK_ANSI_I))
+    let qwertyWithCommand: [CGKeyCode: String] = [CGKeyCode(kVK_ANSI_V): "v", CGKeyCode(kVK_ANSI_C): "c"]
+    #expect(FocusedAppIntegration.keyCode(typing: "v") { qwertyWithCommand[$0] } == CGKeyCode(kVK_ANSI_V))
+    #expect(FocusedAppIntegration.keyCode(typing: "v") { _ in "м" } == nil)
+}
+
+@MainActor @Test func aCharacterNoKeyTypesFallsBackToTheANSIKey() {
+    #expect(FocusedAppIntegration.commandKeyCode(typing: "\u{1F600}", fallback: CGKeyCode(kVK_ANSI_V)) == CGKeyCode(kVK_ANSI_V))
 }
 
 @MainActor @Test func screenSharingClipboardMenuTitlesAreFoundInEveryLanguage() {
