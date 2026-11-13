@@ -1,13 +1,18 @@
 import BetterWisprCore
+import Foundation
 import Observation
 
 /// Offers the notetaker once per call when a known call app or web meeting starts recording from the microphone.
 @MainActor @Observable
 final class MeetingDetector {
-    static let promptSeconds = 30.0
     static let browserPollSeconds = 3.0
 
     private(set) var meeting: DetectedMeeting?
+    /// When the shown prompt closes by itself, or nil while it waits for an answer.
+    private(set) var deadline: Date?
+    @ObservationIgnored var timeout: TimeInterval? = MeetingPromptTimeout.thirtySeconds.seconds {
+        didSet { if timeout != oldValue { scheduleExpiry() } }
+    }
     @ObservationIgnored var isEnabled = false {
         didSet {
             guard isEnabled != oldValue else { return }
@@ -37,6 +42,7 @@ final class MeetingDetector {
         guard let meeting else { return }
         answered.insert(meeting.appID)
         expiry?.cancel()
+        deadline = nil
         self.meeting = nil
     }
 
@@ -62,11 +68,18 @@ final class MeetingDetector {
         let next = calls.first { !answered.contains($0.appID) }
         guard next != meeting else { return }
         meeting = next
+        scheduleExpiry()
+    }
+
+    /// Restarts the countdown for the shown prompt; expiry answers it the way Not now does.
+    private func scheduleExpiry() {
         expiry?.cancel()
-        guard let next else { return }
+        deadline = nil
+        guard let shown = meeting, let timeout else { return }
+        deadline = .now.addingTimeInterval(timeout)
         expiry = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Self.promptSeconds))
-            guard !Task.isCancelled, self?.meeting == next else { return }
+            try? await Task.sleep(for: .seconds(timeout))
+            guard !Task.isCancelled, self?.meeting == shown else { return }
             self?.dismiss()
         }
     }

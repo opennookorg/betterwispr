@@ -225,6 +225,28 @@ struct SettingsView: View {
                         .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
                     SettingToggle("Detect meetings", caption: "Offer the notetaker when Zoom, Google Meet, Teams, a Slack huddle or another call starts using the microphone. Calls in a browser need Accessibility.", isOn: setting(\.detectMeetings))
+                    if model.settings.detectMeetings {
+                        RowDivider()
+                        SettingRow("Meeting prompt position", caption: "Where “Meeting detected” appears, on the screen showing the call. At the top it sits below the menu bar and camera.") {
+                            Picker("Meeting prompt position", selection: setting(\.meetingPromptPosition)) {
+                                Text("Top center").tag(MeetingPromptPosition.top)
+                                Text("Bottom center").tag(MeetingPromptPosition.bottom)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        RowDivider()
+                        SettingRow("Close meeting prompt", caption: "A countdown shows beside Start notetaker. When it ends, nothing is recorded and the prompt doesn’t return until that call ends.") {
+                            Picker("Close meeting prompt", selection: setting(\.meetingPromptTimeout)) {
+                                Text("After 15 seconds").tag(MeetingPromptTimeout.fifteenSeconds)
+                                Text("After 30 seconds").tag(MeetingPromptTimeout.thirtySeconds)
+                                Text("After 60 seconds").tag(MeetingPromptTimeout.sixtySeconds)
+                                Text("Never").tag(MeetingPromptTimeout.never)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
                     RowDivider()
                     SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
                     RowDivider()

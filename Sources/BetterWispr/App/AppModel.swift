@@ -285,6 +285,7 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
+        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
         mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: "Couldn’t mute other apps", $0)) }
@@ -1662,6 +1663,7 @@ final class AppModel {
         }
         applyAppearance()
         if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
+        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         meetings.remembersVoices = settings.rememberVoices
         onPresentationChange?()
     }
