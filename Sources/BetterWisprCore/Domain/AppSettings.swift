@@ -113,7 +113,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var language: String = "auto"
     /// Nil keeps Chinese in the script the speech model wrote.
     public var chineseScript: ChineseScript?
-    /// Languages automatic detection chooses from with a Whisper model; empty allows every language.
+    /// Languages automatic detection chooses from with a Whisper model, or whose alphabet Parakeet keeps to; empty allows every language.
     public var dictationLanguages: Set<String> = []
     public var autoPaste: Bool = true
     /// Presses Return after pasting into a recognized Claude prompt; see `ClaudePrompt`.

@@ -8,6 +8,8 @@ public final class ParakeetProvider: SpeechProvider {
     public var onPartialTranscript: (@MainActor @Sendable (String) -> Void)?
     public private(set) var vocabularyFixes = 0
     public var usesPhraseBooster = true
+    /// Languages automatic detection allows; when they share one alphabet, tokens in other alphabets are never emitted.
+    public var detectionLanguages: Set<String> = []
     private let modelsDirectory: URL
     private var manager: AsrManager?
     private var loadedModelID: String?
@@ -216,6 +218,18 @@ public final class ParakeetProvider: SpeechProvider {
         language.flatMap { Locale(identifier: $0).language.languageCode?.identifier }.flatMap(Language.init(rawValue:))
     }
 
+    /// A language standing for the one alphabet all `languages` share, or nil when they are empty, mixed or unknown.
+    nonisolated static func scriptHint(for languages: Set<String>) -> Language? {
+        let hints = languages.map(hint(for:))
+        let scripts = Set(hints.compactMap { $0?.script })
+        guard !hints.contains(nil), scripts.count == 1, let script = scripts.first else { return nil }
+        return switch script {
+        case .latin: .english
+        case .cyrillic: .russian
+        case .greek: .greek
+        }
+    }
+
     public func transcribe(audioURL: URL, language: String?, vocabulary: [String]) async throws -> String {
         try await transcribe(audioURL: audioURL, language: language, vocabulary: vocabulary, screenTerms: [])
     }
@@ -244,17 +258,18 @@ public final class ParakeetProvider: SpeechProvider {
         guard transcriptionTask == nil else { throw SpeechError.busy }
         try Task.checkCancellation()
         let hint = Self.hint(for: language)
+        let script = language == nil ? Self.scriptHint(for: detectionLanguages) : nil
         let terms = usesPhraseBooster && loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary + screenTerms) : []
         let task = Task { () async throws -> (text: String, vocabularyFixes: Int) in
             let text: String
             var fixes = 0
             var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             if let session = await self.boostingSession(for: terms) {
-                (text, fixes) = try await Self.boostedTranscript(of: try await Self.resampled(samples, of: audioURL), language: hint, manager: manager, session: session, vocabulary: vocabulary)
+                (text, fixes) = try await Self.boostedTranscript(of: try await Self.resampled(samples, of: audioURL), language: hint, script: script, manager: manager, session: session, vocabulary: vocabulary)
             } else if let samples {
-                text = try await manager.transcribe(samples, decoderState: &state, language: hint).text
+                text = try await manager.transcribe(samples, decoderState: &state, language: hint ?? script).text
             } else if let audioURL {
-                text = try await manager.transcribe(audioURL, decoderState: &state, language: hint).text
+                text = try await manager.transcribe(audioURL, decoderState: &state, language: hint ?? script).text
             } else {
                 throw SpeechError.audioUnavailable
             }
@@ -279,7 +294,7 @@ public final class ParakeetProvider: SpeechProvider {
     public func liveTranscribe(_ samples: [Float], language: String?) async throws -> LivePass {
         guard let manager, !preparing else { throw SpeechError.notPrepared }
         guard transcriptionTask == nil, livePass == nil else { throw SpeechError.busy }
-        let hint = Self.hint(for: language)
+        let hint = language == nil ? Self.scriptHint(for: detectionLanguages) : Self.hint(for: language)
         let task = Task {
             var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             let result = try await manager.transcribe(samples, decoderState: &state, language: hint)
@@ -314,10 +329,10 @@ public final class ParakeetProvider: SpeechProvider {
 
     @concurrent
     private nonisolated static func boostedTranscript(
-        of samples: [Float], language: Language?, manager: AsrManager, session: VocabularyBoostingSession, vocabulary: [String]
+        of samples: [Float], language: Language?, script: Language?, manager: AsrManager, session: VocabularyBoostingSession, vocabulary: [String]
     ) async throws -> (text: String, fixes: Int) {
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-        let result = try await manager.transcribe(samples, decoderState: &state, language: language)
+        let result = try await manager.transcribe(samples, decoderState: &state, language: language ?? script)
         try Task.checkCancellation()
         let misspelled = await MainActor.run { !isSpelledCorrectly(result.text) }
         guard language != nil || TranscriptCleaner.isEnglish(result.text, language: nil),
