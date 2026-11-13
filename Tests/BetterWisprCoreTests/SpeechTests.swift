@@ -610,3 +610,15 @@ private enum Downloader { enum DownloadError: Error { case invalidDownloadLocati
         #expect(WhisperKitProvider.readableDownloadError(error).localizedDescription == error.localizedDescription)
     }
 }
+
+@Test func cohereWindowsCoverTheAudioInPiecesOfAtMost15SecondsCutAtTheQuietestMoment() {
+    var samples = [Float](repeating: 0.5, count: 40 * 16_000)
+    for index in (13 * 16_000)..<(13 * 16_000 + 1_600) { samples[index] = 0 }
+    let windows = CohereProvider.windows(in: samples)
+
+    #expect(windows.first == 0..<(13 * 16_000 + 800))
+    #expect(windows.allSatisfy { $0.count <= 15 * 16_000 && !$0.isEmpty })
+    #expect(zip(windows, windows.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound })
+    #expect(windows.last?.upperBound == samples.count)
+    #expect(CohereProvider.windows(in: [Float](repeating: 0.5, count: 16_000)) == [0..<16_000])
+}

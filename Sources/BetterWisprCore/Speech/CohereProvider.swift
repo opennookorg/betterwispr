@@ -79,13 +79,41 @@ public final class CohereProvider: SpeechProvider {
         let cohereLanguage = Self.language(for: language)
         let task = Task { () async throws -> String in
             let samples = try await Self.samples(of: audioURL)
-            let result = try await pipeline.transcribeLong(audio: samples, models: models, language: cohereLanguage)
+            var texts: [String] = []
+            for window in Self.windows(in: samples) {
+                try Task.checkCancellation()
+                let result = try await pipeline.transcribe(audio: Array(samples[window]), models: models, language: cohereLanguage, noRepeatNgram: Self.repeatedPhraseLength)
+                texts.append(result.text.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
             try Task.checkCancellation()
-            return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return texts.filter { !$0.isEmpty }.joined(separator: " ")
         }
         transcriptionTask = task
         defer { if transcriptionTask == task { transcriptionTask = nil } }
         return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+    }
+
+    /// Longer than any phrase a speaker repeats on purpose, so the decoder only blocks runaway loops.
+    nonisolated static let repeatedPhraseLength = 8
+
+    /// Splits audio into windows of at most 15 seconds, each ending at the quietest tenth of a second in its last 3 seconds, so the decoder's 98-token limit never cuts speech off.
+    nonisolated static func windows(in samples: [Float], sampleRate: Int = 16_000) -> [Range<Int>] {
+        let count = samples.count
+        let longest = 15 * sampleRate, search = 3 * sampleRate, frame = sampleRate / 10
+        var windows: [Range<Int>] = []
+        var start = 0
+        while count - start > longest {
+            let cuts = stride(from: start + longest - search, through: start + longest - frame, by: frame)
+            let cut = cuts.min { energy(samples[$0..<$0 + frame]) < energy(samples[$1..<$1 + frame]) }.map { $0 + frame / 2 } ?? start + longest
+            windows.append(start..<cut)
+            start = cut
+        }
+        if start < count { windows.append(start..<count) }
+        return windows
+    }
+
+    private nonisolated static func energy(_ frame: ArraySlice<Float>) -> Float {
+        frame.reduce(0) { $0 + $1 * $1 }
     }
 
     @concurrent

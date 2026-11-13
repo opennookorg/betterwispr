@@ -162,6 +162,11 @@ Environment: Apple M4 Pro, macOS 27.2.1, `BetterWisprCLI` from the working tree.
   English clip came back with every word, with "Yesterday," and "Next week,"
   punctuated and the commas around "longer than planned" dropped. A clip made by
   repeating the 6 s English clip three times came back as one sentence.
+- After review, the provider decodes windows of at most 15 s, cut at the
+  quietest tenth of a second, and blocks only repeated 8-token phrases. A 37.5 s
+  clip made of the 18.8 s clip twice came back with both copies in full. The
+  three-times clip came back as one full sentence plus its second half, so the
+  model still drops some deliberate repetition.
 - `swift build`, `python3 scripts/localization.py check` and the new Cohere
   tests passed. `swift test` failed in timing-sensitive tests
   (`pendingSendStaysCancellableThroughTheFinalPromptCheck`,
