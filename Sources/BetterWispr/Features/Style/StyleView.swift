@@ -113,6 +113,12 @@ struct StyleView: View {
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
+                        if !model.settings.cleanupSettings.notesSelection.formats {
+                            Label(L10n.tr("Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style."),
+                                  systemImage: "exclamationmark.triangle")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)

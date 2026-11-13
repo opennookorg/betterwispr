@@ -679,6 +679,11 @@ final class AppModel {
             fail(DictationFailure(title: L10n.tr("Download a model first."), message: L10n.tr("Download %@ in Models before recording.", String(selectedModel.localizedName))))
             return
         }
+        guard !formatting || settings.cleanupSettings.notesSelection.formats else {
+            selectedPage = .style
+            fail(Self.formatProviderMissing)
+            return
+        }
         if let cleanup = selectedTextCleanup {
             cleanup.cancel()
             selectedTextCleanup = nil
@@ -1132,6 +1137,14 @@ final class AppModel {
 
     /// The format when it can run; otherwise tells the user why this dictation gets the usual cleanup.
     private func formatIfPossible(_ format: DictationFormat, english: Bool, settings: AppSettings) -> DictationFormat? {
+        guard settings.notesSelection.formats else {
+            ToastWindow.shared.show(Toast(title: Self.formatProviderMissing.title, message: Self.formatProviderMissing.message, systemImage: "exclamationmark.triangle", isError: true,
+                                          action: Toast.Action(title: L10n.tr("Open Style")) { [weak self] in
+                                              self?.selectedPage = .style
+                                              self?.onShowDashboard?()
+                                          }))
+            return nil
+        }
         let reason: String
         if format.rules == nil {
             reason = L10n.tr("Dictate and format has no layout for this app yet. This dictation got the usual cleanup.")
@@ -1144,6 +1157,11 @@ final class AppModel {
         }
         ToastWindow.shared.show(Toast(title: L10n.tr("Not formatted"), message: reason, systemImage: "exclamationmark.triangle"))
         return nil
+    }
+
+    static var formatProviderMissing: DictationFailure {
+        DictationFailure(title: L10n.tr("Connect a provider to format."),
+                         message: L10n.tr("Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style."))
     }
 
     /// An email format when the dictation asks for an email in an app without its own email, chat or prompt layout.

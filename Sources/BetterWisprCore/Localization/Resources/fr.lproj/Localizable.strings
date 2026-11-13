@@ -1152,6 +1152,9 @@
 "Dictate and format sends your English dictation to the cleanup provider. %@" = "Dicter et mettre en forme envoie votre dictée en anglais au fournisseur de nettoyage. %@";
 "Dictate and format works in English. This dictation got the usual cleanup." = "Dicter et mettre en forme fonctionne en anglais. Cette dictée a reçu le nettoyage habituel.";
 "Dictate and format has no layout for this app yet. This dictation got the usual cleanup." = "Dicter et mettre en forme n’a pas encore de mise en page pour cette app. Cette dictée a reçu le nettoyage habituel.";
+"Connect a provider to format." = "Connectez un fournisseur pour la mise en forme.";
+"Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style." = "Dicter et mettre en forme nécessite Claude Code, Codex, une connexion API ou Ollama. Choisissez-en un comme fournisseur de nettoyage dans Style.";
+"Open Style" = "Ouvrir Style";
 "Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only." = "Dicte, puis met en forme le texte pour l’app où vous êtes, comme un e-mail ou un message de discussion, avec votre fournisseur de nettoyage de Style. Anglais uniquement.";
 "%@ Hold both keys while you speak. Needs Accessibility." = "%@ Maintenez les deux touches pendant que vous parlez. Nécessite l’accessibilité.";
 "Forget" = "Oublier";

@@ -196,3 +196,12 @@ import Testing
     #expect(EmailDictation.compose("Draft an email to Sam with the following message: the deck is ready. Thanks, Kartik.") == "Hi Sam,\n\nThe deck is ready.\n\nThanks,\nKartik")
     #expect(EmailDictation.compose("Write an email to Sam: I'm running late.") == "Hi Sam,\n\nI'm running late.")
 }
+
+@Test func onlyClaudeCodeCodexAPIConnectionsAndOllamaCanFormat() {
+    #expect(!NotesModelSelection.apple.formats)
+    #expect(!NotesModelSelection.builtIn.formats)
+    #expect(NotesModelSelection.ollama("llama3.1:8b").formats)
+    #expect(NotesModelSelection.connection(UUID()).formats)
+    #expect(NotesModelSelection.cli(.claudeCode).formats)
+    #expect(NotesModelSelection.cli(.codex).formats)
+}
