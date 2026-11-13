@@ -368,7 +368,8 @@ func live(_ url: URL, provider: ParakeetProvider, language: String?) async throw
     transcriber.onUpdate = { [weak transcriber] transcript in
         let elapsed = String(format: "%5.1f", seconds(started.duration(to: clock.now)))
         let pass = String(format: "%.2f", seconds(transcriber?.lastPass ?? .zero))
-        print("\(elapsed) s  pass \(pass) s  \(transcript.confirmed) | \(transcript.hypothesis)")
+        let shown = transcript.writingNumbersAsDigits(language: language)
+        print("\(elapsed) s  pass \(pass) s  \(shown.confirmed) | \(shown.hypothesis)")
     }
     transcriber.beginBuffering()
     transcriber.start { try await provider.liveTranscribe($0, language: language) }
@@ -378,7 +379,8 @@ func live(_ url: URL, provider: ParakeetProvider, language: String?) async throw
         try await Task.sleep(for: .milliseconds(100))
     }
     await transcriber.stop()
-    print("live:  \(transcriber.transcript.confirmed) | \(transcriber.transcript.hypothesis)")
+    let shown = transcriber.transcript.writingNumbersAsDigits(language: language)
+    print("live:  \(shown.confirmed) | \(shown.hypothesis)")
     print("batch: \(try await provider.transcribe(audioURL: url, language: language, vocabulary: []))")
 }
 
