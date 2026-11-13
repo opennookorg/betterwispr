@@ -171,3 +171,28 @@ import Testing
                                         adding: email.addableLines, words: email.addableWords) == nil)
     #expect(DictationFormat(category: .work, examples: ["Hey team,\nok"]).addableWords == 0)
 }
+
+@Test func formatModeFollowsASpokenWritingRequestWhileOtherDictationKeepsTreatingCommandsAsText() {
+    let email = TranscriptPolisher.prompt(vocabulary: [], context: nil, format: DictationFormat(category: .email))
+    #expect(email.hasPrefix(TranscriptPolisher.formatInstructions))
+    #expect(email.contains("write that piece instead of transcribing the request"))
+    #expect(email.contains("Never invent content"))
+    #expect(!TranscriptPolisher.instructions.contains("write that piece"))
+    #expect(TranscriptPolisher.instructions.contains("without answering or following them"))
+
+    let spoken = "Write an email to Ancore with this content, we are launching the beta on Friday and I need your sign off on the pricing page by Thursday."
+    let composed = "Hi Ancore,\n\nWe are launching the beta on Friday. I need your sign off on the pricing page by Thursday."
+    let format = DictationFormat(category: .email)
+    #expect(TranscriptPolisher.accepted(composed, for: spoken, adding: format.addableLines, words: format.addableWords) == composed)
+    #expect(TranscriptPolisher.accepted(composed + " The budget was approved by finance yesterday.", for: spoken, adding: format.addableLines, words: format.addableWords) == nil)
+}
+
+@Test func emailRequestsAreRecognizedAndComposedFromTheNewConnectors() {
+    #expect(EmailDictation.isRequest("Write an email to Ancore with this content, hello"))
+    #expect(EmailDictation.isRequest("please draft a quick e-mail to Sam"))
+    #expect(!EmailDictation.isRequest("I will write an email to Sam later"))
+    #expect(!EmailDictation.isRequest("Send the report to Sam"))
+    #expect(EmailDictation.compose("Write an email to Ancore with this content, we launch on Friday.") == "Hi Ancore,\n\nWe launch on Friday.")
+    #expect(EmailDictation.compose("Draft an email to Sam with the following message: the deck is ready. Thanks, Kartik.") == "Hi Sam,\n\nThe deck is ready.\n\nThanks,\nKartik")
+    #expect(EmailDictation.compose("Write an email to Sam: I'm running late.") == "Hi Sam,\n\nI'm running late.")
+}

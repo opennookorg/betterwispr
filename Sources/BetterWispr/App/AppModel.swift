@@ -1013,7 +1013,7 @@ final class AppModel {
                 var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
                 if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
-                let format = recording.format.flatMap { self.formatIfPossible($0, english: english, settings: writingSettings) }
+                let format = recording.format.flatMap { self.formatIfPossible(self.requested($0, by: spoken), english: english, settings: writingSettings) }
                 var styledFormat: DictationFormat?
                 if let format {
                     self.statusMessage = L10n.tr("Formatting with %@…", String(writingSettings.localizedNotesModelName))
@@ -1022,12 +1022,15 @@ final class AppModel {
                                                                     instructions: mode?.instructions ?? "", format: format)
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
-                    if formatted == nil {
+                    if formatted == nil, format.category == .email, let email = EmailDictation.compose(spoken) {
+                        spoken = email
+                    } else if formatted == nil {
                         ToastWindow.shared.show(Toast(title: L10n.tr("Pasted without formatting"), message: L10n.tr("%@ didn’t return a usable edit, so the cleaned dictation was used.", String(writingSettings.localizedNotesModelName)), systemImage: "text.badge.xmark"))
                     } else {
                         styledFormat = format
                     }
                     spoken = StyleFormatter.apply(tone, to: formatted ?? spoken)
+                    Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Formatting completed: category=\(format.category.rawValue, privacy: .public) accepted=\(formatted != nil)")
                 } else if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
                 } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
@@ -1129,9 +1132,10 @@ final class AppModel {
 
     /// The format when it can run; otherwise tells the user why this dictation gets the usual cleanup.
     private func formatIfPossible(_ format: DictationFormat, english: Bool, settings: AppSettings) -> DictationFormat? {
-        guard format.rules != nil else { return nil }
         let reason: String
-        if !english {
+        if format.rules == nil {
+            reason = L10n.tr("Dictate and format has no layout for this app yet. This dictation got the usual cleanup.")
+        } else if !english {
             reason = L10n.tr("Dictate and format works in English. This dictation got the usual cleanup.")
         } else if case .unavailable(let why) = MeetingNotesGenerator.availability(settings: settings) {
             reason = L10n.tr("%@ Until then, Dictate and format gives the usual cleanup.", String(why))
@@ -1140,6 +1144,12 @@ final class AppModel {
         }
         ToastWindow.shared.show(Toast(title: L10n.tr("Not formatted"), message: reason, systemImage: "exclamationmark.triangle"))
         return nil
+    }
+
+    /// An email format when the dictation asks for an email in an app without its own email, chat or prompt layout.
+    private func requested(_ format: DictationFormat, by spoken: String) -> DictationFormat {
+        guard [.other, .documents].contains(format.category), EmailDictation.isRequest(spoken) else { return format }
+        return DictationFormat(category: .email, examples: styleExamples?.recent(for: .email) ?? [])
     }
 
     func cancelRecording() {
