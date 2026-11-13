@@ -165,3 +165,14 @@ private func event(_ id: String, from start: TimeInterval, to end: TimeInterval,
     #expect(legacy.eventID == nil)
     #expect(legacy.title == "Design review")
 }
+
+@Test func videoLinksNameTheirPlatform() {
+    func platform(_ link: String?) -> MeetingPlatform? {
+        CalendarEvent(id: "a", title: "", start: .now, end: .now, videoURL: link.flatMap(URL.init(string:))).videoPlatform
+    }
+    #expect(platform("https://meet.google.com/xxn-mfcz-war") == .googleMeet)
+    #expect(platform("https://acme.zoom.us/j/123") == .zoom)
+    #expect(platform("https://teams.microsoft.com/l/meetup-join/1") == .teams)
+    #expect(platform("https://notzoom.us/j/1") == nil)
+    #expect(platform(nil) == nil)
+}

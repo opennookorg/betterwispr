@@ -2,7 +2,26 @@ import CoreGraphics
 import EventKit
 import Foundation
 
-/// An event from the Mac's Calendar, reduced to what a meeting note uses.
+/// Someone invited to a calendar event and how they answered.
+public struct CalendarGuest: Equatable, Sendable {
+    public enum Response: Equatable, Sendable { case accepted, declined, tentative, pending }
+
+    public var name: String
+    public var email: String?
+    public var response: Response
+    public var isOrganizer: Bool
+    public var isYou: Bool
+
+    public init(name: String, email: String? = nil, response: Response = .pending, isOrganizer: Bool = false, isYou: Bool = false) {
+        self.name = name
+        self.email = email
+        self.response = response
+        self.isOrganizer = isOrganizer
+        self.isYou = isYou
+    }
+}
+
+/// An event from the Mac's Calendar, reduced to what the Calendar page and a meeting note use.
 public struct CalendarEvent: Equatable, Sendable {
     public var id: String
     public var title: String
@@ -17,9 +36,14 @@ public struct CalendarEvent: Equatable, Sendable {
     public var calendarTitle: String
     /// The calendar's color as sRGB components, when Calendar gives one.
     public var calendarColor: SIMD3<Double>?
+    /// Everyone on the invite, including the user and the organizer, organizer first.
+    public var guests: [CalendarGuest]
+    public var location: String
+    public var notes: String
 
     public init(id: String, title: String, start: Date, end: Date, isAllDay: Bool = false, isAttending: Bool = true, attendees: [String] = [],
-                videoURL: URL? = nil, calendarTitle: String = "", calendarColor: SIMD3<Double>? = nil) {
+                videoURL: URL? = nil, calendarTitle: String = "", calendarColor: SIMD3<Double>? = nil, guests: [CalendarGuest] = [],
+                location: String = "", notes: String = "") {
         self.id = id
         self.title = title
         self.start = start
@@ -30,6 +54,17 @@ public struct CalendarEvent: Equatable, Sendable {
         self.videoURL = videoURL
         self.calendarTitle = calendarTitle
         self.calendarColor = calendarColor
+        self.guests = guests
+        self.location = location
+        self.notes = notes
+    }
+
+    /// The service hosting the event's video link.
+    public var videoPlatform: MeetingPlatform? {
+        guard let host = videoURL?.host()?.lowercased() else { return nil }
+        let platforms: [(String, MeetingPlatform)] = [("zoom.us", .zoom), ("meet.google.com", .googleMeet), ("teams.microsoft.com", .teams),
+                                                      ("teams.live.com", .teams), ("webex.com", .webex)]
+        return platforms.first { host == $0.0 || host.hasSuffix("." + $0.0) }?.1
     }
 
     static let earlyStart: TimeInterval = 5 * 60
@@ -190,8 +225,30 @@ extension CalendarEvent {
                 .compactMap { Self.invitee(name: $0.name, url: $0.url) },
             videoURL: Self.videoURL(in: [event.url?.absoluteString, event.location, event.notes].compactMap { $0 }),
             calendarTitle: event.calendar?.title ?? "",
-            calendarColor: event.calendar?.cgColor.flatMap(Self.sRGB)
+            calendarColor: event.calendar?.cgColor.flatMap(Self.sRGB),
+            guests: Self.guests(of: event),
+            location: event.location?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            notes: event.notes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         )
+    }
+
+    private static func guests(of event: EKEvent) -> [CalendarGuest] {
+        let organizer = event.organizer?.url
+        let guests = (event.attendees ?? [])
+            .filter { $0.participantType != .room && $0.participantType != .resource }
+            .compactMap { attendee -> CalendarGuest? in
+                guard let name = invitee(name: attendee.name, url: attendee.url) else { return nil }
+                let email = attendee.url.scheme?.lowercased() == "mailto" ? URLComponents(url: attendee.url, resolvingAgainstBaseURL: false)?.path : nil
+                let response: CalendarGuest.Response = switch attendee.participantStatus {
+                case .accepted: .accepted
+                case .declined: .declined
+                case .tentative: .tentative
+                default: .pending
+                }
+                return CalendarGuest(name: name, email: email == name ? nil : email, response: response,
+                                     isOrganizer: attendee.url == organizer, isYou: attendee.isCurrentUser)
+            }
+        return guests.filter(\.isOrganizer) + guests.filter { !$0.isOrganizer }
     }
 
     private static func sRGB(_ color: CGColor) -> SIMD3<Double>? {

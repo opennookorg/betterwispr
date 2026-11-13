@@ -490,48 +490,155 @@ private struct EventDetail: View {
     let event: CalendarEvent
     let now: Date
 
+    private static let shownGuests = 25
+
     private var canTakeNotes: Bool { !event.isAllDay && now < event.end && event.start.timeIntervalSince(now) <= 15 * 60 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(event.displayTitle)
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(when)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if !event.calendarTitle.isEmpty {
-                Label {
-                    Text(event.calendarTitle)
-                } icon: {
-                    Circle().fill(event.color).frame(width: 8, height: 8)
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    if let url = event.videoURL { video(url) }
+                    if showsLocation {
+                        section("mappin.and.ellipse") { LinkedText(event.location) }
+                    }
+                    if !event.guests.isEmpty { guests }
+                    if !event.notes.isEmpty {
+                        section("text.alignleft") { LinkedText(event.notes) }
+                    }
+                    if !event.calendarTitle.isEmpty {
+                        section("calendar") {
+                            Text(event.calendarTitle)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                .font(.callout)
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let invitees {
-                Text(invitees)
-                    .font(.callout)
+            .scrollBounceBehavior(.basedOnSize)
+            if canTakeNotes {
+                Divider()
+                HStack {
+                    Spacer()
+                    Button(L10n.tr("Take notes")) { model.startNotetaker(for: event) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.isBusy || model.meetings.capturingID != nil)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+        }
+        .frame(width: 400)
+        .frame(maxHeight: 600)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(event.color)
+                .frame(width: 12, height: 12)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.displayTitle)
+                    .font(.title3.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                Text(when)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if event.videoURL != nil || canTakeNotes {
-                HStack(spacing: 8) {
-                    if let url = event.videoURL {
-                        Button(L10n.tr("Join")) { NSWorkspace.shared.open(url) }
-                            .help(url.host() ?? "")
-                    }
-                    if canTakeNotes {
-                        Button(L10n.tr("Take notes")) { model.startNotetaker(for: event) }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(model.isBusy || model.meetings.capturingID != nil)
-                    }
+        }
+    }
+
+    private func video(_ url: URL) -> some View {
+        section("video") {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Button(event.videoPlatform.map { L10n.tr("Join with %@", String($0.name)) } ?? L10n.tr("Join")) { NSWorkspace.shared.open(url) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    Spacer()
+                    copyButton(url.absoluteString, help: L10n.tr("Copy link"))
                 }
-                .padding(.top, 2)
+                Text(displayed(url))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
             }
         }
-        .padding(16)
-        .frame(width: 300, alignment: .leading)
+    }
+
+    private var guests: some View {
+        section("person.2") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(event.guests.count == 1 ? L10n.tr("1 guest") : L10n.tr("%d guests", event.guests.count))
+                        if let replies { Text(replies).font(.callout).foregroundStyle(.secondary) }
+                    }
+                    Spacer()
+                    let emails = event.guests.compactMap(\.email)
+                    if !emails.isEmpty { copyButton(emails.joined(separator: ", "), help: L10n.tr("Copy guest emails")) }
+                }
+                ForEach(Array(event.guests.prefix(Self.shownGuests).enumerated()), id: \.offset) { _, guest in
+                    GuestRow(guest: guest)
+                }
+                if event.guests.count > Self.shownGuests {
+                    Text(L10n.tr("%d more", event.guests.count - Self.shownGuests))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func section(_ symbol: String, @ViewBuilder content: () -> some View) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: symbol)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func copyButton(_ text: String, help: String) -> some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        } label: {
+            Image(systemName: "doc.on.doc")
+        }
+        .buttonStyle(.borderless)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+
+    private var showsLocation: Bool {
+        !event.location.isEmpty && event.location != event.videoURL?.absoluteString
+    }
+
+    private var replies: String? {
+        let counts = Dictionary(grouping: event.guests, by: \.response).mapValues(\.count)
+        let parts: [String] = [
+            counts[.accepted].map { L10n.tr("%d yes", $0) },
+            counts[.declined].map { L10n.tr("%d no", $0) },
+            counts[.tentative].map { L10n.tr("%d maybe", $0) },
+            counts[.pending].map { L10n.tr("%d awaiting", $0) },
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    private func displayed(_ url: URL) -> String {
+        let text = (url.host() ?? "") + url.path()
+        return text.isEmpty ? url.absoluteString : text
     }
 
     private var when: String {
@@ -539,12 +646,96 @@ private struct EventDetail: View {
         if event.isAllDay { return (event.start..<max(end.addingTimeInterval(-1), event.start)).formatted(date: .complete, time: .omitted) }
         return (event.start..<end).formatted(date: .complete, time: .shortened)
     }
+}
 
-    private var invitees: String? {
-        guard !event.attendees.isEmpty else { return nil }
-        let shown = Array(event.attendees.prefix(6))
-        let names = ListFormatter.localizedString(byJoining: shown)
-        let more = event.attendees.count - shown.count
-        return more == 0 ? L10n.tr("With %@", names) : L10n.tr("With %@ and %d more", names, more)
+private struct GuestRow: View {
+    let guest: CalendarGuest
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(initials)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .background(Color.primary.opacity(0.08), in: .circle)
+                .overlay(alignment: .bottomTrailing) { badge }
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(guest.isYou ? L10n.tr("%@ (you)", guest.name) : guest.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let caption {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(response ?? "")
+    }
+
+    @ViewBuilder private var badge: some View {
+        if let symbol {
+            Image(systemName: symbol.name)
+                .font(.system(size: 11))
+                .foregroundStyle(.white, symbol.color)
+                .background(Circle().fill(.background).padding(-1.5))
+                .offset(x: 3, y: 3)
+        }
+    }
+
+    private var symbol: (name: String, color: Color)? {
+        switch guest.response {
+        case .accepted: ("checkmark.circle.fill", .green)
+        case .declined: ("xmark.circle.fill", .red)
+        case .tentative: ("questionmark.circle.fill", .orange)
+        case .pending: nil
+        }
+    }
+
+    private var response: String? {
+        switch guest.response {
+        case .accepted: L10n.tr("Going")
+        case .declined: L10n.tr("Not going")
+        case .tentative: L10n.tr("Maybe")
+        case .pending: L10n.tr("Awaiting reply")
+        }
+    }
+
+    private var caption: String? {
+        let parts = [guest.isOrganizer ? L10n.tr("Organizer") : nil, guest.email].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private var initials: String {
+        let words = guest.name.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "@" }).prefix(guest.name.contains("@") ? 1 : 2)
+        return words.compactMap(\.first).map(String.init).joined().uppercased()
+    }
+}
+
+private struct LinkedText: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(linked)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+    }
+
+    private var linked: AttributedString {
+        var result = AttributedString(text)
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return result }
+        for match in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let url = match.url, let range = Range(match.range, in: text),
+                  let lower = AttributedString.Index(range.lowerBound, within: result),
+                  let upper = AttributedString.Index(range.upperBound, within: result) else { continue }
+            result[lower..<upper].link = url
+        }
+        return result
     }
 }
