@@ -152,7 +152,7 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(L10n.tr("After you speak")) {
-                    SettingToggle(L10n.tr("Write numbers as digits"), caption: L10n.tr("“Two tickets for PR forty-two” becomes “2 tickets for PR 42”, in any language. Turn off to keep numbers as spoken words."), isOn: setting(\.writesNumbersAsDigits))
+                    SettingToggle(L10n.tr("Write numbers as digits"), caption: L10n.tr("“Two PRs for the ticket sixty-seven” becomes “2 PRs for the ticket 67”, in any language. Turn off to keep numbers as spoken words."), isOn: setting(\.writesNumbersAsDigits))
                     RowDivider()
                     SettingToggle(L10n.tr("Paste into the active app"), caption: L10n.tr("Needs Accessibility. Otherwise, text is copied."), isOn: setting(\.autoPaste))
                     RowDivider()

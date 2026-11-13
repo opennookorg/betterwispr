@@ -41,6 +41,22 @@ public struct LiveTranscript: Sendable, Equatable {
     }
 
     public var isEmpty: Bool { confirmed.isEmpty && hypothesis.isEmpty }
+
+    /// The preview with spoken numbers written as digits like the pasted text; a number spanning both parts shows whole in the hypothesis.
+    public func writingNumbersAsDigits(language: String?) -> LiveTranscript {
+        let joined = [confirmed, hypothesis].filter { !$0.isEmpty }.joined(separator: " ")
+        let detected = language ?? TranscriptCleaner.languageCode(of: joined, language: nil)
+        func digits(_ text: String) -> String {
+            let spoken = language == nil || language?.hasPrefix("en") == true ? SpokenNumbers.apply(text) : text
+            return LocalizedSpokenNumbers.apply(spoken, language: detected)
+        }
+        let settled = digits(confirmed)
+        let whole = digits(joined)
+        guard whole.hasPrefix(settled) else { return LiveTranscript(hypothesis: whole) }
+        let rest = whole.dropFirst(settled.count)
+        guard rest.isEmpty || rest.first == " " else { return LiveTranscript(hypothesis: whole) }
+        return LiveTranscript(confirmed: settled, hypothesis: rest.trimmingCharacters(in: .whitespaces))
+    }
 }
 
 /// Confirms words once several consecutive recognizer passes agree on them, adapted from VoiceInk.

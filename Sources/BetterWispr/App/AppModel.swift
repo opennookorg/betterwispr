@@ -720,9 +720,11 @@ final class AppModel {
         let model = selectedModel
         let live = model.engine == .parakeet ? LiveTranscriber() : nil
         if settings.showLiveText && !settings.hideCapsuleWhileDictating {
+            let language = settings.language == "auto" ? nil : settings.language
+            let digits = settings.writesNumbersAsDigits
             live?.onUpdate = { [weak self] transcript in
                 guard let self, self.generation == token else { return }
-                self.liveTranscript = transcript
+                self.liveTranscript = digits ? transcript.writingNumbersAsDigits(language: language) : transcript
             }
         }
         pieceEdits?.tasks.values.forEach { $0.cancel() }
