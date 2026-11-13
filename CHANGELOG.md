@@ -29,6 +29,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - The floating capsule no longer blocks clicks in apps behind it. Its invisible window covered a large area at the bottom of the screen, so buttons there, for example in apps tiled in split view, could not be clicked. Only the capsule itself and a small margin around it now take the pointer, and hovering it still opens its controls.
 - The capsule no longer uses Liquid Glass on macOS 26 and later, where it could turn gray over bright windows and make its white text and icons hard to read. It now uses the same background as earlier macOS versions.
 - A dictation started while AirPods are playing for your iPhone or another device no longer records only silence. macOS could hand the AirPods to your Mac a moment after BetterWispr opened their microphone and then never send their sound. When a microphone sends nothing but exact silence for 2 seconds, BetterWispr restarts it once and hears what you say after that.
+- Audio interfaces with more than two inputs, such as Focusrite Scarlett interfaces, no longer fail with "No microphone input is available". BetterWispr records the interface's first two inputs, where its microphone inputs usually are, and leaves out loopback channels.
 - Stopping a dictation while BetterWispr is busy no longer throws the recording away with "The microphone stopped delivering audio". BetterWispr waited for the last moment of audio on the same thread that draws its windows, so a busy app could miss it even though the audio had arrived.
 
 ### Changed

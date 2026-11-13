@@ -48,10 +48,15 @@ public enum AudioInputs {
         var stream = AudioStreamBasicDescription()
         var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
         guard AudioObjectGetPropertyData(id, &property, 0, nil, &size, &stream) == noErr,
-              stream.mSampleRate > 0, stream.mChannelsPerFrame > 0,
-              let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: stream.mSampleRate,
-                                         channels: stream.mChannelsPerFrame, interleaved: true) else { throw AudioRecordingError.unavailable }
+              let format = captureFormat(stream) else { throw AudioRecordingError.unavailable }
         return (device, id, format)
+    }
+
+    /// Records an interface's first two inputs, where its microphone preamps are, and leaves out loopback channels.
+    static func captureFormat(_ stream: AudioStreamBasicDescription) -> AVAudioFormat? {
+        guard stream.mSampleRate > 0, stream.mChannelsPerFrame > 0 else { return nil }
+        return AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: stream.mSampleRate,
+                             channels: min(stream.mChannelsPerFrame, 2), interleaved: true)
     }
 
     private static let system = AudioObjectID(kAudioObjectSystemObject)

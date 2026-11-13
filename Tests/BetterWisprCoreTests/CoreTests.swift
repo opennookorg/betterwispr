@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import BetterWisprCore
@@ -120,6 +121,16 @@ import Testing
     #expect(resolve(airPods, [builtIn, renamed], default: builtIn) == renamed)
     #expect(resolve(nil, [builtIn, airPods], default: nil) == nil)
     #expect(resolve(usb, [builtIn, airPods], default: nil) == nil)
+}
+
+@Test(arguments: [(1, 1), (2, 2), (4, 2), (18, 2)])
+func microphoneCaptureRecordsAtMostTheFirstTwoInputsOfAnInterface(channels: UInt32, recorded: UInt32) throws {
+    let stream = AudioStreamBasicDescription(mSampleRate: 48_000, mFormatID: kAudioFormatLinearPCM, mFormatFlags: 0, mBytesPerPacket: 0,
+                                             mFramesPerPacket: 1, mBytesPerFrame: 0, mChannelsPerFrame: channels, mBitsPerChannel: 24, mReserved: 0)
+    let format = try #require(AudioInputs.captureFormat(stream))
+    #expect(format.channelCount == recorded)
+    #expect(format.sampleRate == 48_000)
+    #expect(AudioInputs.captureFormat(AudioStreamBasicDescription()) == nil)
 }
 
 @Test func shortcutsValidateKeysAndRoundTripThroughSettings() throws {
