@@ -40,9 +40,14 @@ public enum TranscriptCleaner {
 
     /// Uses the chosen language, or detects it when the language is automatic; undetectable text counts as English.
     public static func isEnglish(_ text: String, language: String?) -> Bool {
-        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
-            ?? NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+        let code = languageCode(of: text, language: language)
         return code == nil || code == "en"
+    }
+
+    /// The selected language's code, or the text's detected language when the selection is automatic.
+    static func languageCode(of text: String, language: String?) -> String? {
+        language.map { Locale(identifier: $0).language.languageCode?.identifier }
+            ?? NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
     }
 
     private static func dropFillers(_ tokens: [Token]) -> [Token] {

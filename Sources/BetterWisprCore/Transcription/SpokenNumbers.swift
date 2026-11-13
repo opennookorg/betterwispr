@@ -27,6 +27,8 @@ enum SpokenNumbers {
         "twentieth", "thirtieth", "fortieth", "fiftieth", "sixtieth", "seventieth", "eightieth", "ninetieth",
         "hundredth", "thousandth", "millionth", "billionth", "trillionth",
     ]
+    /// Words after which "one" is a number rather than a pronoun and numbers read one after another always join, as in "PR number one" or "PR four eight".
+    private static let anchors: Set<String> = ["number", "pr", "issue", "ticket"]
     private static let suffixes: [([String], String)] = [
         (["percent"], "%"), (["percentage"], "%"), (["per", "cent"], "%"), (["k"], "K"),
     ]
@@ -88,17 +90,54 @@ enum SpokenNumbers {
         }
     }
 
-    /// Writes English number words as digits, so "two hundred and fifty thousand" becomes "250,000", "two lakh fifty thousand" "2,50,000" and "ten percent" "10%".
+    /// Writes English number words as digits, so "two hundred and fifty thousand" becomes "250,000", "two lakh fifty thousand" "2,50,000", "four five six seven" "4567" and "ten percent" "10%".
     static func apply(_ text: String) -> String {
         let tokens = text.split(separator: " ").map(Token.init)
         var out: [String] = []
         var i = 0
         while i < tokens.count {
+            if let (digits, end) = run(at: i, in: tokens) {
+                out.append(digits)
+                i = end
+                continue
+            }
             let (digits, end) = number(at: i, in: tokens)
             out += digits.map { [$0] } ?? tokens[i..<end].map(\.text)
             i = end
         }
         return out.joined(separator: " ")
+    }
+
+    /// Whether numbers read one after another are one number: after an anchor such as "PR", three or more such as "five five five", or a year such as "nineteen ninety nine".
+    static func joins(_ values: [Int], anchored: Bool) -> Bool {
+        anchored || values.count > 2 || values.count == 2 && (13...29).contains(values[0]) && values[1] >= 10
+    }
+
+    /// Numbers spoken one after another from `start` as one run of digits, the words when they don't join, such as the time "eleven thirty", or nil for a single number.
+    private static func run(at start: Int, in tokens: [Token]) -> (String, Int)? {
+        func open(_ j: Int) -> Bool { j < tokens.count && (j == start || (tokens[j - 1].trailing.isEmpty && tokens[j].leading.isEmpty)) }
+        var pieces: [(value: Int, start: Int)] = []
+        var j = start
+        while open(j) {
+            var reading = Reading()
+            var end = j
+            while open(end), let words = tokens[end].words {
+                var next = reading
+                guard words.allSatisfy({ next.read($0) }) else { break }
+                reading = next
+                end += 1
+            }
+            guard reading.last != nil, pieces.isEmpty || reading.value < 100 else { break }
+            pieces.append((reading.value, j))
+            j = end
+        }
+        if open(j), ordinals.contains(tokens[j].key) || tokens[j].key == "point" || suffixes.contains(where: { $0.0[0] == tokens[j].key }), let last = pieces.popLast() {
+            j = last.start
+        }
+        guard pieces.count > 1 else { return nil }
+        let anchored = start > 0 && tokens[start - 1].trailing.isEmpty && anchors.contains(tokens[start - 1].key)
+        guard joins(pieces.map(\.value), anchored: anchored) else { return (tokens[start..<j].map(\.text).joined(separator: " "), j) }
+        return (tokens[start].leading + pieces.map { String($0.value) }.joined() + tokens[j - 1].trailing, j)
     }
 
     /// The digits for the number spoken at `start`, or nil to keep the words, and the index after them.
@@ -140,7 +179,6 @@ enum SpokenNumbers {
         }
         guard end > start else { return (nil, start + 1) }
         let scaleFollows = single(end, .scale) != nil
-        let multiplierFollows = scaleFollows || single(end, .hundred) != nil
         if let beforeAnd, reading.last == .and || isNumberWord(end) {
             (reading, end) = beforeAnd
         } else if scaleFollows, reading.group > 0, let afterScale {
@@ -165,14 +203,10 @@ enum SpokenNumbers {
             end += 1
         }
 
-        if isNumberWord(end), !multiplierFollows {
-            var runEnd = end
-            while isNumberWord(runEnd) { runEnd += 1 }
-            return (nil, runEnd)
-        }
         if open(end), ordinals.contains(tokens[end].key) { return (nil, end) }
         let unit = suffix(at: end)
-        let lone = end - start == 1 && reading.value < 10
+        let anchored = start > 0 && tokens[start - 1].trailing.isEmpty && anchors.contains(tokens[start - 1].key)
+        let lone = end - start == 1 && reading.value == 1 && !anchored
         let bareA = first.key == "a" && end - start <= 2
         if unit == nil, lone || bareA { return (nil, end) }
 
@@ -183,7 +217,7 @@ enum SpokenNumbers {
         }
         let last = unit?.end ?? end
         let indian = tokens[start..<end].contains { indianScales.contains($0.key) }
-        let digits = format(value, indian: indian) + fraction + (named.map { " " + $0 } ?? "") + (unit?.symbol ?? "")
+        let digits = (anchored ? String(value) : format(value, indian: indian)) + fraction + (named.map { " " + $0 } ?? "") + (unit?.symbol ?? "")
         return (first.leading + digits + tokens[last - 1].trailing, last)
     }
 

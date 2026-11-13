@@ -101,6 +101,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var historyClock = RetentionClock()
     /// Adds a space after pasted text so the next dictation doesn't run into it.
     public var appendTrailingSpace: Bool = false
+    /// Writes spoken numbers as digits, such as "forty-two" as "42", in every language.
+    public var writesNumbersAsDigits: Bool = true
     public var showCapsule: Bool = true
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
@@ -263,6 +265,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         historyRetention = try container.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention) ?? .forever
         historyClock = try container.decodeIfPresent(RetentionClock.self, forKey: .historyClock) ?? RetentionClock()
         appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
+        writesNumbersAsDigits = try container.decodeIfPresent(Bool.self, forKey: .writesNumbersAsDigits) ?? true
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false

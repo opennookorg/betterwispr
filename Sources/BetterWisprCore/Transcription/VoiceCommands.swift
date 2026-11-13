@@ -28,9 +28,9 @@ public enum VoiceCommands {
     private static let topLevelDomains: Set<String> = ["com", "org", "net", "io", "ai", "edu", "gov"]
     private static let wordLikeDomains: Set<String> = ["in", "me", "co", "app", "dev"]
 
-    /// Applies English spoken numbers, punctuation, line breaks, "scratch that" and the @, # and % symbols.
-    public static func apply(_ text: String) -> String {
-        let tokens = joiningDomains(SpokenNumbers.apply(text).split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init))
+    /// Applies English spoken numbers (unless `digits` is false), punctuation, line breaks, "scratch that" and the @, # and % symbols.
+    public static func apply(_ text: String, digits: Bool = true) -> String {
+        let tokens = joiningDomains((digits ? SpokenNumbers.apply(text) : text).split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init))
         let spoken = tokens.map(normalized).filter { !$0.isEmpty }
         if let whole = symbols.first(where: { $0.words == spoken }) { return whole.symbol }
         if let whole = requestedPunctuation.first(where: { $0.0 == spoken }) { return whole.1.trimmingCharacters(in: .whitespaces) }
