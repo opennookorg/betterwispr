@@ -102,7 +102,7 @@ extension AppModel {
         settings.showCapsule = false
         saveSettings()
         ToastWindow.shared.show(Toast(title: L10n.tr("Capsule hidden"),
-                                      message: L10n.tr("Turn on Floating recording capsule in Settings to bring it back. It still appears while you dictate."),
+                                      message: L10n.tr("Turn on Floating recording capsule in Settings to bring it back."),
                                       systemImage: "eye.slash",
                                       action: Toast.Action(title: L10n.tr("Undo")) { [weak self] in
                                           self?.settings.showCapsule = true
