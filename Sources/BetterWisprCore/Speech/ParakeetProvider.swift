@@ -7,6 +7,7 @@ public final class ParakeetProvider: SpeechProvider {
     public var onProgress: (@MainActor @Sendable (Double) -> Void)?
     public var onPartialTranscript: (@MainActor @Sendable (String) -> Void)?
     public private(set) var vocabularyFixes = 0
+    public var usesPhraseBooster = true
     private let modelsDirectory: URL
     private var manager: AsrManager?
     private var loadedModelID: String?
@@ -226,7 +227,7 @@ public final class ParakeetProvider: SpeechProvider {
         guard audioURL.isFileURL, FileManager.default.fileExists(atPath: audioURL.path) else { throw SpeechError.audioUnavailable }
         try Task.checkCancellation()
         let hint = Self.hint(for: language)
-        let terms = loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary + screenTerms) : []
+        let terms = usesPhraseBooster && loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary + screenTerms) : []
         vocabularyFixes = 0
         let task = Task {
             let text: String

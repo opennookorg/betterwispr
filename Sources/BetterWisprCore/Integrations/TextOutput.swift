@@ -169,11 +169,11 @@ public struct FocusedAppIntegration: TextOutputIntegration {
     }
 
     /// Command-V as a physical keyboard sends it, with left Command pressed and released as its own events.
-    static func pasteKeystroke() -> [CGEvent]? {
+    static func pasteKeystroke(vKey: CGKeyCode = commandKeyCode(typing: "v", fallback: CGKeyCode(kVK_ANSI_V))) -> [CGEvent]? {
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let commandDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true),
-              let vDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-              let vUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false),
+              let vDown = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
+              let vUp = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false),
               let commandUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else { return nil }
         commandDown.type = .flagsChanged
         commandUp.type = .flagsChanged
@@ -183,6 +183,32 @@ public struct FocusedAppIntegration: TextOutputIntegration {
         vUp.flags = leftCommand
         commandUp.flags = []
         return [commandDown, vDown, vUp, commandUp]
+    }
+
+    /// The key that types `character` with Command held in the current layout, so Dvorak and "QWERTY ⌘" layouts paste.
+    static func commandKeyCode(typing character: String, fallback: CGKeyCode) -> CGKeyCode {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let layout = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return fallback }
+        let data = Unmanaged<CFData>.fromOpaque(layout).takeUnretainedValue() as Data
+        return data.withUnsafeBytes { bytes in
+            guard let keyboard = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return fallback }
+            return keyCode(typing: character) { commandCharacter(of: $0, in: keyboard) } ?? fallback
+        }
+    }
+
+    /// The first virtual key code whose translated character is `character`.
+    nonisolated static func keyCode(typing character: String, translate: (CGKeyCode) -> String?) -> CGKeyCode? {
+        (0..<CGKeyCode(128)).first { translate($0) == character }
+    }
+
+    private static func commandCharacter(of keyCode: CGKeyCode, in keyboard: UnsafePointer<UCKeyboardLayout>) -> String? {
+        var deadKeyState: UInt32 = 0
+        var length = 0
+        var characters = [UniChar](repeating: 0, count: 4)
+        let status = UCKeyTranslate(keyboard, keyCode, UInt16(kUCKeyActionDown), UInt32((cmdKey >> 8) & 0xFF), UInt32(LMGetKbdType()),
+                                    OptionBits(1 << kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters)
+        guard status == noErr, length > 0 else { return nil }
+        return String(utf16CodeUnits: characters, count: length)
     }
 
     public static func focusedElement(in app: NSRunningApplication?) -> AXUIElement? {
