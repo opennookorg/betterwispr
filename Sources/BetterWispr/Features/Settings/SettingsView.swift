@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var permissionCheck = 0
     @State private var terminals: [ScriptableTerminal] = []
     @State private var pendingRetention: HistoryRetention?
+    @State private var choosesDictationLanguages = false
 
     private static let voiceCommands = [
         ("“comma”, “question mark”, “full stop”", ", ? ."),
@@ -84,15 +85,26 @@ struct SettingsView: View {
                     if [.whisperKit, .parakeet].contains(model.selectedModel.engine) && model.settings.language == "auto" {
                         RowDivider()
                         SettingRow(L10n.tr("Dictation languages"), caption: L10n.tr("Automatic detection chooses only among these.")) {
-                            Menu(dictationLanguagesLabel) {
-                                Toggle(L10n.tr("All languages"), isOn: Binding(
-                                    get: { dictationLanguageNames.isEmpty },
-                                    set: { if $0 { setting(\.dictationLanguages).wrappedValue = [] } }
-                                ))
-                                Divider()
-                                ForEach(languageChoices, id: \.code) { Toggle($0.name, isOn: dictates($0.code)) }
-                            }
-                            .fixedSize()
+                            Button(dictationLanguagesLabel) { choosesDictationLanguages = true }
+                                .fixedSize()
+                                .accessibilityLabel(L10n.tr("Dictation languages"))
+                                .accessibilityValue(dictationLanguagesLabel)
+                                .popover(isPresented: $choosesDictationLanguages, arrowEdge: .bottom) {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Toggle(L10n.tr("All languages"), isOn: Binding(
+                                                get: { dictationLanguageNames.isEmpty },
+                                                set: { if $0 { setting(\.dictationLanguages).wrappedValue = [] } }
+                                            ))
+                                            Divider()
+                                            ForEach(languageChoices, id: \.code) { Toggle($0.name, isOn: dictates($0.code)) }
+                                        }
+                                        .toggleStyle(.checkbox)
+                                        .padding(12)
+                                    }
+                                    .frame(width: 220)
+                                    .frame(maxHeight: 360)
+                                }
                         }
                     }
                     if showsChineseScript {
