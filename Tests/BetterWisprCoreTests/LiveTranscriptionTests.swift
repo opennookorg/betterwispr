@@ -235,6 +235,11 @@ private func segmentFirstSentence(answering text: String) async throws -> (LiveT
     #expect(transcriber.wordAfterPieces != nil)
 }
 
+@Test @MainActor func pieceRecognizedWithoutItsSentenceEndKeepsThePreviewsPunctuation() async throws {
+    let (transcriber, _) = try await segmentFirstSentence(answering: "One two three four five six")
+    #expect(transcriber.segments.first == "One two three four five six.")
+}
+
 @Test @MainActor func pieceThatLostAWordAtTheCutIsDroppedAndStopsFurtherPieces() async throws {
     let (transcriber, calls) = try await segmentFirstSentence(answering: "two three four five six.")
     #expect(calls == 1)

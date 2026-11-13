@@ -151,6 +151,7 @@ public final class LiveTranscriber {
     }
 
     /// Recognizes the confirmed audio not yet in `segments`, cut halfway between the last confirmed word and the next one.
+    /// A piece recognized ending in a bare word keeps the sentence end of its last confirmed word.
     private func recognizeConfirmedPiece(_ segment: Segment) async {
         guard state == .running, !segmentsFailed else { return }
         let gapEnd = max(engine.confirmedEndTime, engine.hypothesisStartTime)
@@ -164,11 +165,12 @@ public final class LiveTranscriber {
             segmentsFailed = true
             return
         }
-        segments.append(result.text)
+        let text = result.text.last.map { $0.isLetter || $0.isNumber } == true ? result.text + (last.sentenceEnder.map(String.init) ?? "") : result.text
+        segments.append(text)
         vocabularyFixes += result.vocabularyFixes
         segmentedSamples = cut
         segmentedWords = engine.confirmedCount
-        onSegment?(result.text)
+        onSegment?(text)
     }
 }
 
