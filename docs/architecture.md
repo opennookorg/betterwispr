@@ -70,7 +70,10 @@ the policy immediately and persist through the existing workspace store.
    again before transcription. Model downloads are separate user actions.
 3. Record microphone audio locally and publish levels to the capsule. Stopping
    drains the in-flight input buffer and closes the file before preparing the
-   selected provider and recognizing it.
+   selected provider and recognizing it. The capture worker records which audio
+   has arrived, so a busy main thread cannot make the stop look stalled. If an
+   input sends only exact zeros for 2 s, the recorder restarts it once. AirPods do
+   that when capture starts just before macOS takes them over from another device.
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
    Entries written as a voice command ("question mark", "at the rate") are not
    hints, because boosting command words drops neighbouring words.
