@@ -228,6 +228,8 @@
 "Codex subscription" = "Abonnement Codex";
 "Codex transcription took too long. Check your connection or try a shorter recording." = "La transcription Codex a pris trop de temps. Vérifiez votre connexion ou essayez un enregistrement plus court.";
 "Codex · Subscription" = "Codex · Abonnement";
+"Cohere Transcribe" = "Cohere Transcribe";
+"Cohere's model for 14 languages, with punctuation. It can't detect the language, so choose the spoken language in Settings." = "Modèle de Cohere pour 14 langues, avec ponctuation. Il ne détecte pas la langue : choisissez la langue parlée dans les Réglages.";
 "Combine the full transcript and your current thoughts using %@" = "Combiner la transcription complète et vos notes actuelles avec %@";
 "Command" = "Commande";
 "Configure and test notes models…" = "Configurer et tester les modèles de notes…";
@@ -866,7 +868,7 @@
 "Then press the shortcut to clean it up." = "Appuyez ensuite sur le raccourci pour le nettoyer.";
 "There’s nothing to ask about yet. Record a meeting or write a few thoughts first." = "Il n’y a encore aucun contenu à interroger. Enregistrez d’abord une réunion ou notez quelques idées.";
 "There’s nothing to summarize yet. Speak or type a few notes first." = "Il n’y a encore rien à résumer. Dictez ou saisissez d’abord quelques notes.";
-"These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared." = "Ces modèles traitent l’audio sur votre Mac. Parakeet et Whisper ont besoin d’une connexion internet uniquement pour l’installation. Les tailles de Parakeet incluent l’amplificateur de vocabulaire de 100 Mo, téléchargé une seule fois et partagé.";
+"These models process audio on your Mac. Parakeet, Whisper and Cohere need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared." = "Ces modèles traitent l’audio sur votre Mac. Parakeet, Whisper et Cohere ont besoin d’une connexion internet uniquement pour l’installation. Les tailles de Parakeet incluent l’amplificateur de vocabulaire de 100 Mo, téléchargé une seule fois et partagé.";
 "They’re removed from this Mac. This can’t be undone." = "Elles seront supprimées de ce Mac. Cette action est irréversible.";
 "This Mac doesn’t support Apple Intelligence. Choose the built-in model, Claude Code, Codex, Ollama or an API connection in Models." = "Ce Mac ne prend pas en charge Apple Intelligence. Choisissez le modèle intégré, Claude Code, Codex, Ollama ou une connexion API dans Modèles.";
 "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day." = "La date de ce Mac a avancé depuis la dernière dictée. Les dictées plus anciennes sont donc conservées au moins un jour.";
@@ -1044,6 +1046,7 @@
 "yt-dlp found no audio at this link." = "yt-dlp n’a trouvé aucun audio à ce lien.";
 "yt-dlp stopped with status %@." = "yt-dlp s’est arrêté avec le code %@.";
 "~1.6 GB" = "~1,6 Go";
+"~2.2 GB" = "~2,2 Go";
 "~330 MB" = "~330 Mo";
 "~490 MB" = "~490 Mo";
 "~560 MB" = "~560 Mo";

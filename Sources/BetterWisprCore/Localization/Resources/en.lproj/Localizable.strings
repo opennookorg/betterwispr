@@ -228,6 +228,8 @@
 "Codex subscription" = "Codex subscription";
 "Codex transcription took too long. Check your connection or try a shorter recording." = "Codex transcription took too long. Check your connection or try a shorter recording.";
 "Codex · Subscription" = "Codex · Subscription";
+"Cohere Transcribe" = "Cohere Transcribe";
+"Cohere's model for 14 languages, with punctuation. It can't detect the language, so choose the spoken language in Settings." = "Cohere's model for 14 languages, with punctuation. It can't detect the language, so choose the spoken language in Settings.";
 "Combine the full transcript and your current thoughts using %@" = "Combine the full transcript and your current thoughts using %@";
 "Command" = "Command";
 "Configure and test notes models…" = "Configure and test notes models…";
@@ -866,7 +868,7 @@
 "Then press the shortcut to clean it up." = "Then press the shortcut to clean it up.";
 "There’s nothing to ask about yet. Record a meeting or write a few thoughts first." = "There’s nothing to ask about yet. Record a meeting or write a few thoughts first.";
 "There’s nothing to summarize yet. Speak or type a few notes first." = "There’s nothing to summarize yet. Speak or type a few notes first.";
-"These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared." = "These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared.";
+"These models process audio on your Mac. Parakeet, Whisper and Cohere need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared." = "These models process audio on your Mac. Parakeet, Whisper and Cohere need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared.";
 "They’re removed from this Mac. This can’t be undone." = "They’re removed from this Mac. This can’t be undone.";
 "This Mac doesn’t support Apple Intelligence. Choose the built-in model, Claude Code, Codex, Ollama or an API connection in Models." = "This Mac doesn’t support Apple Intelligence. Choose the built-in model, Claude Code, Codex, Ollama or an API connection in Models.";
 "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day." = "This Mac’s date moved ahead since the last dictation, so older ones stay for at least a day.";
@@ -1044,6 +1046,7 @@
 "yt-dlp found no audio at this link." = "yt-dlp found no audio at this link.";
 "yt-dlp stopped with status %@." = "yt-dlp stopped with status %@.";
 "~1.6 GB" = "~1.6 GB";
+"~2.2 GB" = "~2.2 GB";
 "~330 MB" = "~330 MB";
 "~490 MB" = "~490 MB";
 "~560 MB" = "~560 MB";

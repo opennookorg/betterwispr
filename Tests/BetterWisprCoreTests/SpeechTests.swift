@@ -14,6 +14,7 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
     case .apple: #expect(meeting is AppleSpeechProvider)
     case .whisperKit: #expect(meeting is WhisperKitProvider)
     case .parakeet: #expect(meeting is ParakeetProvider)
+    case .cohere: #expect(meeting is CohereProvider)
     case .api: #expect(meeting is APISpeechProvider)
     case .codex: #expect(meeting is CodexSpeechProvider)
     }
@@ -404,6 +405,42 @@ func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSecond
         }
     }
     #expect(phraseBoosterFiles() == boosterFilesBefore)
+}
+
+@Test func cohereIsListedOnlyWhereItsEncoderLoads() {
+    #expect(SpeechModel.catalog.contains { $0.id == "cohere-transcribe" } == CohereProvider.runsOnThisMac)
+}
+
+@MainActor
+@Test func cohereRejectsMissingAssetsWithoutDownloading() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: "betterwispr-cohere-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let model = SpeechModel.cohereTranscribe
+    #expect(!CohereProvider.isInstalled(model, modelsDirectory: directory))
+    do {
+        try await CohereProvider(modelsDirectory: directory).prepare(model: model, download: false)
+        Issue.record("An absent local model must not be prepared or downloaded")
+    } catch SpeechError.modelNotInstalled {
+        #expect(!FileManager.default.fileExists(atPath: directory.path))
+    }
+    let folder = CohereProvider.folder(modelsDirectory: directory)
+    for file in CohereProvider.requiredFiles {
+        try FileManager.default.createDirectory(at: folder.appending(path: file).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: folder.appending(path: file))
+    }
+    #expect(!CohereProvider.isInstalled(model, modelsDirectory: directory))
+    try Data().write(to: folder.appending(path: ".betterwispr-installed"))
+    #expect(CohereProvider.isInstalled(model, modelsDirectory: directory))
+}
+
+@Test func cohereReceivesEveryListedLanguageAndFallsBackToTheSystemLanguage() throws {
+    let languages = try #require(SpeechModel.cohereTranscribe.languages)
+    #expect(Set(languages) == Set(CohereAsrConfig.Language.allCases.map(\.rawValue)))
+    for code in languages { #expect(CohereProvider.language(for: code, preferred: []).rawValue == code) }
+    #expect(CohereProvider.language(for: "pt-BR", preferred: ["de-DE"]) == .portuguese)
+    #expect(CohereProvider.language(for: "auto", preferred: ["sv-SE", "fr-CA"]) == .french)
+    #expect(CohereProvider.language(for: nil, preferred: ["ko-KR"]) == .korean)
+    #expect(CohereProvider.language(for: "sv", preferred: ["fi"]) == .english)
 }
 
 @Test(arguments: ["parakeet-v3", "parakeet-ultra"])
