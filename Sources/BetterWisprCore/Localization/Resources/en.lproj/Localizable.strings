@@ -778,7 +778,6 @@
 "Speaker" = "Speaker";
 "Speaker %@" = "Speaker %@";
 "Speaker detection" = "Speaker detection";
-"Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript." = "Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript.";
 "Speaker detection labels the other side of a call Speaker 1, Speaker 2 and so on. It runs on this Mac and starts with your next meeting, because this meeting’s call audio wasn’t kept. For this meeting, click a speaker name to choose who said that line." = "Speaker detection labels the other side of a call Speaker 1, Speaker 2 and so on. It runs on this Mac and starts with your next meeting, because this meeting’s call audio wasn’t kept. For this meeting, click a speaker name to choose who said that line.";
 "Speaking pace" = "Speaking pace";
 "Speaking time" = "Speaking time";
@@ -1163,3 +1162,11 @@
 "When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app." = "When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app.";
 "Writing examples" = "Writing examples";
 "Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept." = "Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept.";
+"My voice" = "My voice";
+"Not enough of your voice was heard. Try again and keep talking for the whole 30 seconds." = "Not enough of your voice was heard. Try again and keep talking for the whole 30 seconds.";
+"Record 30 seconds of yourself talking without long pauses. BetterWispr saves a profile of your voice on this Mac and deletes the recording. When it tells apart people in the room, the microphone voice closest to your profile stays Me, even if someone near you talks more. Without a profile, or when no voice is close to it, the voice heard longest stays Me. Your profile is never uploaded, but Time Machine backs it up. Forget Voices deletes it too." = "Record 30 seconds of yourself talking without long pauses. BetterWispr saves a profile of your voice on this Mac and deletes the recording. When it tells apart people in the room, the microphone voice closest to your profile stays Me, even if someone near you talks more. Without a profile, or when no voice is close to it, the voice heard longest stays Me. Your profile is never uploaded, but Time Machine backs it up. Forget Voices deletes it too.";
+"Record Again" = "Record Again";
+"Record My Voice" = "Record My Voice";
+"Recording. Keep talking for 30 seconds." = "Recording. Keep talking for 30 seconds.";
+"Speaker detection is on. BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. The labels are a first guess that can change while the meeting records, and a more careful pass replaces them when it ends. Rename them above the transcript." = "Speaker detection is on. BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. The labels are a first guess that can change while the meeting records, and a more careful pass replaces them when it ends. Rename them above the transcript.";
+"Your voice couldn’t be saved. %@" = "Your voice couldn’t be saved. %@";

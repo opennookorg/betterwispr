@@ -602,6 +602,110 @@ FLAC, MOV and M4V files were not tried, and a WAV file was tried only in
   transcribes. No yt-dlp process keeps running after the quit, and after a
   relaunch no chunk audio is left.
 
+## Live speaker labels and My voice check, 2026-11-13, version 0.1.6
+
+Apple M4 Pro, macOS 27.2.1, debug builds. `swift build` and
+`./scripts/build-app.sh` passed. `swift test` ran 547 tests. The 33 speaker,
+voice and localization tests passed. In each full run 4 to 5 timing tests
+outside this change failed, in `CapsuleTests`, `LiveTranscriptionTests`,
+`SpeechTests`, `YTDLPTests` and `AskThreadTests`. A full run of `main` on the
+same Mac failed 6 tests from the same files, and the failing tests passed when
+run on their own. The new tests cover these behaviors:
+
+- A microphone voice within the cutoff of the My voice profile stays Me when
+  another voice talks more, and the longest voice stays Me without a profile
+  or when no voice is within the cutoff.
+- Provisional speakers keep their numbers when a later listen names the
+  voices differently, and a new voice takes the lowest number no line carries.
+- The pass after the meeting keeps the numbers shown during the call.
+- `Meeting.number` changes only the lines it names.
+- `VoiceStore` keeps the My voice profile beside remembered voices when a
+  meeting's voices are replaced, and `forget()` deletes it with them.
+
+`python3 Tests/live_speakers_check.py` builds a conversation from macOS `say`
+voices, plays it through the meeting chunker with
+`BetterWisprCLI --live-speakers`, and scores the share of chunk time whose
+label is the voice that spoke most of the chunk, under the best one-to-one
+match of labels to voices. Speaker detection has to be installed. Every number
+below is synthetic: clean text-to-speech with 0.8 seconds between turns, no
+overlap, noise or call compression. No real call was measured.
+
+Short conversations, 18 turns, 113 to 123 seconds, 16 chunks, five-minute
+window:
+
+| Voices | First shown | Call end | After meeting | Labels at call end |
+| --- | --- | --- | --- | --- |
+| Daniel, Karen, Samantha | 78% | 92% | 92% | 3 |
+| Daniel, Karen | 80% | 100% | 100% | 2 |
+| Fred, Moira | 77% | 100% | 100% | 2 |
+| Daniel, Fred, Rishi | 48% | 97% | 97% | 3 |
+| Moira, Tessa, Samantha | 77% | 92% | 92% | 4 |
+| Daniel, Fred, Rishi, Moira | 75% | 92% | 92% | 5 |
+| Daniel | 76% | 96% | 96% | 2 |
+
+Each listen took a median of 0.41 to 0.49 seconds and at most 0.58 seconds.
+The first listen of a call also loads the models and took up to 5.8 seconds.
+
+Long conversations, 90 turns, 80 chunks, 10 holding more than one voice:
+
+| Voices | Length | Window | First shown | Call end | After meeting | Labels at call end | Median listen |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Daniel, Fred, Rishi | 615 s | 300 s | 65% | 94% | 99% | 3 | 0.87 s |
+| Daniel, Karen, Samantha | 568 s | 120 s | 73% | 71% | 68% | 4 | 0.50 s |
+| Daniel, Karen, Samantha | 568 s | 300 s | 54% | 63% | 68% | 4 | 0.85 s |
+| Daniel, Karen, Samantha | 568 s | 3600 s | 59% | 68% | 68% | 2 | 0.91 s |
+
+On the Daniel, Karen, Samantha conversation the pass after the meeting found 2
+voices for 3, so the 68% ceiling comes from the models and not from the
+window. The app uses the five-minute window. The two-minute window scored
+higher on this one conversation and was not compared on any other, so the
+default was not changed. The longest listen after the first took 0.96 seconds
+with the five-minute window and 1.71 seconds with the whole call.
+
+`python3 Tests/live_speakers_check.py --me VOICE` records a separate 30-second
+`say` sample of one of three voices as the My voice profile, then scores the
+share of microphone chunk time rightly marked Me or not:
+
+| My voice | Others | Right |
+| --- | --- | --- |
+| Karen | Daniel, Samantha | 92% |
+| Rishi | Daniel, Fred | 97% |
+| Moira | Tessa, Samantha | 100% |
+| Samantha | Daniel, Karen | 92% |
+| Fred | Daniel, Rishi | 97% |
+| Tessa | Moira, Samantha | 95% |
+
+With a 9-second sample the profile was 1.2 to 1.36 from the same voice in the
+meeting, past the 0.6 cutoff, and the longest-voice rule decided: Karen 39%,
+Rishi 32%, Moira 0%. A recording with less than about 20 seconds of speech
+gave a profile 1.0 to 1.4 from the same voice in a longer recording, and 22
+seconds or more gave 0.25 to 0.37. Padding a short sample with silence did not
+help. That is why the sample is 30 seconds and one with less than 20 seconds
+of the main voice is refused. A `say` voice is identical in every recording,
+so these figures are an upper bound for real voices.
+
+Not exercised: a real call, real voices, the labels appearing in the
+transcript while a meeting records, Record My Voice and the microphone
+sample, the Models settings row, the French strings on screen, and CPU use or
+transcription delay with live labels running beside the speech model.
+
+- [ ] With Speaker detection installed, record a call with two or more people
+  on the other side. Their lines show Speaker 1, Speaker 2 a moment after each
+  line appears, your lines stay Me, and the live transcript keeps up. When the
+  meeting ends, Finding speakers runs and the numbers stay with the same
+  people.
+- [ ] Without Speaker detection, a call's lines stay Them and nothing
+  downloads.
+- [ ] In Models > Meeting speakers, click Record My Voice and talk for 30
+  seconds. The row shows Recording, then Record Again and Remove, and
+  `Voices.json` has mode 0600 and a `me` entry. Stay silent for a second
+  sample: the row says not enough of your voice was heard and the earlier
+  profile is kept. Remove deletes the entry, and Forget Voices deletes the
+  file.
+- [ ] With a My voice profile and Tell apart people in the room on, hold a
+  meeting where a person beside the Mac talks more than you. Your lines stay
+  Me and theirs get a speaker number.
+
 ## Meeting speakers check, 2026-10-15, version 0.1.6
 
 Apple M4 Pro, macOS 27.0.1, debug builds. `swift build`, all 291 tests in

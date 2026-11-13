@@ -147,9 +147,13 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
     public var participants: [Int] { Set(segments.compactMap(\.participant)).sorted() }
 
     /// The lowest speaker number that no line or non-blank saved name uses yet.
+    /// Speaker numbers that carry a non-blank name.
+    public var namedParticipants: Set<Int> {
+        Set((participantNames ?? [:]).filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.keys)
+    }
+
     public var nextParticipant: Int {
-        let named = (participantNames ?? [:]).filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.keys
-        let used = Set(participants).union(named)
+        let used = Set(participants).union(namedParticipants)
         var number = 1
         while used.contains(number) { number += 1 }
         return number
@@ -167,6 +171,13 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
     public mutating func assign(segment id: UUID, toParticipant participant: Int?) {
         guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
         segments[index].participant = participant
+    }
+
+    /// Gives lines the speaker numbers found for them, leaving every other line as it is.
+    public mutating func number(_ speakers: [UUID: Int]) {
+        for index in segments.indices {
+            if let number = speakers[segments[index].id] { segments[index].participant = number }
+        }
     }
 
     /// Relabels every line of one voice as another, keeping the source's name when the target has none.
