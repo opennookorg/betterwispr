@@ -159,7 +159,6 @@ struct TranscriptRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if expanded && transcript.text != transcript.rawText {
-                // List draws a DisclosureGroup as an outline row with no chevron at rest.
                 VStack(alignment: .leading, spacing: 6) {
                     Button { showsOriginal.toggle() } label: {
                         HStack(spacing: 4) {
