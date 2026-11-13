@@ -53,6 +53,9 @@ final class MeetingModel {
     var voicesMessage: String?
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
+    var microphoneMuted = false {
+        didSet { recorder.microphoneMuted = microphoneMuted }
+    }
     var showsCallAudioHint = false
     var notesSettings = AppSettings()
     var ollamaModels: [String] = []
@@ -142,6 +145,7 @@ final class MeetingModel {
                 await releasing?.value
                 guard let self, self.owns(run) else { return }
                 self.recorderOwner = run
+                self.microphoneMuted = false
                 try await self.recorder.start(silenceThreshold: silenceThreshold, microphone: microphone)
                 guard self.owns(run) else { return }
                 self.systemAudioIssue = self.recorder.systemAudioIssue
