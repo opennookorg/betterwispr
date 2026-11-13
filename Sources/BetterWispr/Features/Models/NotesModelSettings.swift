@@ -97,6 +97,11 @@ struct NotesModelSettings: View {
                 .font(.caption).foregroundStyle(.secondary)
             if cli == .claudeCode { ClaudeCodeAnySignInSettings(model: model, testing: testing) }
         }
+        SummaryLanguagePicker(model: model)
+            .disabled(testing)
+        Text(MeetingNotesGenerator.summaryLanguageProblem(settings: model.settings)
+             ?? "Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most.")
+            .font(.caption).foregroundStyle(.secondary)
         HStack {
             Button(testing ? "Testing…" : "Test notes model") { result = nil; testing = true }
                 .disabled(testing || !model.canEditConnections || model.meetings.notesAvailability != .available)
@@ -135,6 +140,26 @@ struct NotesModelSettings: View {
                 testing = false
             }
             .onChange(of: model.settings) { _, _ in result = nil }
+    }
+}
+
+struct SummaryLanguagePicker: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        Picker("Summary language", selection: Binding(
+            get: { model.settings.summaryLanguage },
+            set: { model.settings.summaryLanguage = $0; model.saveNotesSettings() }
+        )) {
+            Text("Same as meeting").tag(String?.none)
+            ForEach(languages, id: \.code) { Text($0.name).tag(String?.some($0.code)) }
+        }
+    }
+
+    private var languages: [(code: String, name: String)] {
+        let choices = SettingsView.spokenLanguages
+        guard let saved = model.settings.summaryLanguage, !choices.contains(where: { $0.code == saved }) else { return choices }
+        return choices + [(code: saved, name: Locale.current.localizedString(forLanguageCode: saved) ?? saved)]
     }
 }
 
