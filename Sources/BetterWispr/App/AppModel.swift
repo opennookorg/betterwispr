@@ -927,6 +927,7 @@ final class AppModel {
 
     func cancelRecording() {
         guard isBusy else { return }
+        Logger(subsystem: "org.betterwispr.app", category: "Dictation").notice("Dictation cancelled: recording=\(self.phase == .recording)")
         let recoverable: DictationRecording?
         if phase == .recording, let audio = try? recorder.stop() {
             let recording = sessionRecording(audio)
@@ -1825,6 +1826,7 @@ final class AppModel {
             failure.message += " Your earlier dictation was pasted but not sent."
             continuesIn = nil
         }
+        Logger(subsystem: "org.betterwispr.app", category: "Dictation").error("Dictation failed: \(failure.title, privacy: .public) \(failure.message, privacy: .public)")
         statusMessage = failure.message
         present(.failed(failure), for: 6)
         playFeedback(.attention)
