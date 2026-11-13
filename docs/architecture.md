@@ -653,10 +653,18 @@ local state and never records anything itself.
    0.25 second timeout. While an unmatched browser records, titles are checked
    again every 3 seconds.
 4. Each call is offered once. Starting the notetaker, choosing Not now or letting
-   the prompt expire after 30 seconds marks that app's call as answered. Calls
+   the prompt expire marks that app's call as answered. Expiry goes through the
+   same `dismiss()` as Not now and records nothing. `meetingPromptTimeout` picks
+   15, 30 (the default) or 60 seconds, or never; the card shows the seconds left
+   beside Start notetaker. Calls
    that run while the notetaker records are answered too. A new call is offered
    while an earlier meeting is still processing. An app's answer is forgotten
    when it stops recording.
+5. While the prompt is pending, the capsule moves to the screen holding the call
+   app's frontmost on-screen window (read from `CGWindowListCopyWindowInfo`,
+   which needs no Screen Recording access), falling back to the pointer's screen.
+   `meetingPromptPosition` keeps it at the bottom (the default) or places it top
+   center, below both the menu bar and the camera housing's safe-area inset.
 
 `AppSettings.notesSelection` resolves the legacy Ollama choice plus the new optional
 CLI or notes-connection selection. Old workspaces decode without changing providers.

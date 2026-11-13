@@ -1892,6 +1892,17 @@ were not exercised in this UI pass.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or
   "BetterWispr Meeting Audio", including while a meeting is recording.
+- [ ] Meeting prompt position: with Top center chosen, join a Zoom call and a
+  Google Meet call. "Meeting detected" appears top center below the menu bar
+  and the notch, on the display holding the call window (try a second display
+  and a full-screen call). After answering, the capsule returns to the bottom.
+  Bottom center matches the earlier placement.
+- [ ] Meeting prompt timeout: with 15, 30 and 60 seconds, the seconds left count
+  down beside Start notetaker; at zero the prompt closes, nothing records and it
+  doesn't return during that call, only after the app stops and starts a new
+  one. With Never it stays until answered. VoiceOver reads "Closes in N seconds
+  without recording", and with Reduce Motion on the digits change without
+  animating.
 - [ ] Start notetaker from the capsule and from the menu bar with another app
   focused. A card docks to the right edge of the current screen without stealing
   focus. The expand button opens the meeting in the dashboard and closes the
