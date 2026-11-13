@@ -66,4 +66,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE). Third-party code and model weights keep their own terms. See [docs/oss-reuse.md](docs/oss-reuse.md).
+[Apache-2.0](LICENSE). Third-party code and model weights keep their own terms.
