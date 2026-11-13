@@ -741,7 +741,8 @@ final class AppModel {
             guard let self, self.generation == token, self.preparedModelID == model.id,
                   let parakeet = self.provider as? ParakeetProvider else { return }
             let hints = VocabularyProcessor.hints(self.vocabulary)
-            let spellsScreenNames = self.spellsScreenNames(with: model, language: self.settings.language)
+            let spellsScreenNames = self.spellsScreenNames(with: model, settings: self.settings)
+            parakeet.usesPhraseBooster = self.settings.usePhraseBooster
             live.onSegment = { [weak self] in self?.editAhead($0, token: token) }
             live.start(pass: { try await parakeet.liveTranscribe($0, language: language) }, segment: { [weak self] samples in
                 let context = self?.dictationContext
@@ -766,7 +767,7 @@ final class AppModel {
         let language = settings.language == "auto" ? nil : settings.language
         let editSettings = settings.applying(writingMode).cleanupSettings
         guard editSettings.cleanup == .medium, MeetingNotesGenerator.availability(settings: editSettings) == .available else { return }
-        let spoken = Self.prepared(recognized, settings: settings, entries: vocabulary, language: language)
+        let spoken = Self.prepared(recognized, settings: settings, entries: settings.replacements(vocabulary), language: language)
         guard TranscriptCleaner.isEnglish(spoken, language: language), pieceEdits?.tasks[spoken] == nil else { return }
         let hints = VocabularyProcessor.hints(vocabulary)
         let context = settings.sharesContext(startedIn: writingMode, trigger: nil) ? dictationContext : nil
@@ -875,10 +876,10 @@ final class AppModel {
         let audio = recording.audio
         let model = recording.model
         let language = recording.settings.language == "auto" ? nil : recording.settings.language
-        let entries = recording.vocabulary
-        let hints = VocabularyProcessor.hints(entries)
+        let hints = VocabularyProcessor.hints(recording.vocabulary)
+        let entries = recording.settings.replacements(recording.vocabulary)
         let context = recording.context
-        let spellsScreenNames = self.spellsScreenNames(with: model, language: recording.settings.language)
+        let spellsScreenNames = self.spellsScreenNames(with: model, settings: recording.settings)
         let appBundleID = recording.target?.bundleIdentifier
         phase = .transcribing
         statusMessage = !model.processingLocation.isOnDevice ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
@@ -895,6 +896,7 @@ final class AppModel {
                 try Task.checkCancellation()
                 guard self.generation == token, let provider = self.provider else { return }
                 (provider as? WhisperKitProvider)?.detectionLanguages = recording.settings.dictationLanguages
+                (provider as? ParakeetProvider)?.usesPhraseBooster = recording.settings.usePhraseBooster
                 let recognitionStarted = ContinuousClock.now
                 var pieces: [String] = []
                 var recognitionFixes = 0
@@ -1303,12 +1305,13 @@ final class AppModel {
     private func captureContext(for settings: AppSettings) -> Task<DictationContext, Never>? {
         guard settings.useScreenContext else { return nil }
         let showsNotesModel = settings.cleanup == .medium && MeetingNotesGenerator.availability(settings: settings.cleanupSettings) == .available
-        guard showsNotesModel || spellsScreenNames(with: selectedModel, language: settings.language) else { return nil }
+        guard showsNotesModel || spellsScreenNames(with: selectedModel, settings: settings) else { return nil }
         return targetApplication.map { DictationContext.capture(from: $0, recognizingScreen: settings.recognizeScreenText, readingClipboard: showsNotesModel) }
     }
 
-    private func spellsScreenNames(with model: SpeechModel, language: String) -> Bool {
-        phraseBoosterInstalled && model.engine == .parakeet && model.languages?.contains("en") == true
+    private func spellsScreenNames(with model: SpeechModel, settings: AppSettings) -> Bool {
+        let language = settings.language
+        return settings.usePhraseBooster && phraseBoosterInstalled && model.engine == .parakeet && model.languages?.contains("en") == true
             && (language == "auto" || language.hasPrefix("en"))
     }
 

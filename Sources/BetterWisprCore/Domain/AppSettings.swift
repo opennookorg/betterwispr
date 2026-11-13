@@ -135,6 +135,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
     public var learnCorrections: Bool = true
+    /// Lets the Parakeet phrase booster rescore English dictation with vocabulary and screen names.
+    public var usePhraseBooster: Bool = true
+    /// When off, learned entries only guide the speech model and never rewrite the transcript afterwards.
+    public var replaceLearnedWords: Bool = true
     /// Shows a toast with Undo when a correction is learned; learning happens either way.
     public var notifyLearnedCorrections: Bool = true
     public var cleanup: CleanupLevel = .light
@@ -204,6 +208,11 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 
     public init() {}
+
+    /// The vocabulary entries that may rewrite a transcript after recognition.
+    public func replacements(_ vocabulary: [VocabularyEntry]) -> [VocabularyEntry] {
+        replaceLearnedWords ? vocabulary : vocabulary.filter { !$0.learned }
+    }
 
     public func tone(for context: StyleContext) -> StyleTone { styles[context] ?? .formal }
 
@@ -281,6 +290,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         separateRoomVoices = try container.decodeIfPresent(Bool.self, forKey: .separateRoomVoices) ?? false
         rememberVoices = try container.decodeIfPresent(Bool.self, forKey: .rememberVoices) ?? false
         learnCorrections = try container.decodeIfPresent(Bool.self, forKey: .learnCorrections) ?? true
+        usePhraseBooster = try container.decodeIfPresent(Bool.self, forKey: .usePhraseBooster) ?? true
+        replaceLearnedWords = try container.decodeIfPresent(Bool.self, forKey: .replaceLearnedWords) ?? true
         notifyLearnedCorrections = try container.decodeIfPresent(Bool.self, forKey: .notifyLearnedCorrections) ?? true
         cleanup = try container.decodeIfPresent(CleanupLevel.self, forKey: .cleanup) ?? .light
         useScreenContext = try container.decodeIfPresent(Bool.self, forKey: .useScreenContext) ?? false

@@ -238,3 +238,19 @@ private final class ScriptedProvider: SpeechProvider {
     #expect(meeting.transcriptionMarkdown.hasPrefix("# Panel\n\n"))
     #expect(meeting.transcriptionMarkdown.contains("**01:05** Thanks."))
 }
+
+@MainActor
+@Test func mediaTranscriptionHintsLearnedWordsWithoutReplacingThemWhenReplacementIsOff() async throws {
+    let url = try await mediaFile(seconds: 10, silent: [], tone: false)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let learned = [VocabularyEntry(phrase: "cloud", replacement: "Claude", learned: true)]
+    var settings = AppSettings()
+    settings.replaceLearnedWords = false
+    let provider = ScriptedProvider([{ "ask cloud about it" }])
+
+    let transcript = try await MediaTranscriber.transcribe(url, with: provider, language: "en", vocabulary: learned,
+                                                           replacements: settings.replacements(learned), findSpeakers: false)
+
+    #expect(transcript.segments.map(\.text) == ["ask cloud about it"])
+    #expect(provider.heard.map(\.vocabulary) == [["Claude"]])
+}
