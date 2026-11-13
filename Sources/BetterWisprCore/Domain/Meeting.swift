@@ -147,9 +147,13 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
     public var participants: [Int] { Set(segments.compactMap(\.participant)).sorted() }
 
     /// The lowest speaker number that no line or non-blank saved name uses yet.
+    /// Speaker numbers that carry a non-blank name.
+    public var namedParticipants: Set<Int> {
+        Set((participantNames ?? [:]).filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.keys)
+    }
+
     public var nextParticipant: Int {
-        let named = (participantNames ?? [:]).filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.keys
-        let used = Set(participants).union(named)
+        let used = Set(participants).union(namedParticipants)
         var number = 1
         while used.contains(number) { number += 1 }
         return number

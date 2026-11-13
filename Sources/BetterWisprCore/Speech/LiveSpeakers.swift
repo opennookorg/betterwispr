@@ -7,12 +7,12 @@ public struct ProvisionalSpeakers: Sendable {
 
     public init() {}
 
-    public mutating func number(_ lines: [(segment: UUID, voice: String, length: TimeInterval)]) -> [UUID: Int] {
+    public mutating func number(_ lines: [(segment: UUID, voice: String, length: TimeInterval)], named: Set<Int> = []) -> [UUID: Int] {
         var voices = SpeakerDetection.agreedNumbers(lines.compactMap { line in
             numbers[line.segment].map { (voice: line.voice, number: $0, length: line.length) }
         })
         let heard = Set(lines.map(\.segment))
-        var taken = Set(numbers.filter { !heard.contains($0.key) }.values).union(voices.values)
+        var taken = Set(numbers.filter { !heard.contains($0.key) }.values).union(voices.values).union(named)
         var numbered: [UUID: Int] = [:]
         for line in lines {
             let number = voices[line.voice] ?? (1...).first { !taken.contains($0) }!
@@ -51,8 +51,8 @@ public actor LiveSpeakerLabeller {
         }
     }
 
-    /// The speaker of each line heard lately, or nil while an earlier pass still runs or the voices can't be read.
-    public func speakers() async -> [UUID: Int]? {
+    /// The speaker of each line heard lately, never giving a new voice a `named` number, or nil while an earlier pass still runs or the voices can't be read.
+    public func speakers(named: Set<Int> = []) async -> [UUID: Int]? {
         guard !isListening, !placements.isEmpty else { return nil }
         isListening = true
         defer { isListening = false }
@@ -61,7 +61,7 @@ public actor LiveSpeakerLabeller {
         let voices = SpeakerDetection.voiceTurns(turns: turns, placements: placed)
         return speakers.number(placed.compactMap { placement in
             voices[placement.segment]?.max { $0.length < $1.length }.map { (placement.segment, $0.voice, $0.length) }
-        })
+        }, named: named)
     }
 
     private func turns(in audio: [Float]) async throws -> [SpeakerSegment] {

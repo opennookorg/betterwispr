@@ -126,7 +126,7 @@ final class MeetingModel {
     func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], replacements: [VocabularyEntry]? = nil, usesPhraseBooster: Bool = true,
                silenceThreshold: Float, microphone: AudioInputDevice?,
                event: CalendarEvent? = nil, separateRoomVoices: Bool = false) {
-        guard capturing == nil else { return }
+        guard capturing == nil, !isRecordingMyVoice else { return }
         var meeting = Meeting(title: event?.title ?? "", modelName: model.name, language: language ?? "auto")
         meeting.attendees = event?.attendees
         meeting.eventID = event?.id
@@ -363,10 +363,11 @@ final class MeetingModel {
         let id = run.meetingID
         run.phase = .findingSpeakers
         let segments = meeting(id)?.segments ?? []
+        let named = meeting(id)?.namedParticipants ?? []
         let provider = run.provider
         let myVoice = try? voiceStore.myVoice()
         let detection = Task {
-            try await SpeakerDetection.label(segments, voices: voices, myVoice: myVoice) { audio, start, duration in
+            try await SpeakerDetection.label(segments, voices: voices, myVoice: myVoice, named: named) { audio, start, duration in
                 guard let provider else { return nil }
                 return try await self.segment(of: audio, speaker: .them, start: start, duration: duration, with: provider, for: run)
             }
@@ -455,7 +456,7 @@ final class MeetingModel {
                 if chunk.speaker == .them, let live = run.liveSpeakers {
                     await live.add(chunk.url, for: segment.id)
                     Task { [weak self] in
-                        guard let numbers = await live.speakers(), let self, self.owns(run), run.liveSpeakers != nil else { return }
+                        guard let named = self?.meeting(id)?.namedParticipants, let numbers = await live.speakers(named: named), let self, self.owns(run), run.liveSpeakers != nil else { return }
                         self.edit(id) { $0.number(numbers) }
                     }
                 }
@@ -540,6 +541,7 @@ final class MeetingModel {
             hasMyVoice = true
             myVoiceMessage = nil
         } catch {
+            (error as? RecordingInterruption)?.discardAudio()
             recorder.cancel()
             myVoiceMessage = L10n.tr("Your voice couldn’t be saved. %@", String(error.localizedDescription))
         }

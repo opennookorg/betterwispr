@@ -119,10 +119,10 @@ public enum SpeakerDetection {
 
     /// Numbers each segment's voice, splitting segments several voices share, with each number's voice embedding. A voice keeps the number most of its lines had during the call and the rest are numbered by first appearance. On the microphone, the voice that matches `myVoice` stays Me, or the most heard voice when none does.
     @MainActor
-    public static func label(_ segments: [MeetingSegment], voices: SpeakerRecording, myVoice: [Float]? = nil,
+    public static func label(_ segments: [MeetingSegment], voices: SpeakerRecording, myVoice: [Float]? = nil, named: Set<Int> = [],
                              transcribe: (_ audio: URL, _ start: TimeInterval, _ duration: TimeInterval) async throws -> MeetingSegment?) async throws -> (segments: [MeetingSegment], voices: [Int: [Float]]) {
         let found = try await voices.voiceTurns()
-        return try await label(segments, turns: found.turns, embeddings: found.embeddings, myVoice: myVoice,
+        return try await label(segments, turns: found.turns, embeddings: found.embeddings, myVoice: myVoice, named: named,
                                audio: { try await voices.audio(of: $0, from: $1.start, to: $1.end) }, transcribe: transcribe)
     }
 
@@ -136,7 +136,7 @@ public enum SpeakerDetection {
     }
 
     @MainActor
-    static func label(_ segments: [MeetingSegment], turns: [UUID: [VoiceTurn]], embeddings: [String: [Float]] = [:], myVoice: [Float]? = nil,
+    static func label(_ segments: [MeetingSegment], turns: [UUID: [VoiceTurn]], embeddings: [String: [Float]] = [:], myVoice: [Float]? = nil, named: Set<Int> = [],
                       audio: (UUID, VoiceTurn) async throws -> URL,
                       transcribe: (_ audio: URL, _ start: TimeInterval, _ duration: TimeInterval) async throws -> MeetingSegment?) async throws -> (segments: [MeetingSegment], voices: [Int: [Float]]) {
         let microphone = Set(MeetingTranscript.removingEchoes(from: segments).filter { $0.speaker == .me }.map(\.id))
@@ -176,7 +176,7 @@ public enum SpeakerDetection {
         let numbered = labelled.map { segment, voice in
             var segment = segment
             if let voice, segment.speaker == .them || voice != me {
-                while numbers[voice] == nil, numbers.values.contains(next) { next += 1 }
+                while numbers[voice] == nil, numbers.values.contains(next) || named.contains(next) { next += 1 }
                 segment.participant = numbers[voice] ?? next
                 numbers[voice] = segment.participant
             } else if segment.speaker == .them {
