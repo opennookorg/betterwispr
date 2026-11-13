@@ -173,7 +173,6 @@ struct CapsuleView: View {
         case .notetaker:
             isMeetingCapturing ? L10n.tr("Stop notetaker") : L10n.tr("Start notetaker")
         case .meetingNotes: L10n.tr("Open meeting notes")
-        case .hide: L10n.tr("Hide capsule")
         case .dictation:
             switch model.phase {
             case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.settings.shortcut.displayName)) : L10n.tr("Finish dictation")
@@ -454,18 +453,6 @@ struct CapsuleView: View {
             .background { CapsuleGlass(cornerRadius: 14) }
             .capsuleRegion(.microphone)
             meetingButton
-            Button(action: model.hideIdleCapsule) {
-                Image(systemName: "eye.slash")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(hover.target == .hide ? 1 : 0.6))
-                    .frame(width: 28, height: 28)
-                    .background(.white.opacity(hover.target == .hide ? 0.12 : 0), in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.tr("Hide capsule"))
-            .background { CapsuleGlass(cornerRadius: 14) }
-            .capsuleRegion(.hide)
         }
         .contextMenu {
             Picker(L10n.tr("Capsule position"), selection: Binding(get: { model.settings.capsulePosition }, set: { model.settings.capsulePosition = $0; model.saveSettings() })) {

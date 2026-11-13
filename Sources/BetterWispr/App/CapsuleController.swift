@@ -10,7 +10,7 @@ private final class RecordingPanel: NSPanel {
 
 @MainActor @Observable
 final class CapsuleHover {
-    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, hide, dictation }
+    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, dictation }
 
     private(set) var isHovering = false
     private(set) var target: Target?
@@ -34,7 +34,7 @@ final class CapsuleHover {
         let activation = CGRect(x: surface.midX - width / 2 - 6, y: surface.maxY - height - 8,
                                 width: width + 12, height: height + 16)
         let inside = activation.contains(point)
-        let hit = [Target.microphone, .notetaker, .meetingNotes, .hide, .dictation].first { regions[$0]?.contains(point) == true }
+        let hit = [Target.microphone, .notetaker, .meetingNotes, .dictation].first { regions[$0]?.contains(point) == true }
         // Crossing the narrow gap between controls must not flash the tooltip off.
         set(isHovering: inside, target: hit ?? (inside && target.flatMap { regions[$0] } != nil ? target : nil))
     }

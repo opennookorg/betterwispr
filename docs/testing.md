@@ -1445,8 +1445,9 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   corner on the screen with the pointer, fully on screen. With the meeting
   prompt set to Top center, a detected meeting still appears at the top center.
   Right-click the hover controls to change the position from the capsule.
-- [ ] Hover over the idle capsule and click the eye button. The capsule hides and
-  a toast points to Floating recording capsule in Settings; Undo brings it back.
+- [ ] The idle capsule has no hide button. Right-click it and choose Hide capsule:
+  it hides and a toast points to Floating recording capsule in Settings; Undo
+  brings it back. Turning that setting off hides it too.
   Dictating while it is hidden still shows the capsule.
 - [ ] Toggle mode: press ⌥ Space once and speak. The 108 × 28 point capsule has
   nine waveform bars, a gray × button and a white ✓ button. The circles are

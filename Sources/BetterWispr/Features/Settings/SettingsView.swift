@@ -353,7 +353,6 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
-            .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
         }
         .toggleStyle(.switch)

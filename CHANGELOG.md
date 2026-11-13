@@ -9,7 +9,7 @@ All notable changes to BetterWispr are listed here. The format follows
 ### Added
 - Hold only, a third shortcut behavior in Settings > Shortcut. Dictation runs only while you hold the shortcut and finishes when you let go. A quick tap no longer starts hands-free dictation: it ends the dictation without transcribing or pasting anything and shows "Keep holding" with the shortcut. Hold or tap stays the default and works as before, and saved settings keep their behavior.
 - Capsule position, in Settings > App under Floating recording capsule. The capsule can sit at the bottom center, bottom left or bottom right of the screen. Bottom center is the default. A meeting prompt set to appear at the top still appears at the top center. Right-click the capsule's controls to move it or hide it.
-- Hide the capsule from the capsule itself. Hover over it and click the eye button to hide it while you're not dictating. A toast says where to turn it back on, under Floating recording capsule in Settings, and offers Undo.
+- Hide the capsule while you're not dictating by turning off Floating recording capsule in Settings > App, or by right-clicking the capsule and choosing Hide capsule. Hiding it from the capsule shows a toast that says where to turn it back on and offers Undo.
 - Dictate and format, a second shortcut in Settings > Shortcut that is unset by default. It works like your dictation shortcut and follows the same hold or toggle behavior. It sends the English dictation to the cleanup provider chosen in Style, shaped for the app you are in:
   - email gets a greeting and paragraphs, with a sign-off only when you say one or usually write one
   - work chat is short, with code and identifiers in backticks
@@ -73,6 +73,8 @@ All notable changes to BetterWispr are listed here. The format follows
 - The dashboard sidebar shows the app version with a What's new link to the changelog. About has new Changelog and Support rows, and Support opens Buy Me a Coffee.
 
 ### Changed
+- Home's greeting card is a plain card now, without the colored glow in its corner.
+- Settings fills the width of the window instead of staying in a narrow column in the middle.
 - Setup recommends Parakeet Ultra and lists Apple on-device speech only when it supports your language on this Mac. If Apple is your selected model and it isn't available, setup says so, keeps your setting and holds Continue until you pick another model. Models marks Apple as unavailable and turns off its Use button.
 - Dictation no longer stops at two minutes. It used to stop at two minutes without warning. Now it records until you release or press your shortcut, with a brief reminder every hour, up to a limit of 4,278,190,080 audio frames: about 24 hours 45 minutes at 48 kHz, half that at 96 kHz. At the limit it finishes by itself and transcribes what it captured. The live preview still stops following after ten minutes, and the full recording is transcribed when you finish.
 - A recording of ten minutes or longer now asks before it is sent to an API connection and before it is pasted automatically. If you don't send it, the audio stays on your Mac and you can try it again. If you don't paste it, the text is left on your clipboard. Local models never ask before transcribing.
