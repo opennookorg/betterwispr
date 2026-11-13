@@ -3,9 +3,24 @@ import Foundation
 public enum EmailDictation {
     private static let formalClosings = ["regards", "sincerely", "yours", "wishes"]
 
+    /// Whether the dictation opens by asking for an email, such as "can you write an email to Sam …".
+    public static func isRequest(_ text: String) -> Bool { request(in: text) != nil }
+
+    /// The text after the spoken email request's sentence, or the whole text when there is no request.
+    public static func afterRequest(_ text: String) -> Substring {
+        guard let request = request(in: text) else { return text[...] }
+        let rest = text[request.upperBound...]
+        return rest.firstIndex(where: { ".?!:".contains($0) }).map { rest[rest.index(after: $0)...] } ?? rest
+    }
+
+    private static func request(in text: String) -> Range<String.Index>? {
+        let lead = #/(?:^|[.?!,:]\s*|\b(?:please|you|so|now|just|and|then|okay|ok|uh|um)\s+)(?:please\s+)?(?:write|draft|compose|send)\s+(?:me\s+)?(?:an?\s+|this\s+|the\s+)?(?:quick\s+|short\s+)?e-?mail\b/#
+        return (try? lead.ignoresCase().firstMatch(in: text.prefix(160)))?.range
+    }
+
     /// Lays out "write an email to Sam saying …" as a greeting, body and sign-off, or returns nil for any other text.
     public static func compose(_ text: String) -> String? {
-        let request = #/\s*(?:please\s+)?(?:write|draft|compose)\s+(?:an?\s+)?(?:quick\s+|short\s+)?e-?mail\s+to\s+(?:the\s+)?(?<name>\p{L}[\p{L}'’.-]*(?:\s+\p{L}[\p{L}'’.-]*){0,2}?)\s*,?\s+(?:saying|telling\s+(?:him|her|them)|letting\s+(?:him|her|them)\s+know|to\s+say|that)[,:]?\s+(?:that\s+)?(?<body>.+)/#
+        let request = #/\s*(?:please\s+)?(?:write|draft|compose)\s+(?:an?\s+)?(?:quick\s+|short\s+)?e-?mail\s+to\s+(?:the\s+)?(?<name>\p{L}[\p{L}'’.-]*(?:\s+\p{L}[\p{L}'’.-]*){0,2}?)\s*(?:,?\s+(?:saying|telling\s+(?:him|her|them)|letting\s+(?:him|her|them)\s+know|to\s+say|that|with\s+(?:this|the\s+following)\s+(?:content|message|text|body))[,:]?|:)\s+(?:that\s+)?(?<body>.+)/#
         guard let match = try? request.ignoresCase().dotMatchesNewlines().wholeMatch(in: text) else { return nil }
         var body = String(match.output.body).trimmingCharacters(in: .whitespacesAndNewlines)
         var signOff: String?

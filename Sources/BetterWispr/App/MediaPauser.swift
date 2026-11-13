@@ -104,6 +104,13 @@ final class MediaPauser {
     }
 }
 
+/// Never reports or commands a player, for models that don't start services.
+struct NoMediaPlayers: MediaPlayers {
+    func state(of app: MediaApp) async -> PlayerState { .unavailable }
+    func pause(_ app: MediaApp) async {}
+    func play(_ app: MediaApp) async {}
+}
+
 struct AppleEventMediaPlayers: MediaPlayers {
     @concurrent
     func state(of app: MediaApp) async -> PlayerState {

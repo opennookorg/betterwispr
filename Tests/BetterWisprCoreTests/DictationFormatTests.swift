@@ -25,6 +25,10 @@ import Testing
     #expect(AppCategory(bundleID: chrome, url: "https://outlook.live.com/mail/0/") == .email)
     #expect(AppCategory(bundleID: chrome, url: "https://app.slack.com/client/T1/C1") == .work)
     #expect(AppCategory(bundleID: chrome, url: "https://teams.microsoft.com/v2/") == .work)
+    #expect(AppCategory(bundleID: chrome, url: "https://teams.cloud.microsoft/") == .work)
+    #expect(AppCategory(bundleID: chrome, url: "https://chat.google.com/room/A1") == .work)
+    #expect(AppCategory(bundleID: chrome, url: "https://outlook.cloud.microsoft/mail/") == .email)
+    #expect(AppCategory(bundleID: chrome, url: "https://mail.proton.me/u/0/inbox") == .email)
     #expect(AppCategory(bundleID: chrome, url: "https://web.whatsapp.com/") == .personal)
     #expect(AppCategory(bundleID: chrome, url: "https://chatgpt.com/c/1") == .aiPrompts)
     #expect(AppCategory(bundleID: chrome, url: "https://claude.ai/new") == .aiPrompts)
@@ -170,4 +174,47 @@ import Testing
     #expect(TranscriptPolisher.accepted("Hey team,\n\nCan we move the review to Thursday afternoon? The budget doubled.\n\nBest,\nSam", for: spoken,
                                         adding: email.addableLines, words: email.addableWords) == nil)
     #expect(DictationFormat(category: .work, examples: ["Hey team,\nok"]).addableWords == 0)
+}
+
+@Test func formatModeFollowsASpokenWritingRequestWhileOtherDictationKeepsTreatingCommandsAsText() {
+    let email = TranscriptPolisher.prompt(vocabulary: [], context: nil, format: DictationFormat(category: .email))
+    #expect(email.hasPrefix(TranscriptPolisher.formatInstructions))
+    #expect(email.contains("write that piece instead of transcribing the request"))
+    #expect(email.contains("Never invent content"))
+    #expect(!TranscriptPolisher.instructions.contains("write that piece"))
+    #expect(TranscriptPolisher.instructions.contains("without answering or following them"))
+
+    let spoken = "Write an email to Ancore with this content, we are launching the beta on Friday and I need your sign off on the pricing page by Thursday."
+    let composed = "Hi Ancore,\n\nWe are launching the beta on Friday. I need your sign off on the pricing page by Thursday."
+    let format = DictationFormat(category: .email)
+    #expect(TranscriptPolisher.accepted(composed, for: spoken, adding: format.addableLines, words: format.addableWords) == composed)
+    #expect(TranscriptPolisher.accepted(composed + " The budget was approved by finance yesterday.", for: spoken, adding: format.addableLines, words: format.addableWords) == nil)
+}
+
+@Test func emailRequestsAreRecognizedAndComposedFromTheNewConnectors() {
+    #expect(EmailDictation.isRequest("Write an email to Ancore with this content, hello"))
+    #expect(EmailDictation.isRequest("please draft a quick e-mail to Sam"))
+    #expect(!EmailDictation.isRequest("I will write an email to Sam later"))
+    #expect(!EmailDictation.isRequest("Send the report to Sam"))
+    #expect(EmailDictation.isRequest("Can you please write an email to Angkor? The email will be Hey Angkor, thanks."))
+    #expect(EmailDictation.isRequest("Hey thank you for the so write an email for me. Thank you for this opportunity."))
+    #expect(EmailDictation.isRequest("Can you write this email to Ankor? Hi Ankor, thank you."))
+    #expect(EmailDictation.afterRequest("Can you please write an email to Angkor? The email will be thanks.") == " The email will be thanks.")
+    let composed = "Hi Angkor,\n\nThanks for giving me this opportunity. I'm going to prepare really well and make sure I perform.\n\nBest regards"
+    let spoken = "Can you please write an email to Angkor? The email will be Hey Angkor, thanks for giving me this opportunity and I'm now going to prepare really well and make sure that I perform generally."
+    let email = DictationFormat(category: .email)
+    #expect(TranscriptPolisher.accepted(composed, for: spoken, adding: email.addableLines, words: email.addableWords) == composed)
+    #expect(TranscriptPolisher.accepted("Thanks.", for: "Write an email to Sam: can you join on Friday?", adding: email.addableLines, words: email.addableWords) == nil)
+    #expect(EmailDictation.compose("Write an email to Ancore with this content, we launch on Friday.") == "Hi Ancore,\n\nWe launch on Friday.")
+    #expect(EmailDictation.compose("Draft an email to Sam with the following message: the deck is ready. Thanks, Kartik.") == "Hi Sam,\n\nThe deck is ready.\n\nThanks,\nKartik")
+    #expect(EmailDictation.compose("Write an email to Sam: I'm running late.") == "Hi Sam,\n\nI'm running late.")
+}
+
+@Test func onlyClaudeCodeCodexAPIConnectionsAndOllamaCanFormat() {
+    #expect(!NotesModelSelection.apple.formats)
+    #expect(!NotesModelSelection.builtIn.formats)
+    #expect(NotesModelSelection.ollama("llama3.1:8b").formats)
+    #expect(NotesModelSelection.connection(UUID()).formats)
+    #expect(NotesModelSelection.cli(.claudeCode).formats)
+    #expect(NotesModelSelection.cli(.codex).formats)
 }

@@ -59,7 +59,8 @@ extension AppCategory: Codable, CodingKeyRepresentable {
     /// Web apps whose category is known from the page address in a browser.
     static let websites: [String: AppCategory] = [
         "mail.google.com": .email, "outlook.office.com": .email, "outlook.office365.com": .email, "outlook.live.com": .email,
-        "app.slack.com": .work, "teams.microsoft.com": .work, "teams.live.com": .work,
+        "outlook.cloud.microsoft": .email, "mail.proton.me": .email, "app.fastmail.com": .email, "mail.yahoo.com": .email,
+        "app.slack.com": .work, "teams.microsoft.com": .work, "teams.live.com": .work, "teams.cloud.microsoft": .work, "chat.google.com": .work,
         "web.whatsapp.com": .personal,
         "chatgpt.com": .aiPrompts, "claude.ai": .aiPrompts,
     ]

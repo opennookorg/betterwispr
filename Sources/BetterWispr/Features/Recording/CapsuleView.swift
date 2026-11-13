@@ -573,7 +573,7 @@ struct CapsuleView: View {
 
     private var meetingButton: some View {
         HStack(spacing: 0) {
-            Button(action: model.startNotetaker) {
+            Button { model.startNotetaker() } label: {
                 Image(systemName: "record.circle")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)

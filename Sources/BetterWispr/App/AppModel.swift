@@ -220,6 +220,7 @@ final class AppModel {
     var accessibilityGranted = AXIsProcessTrusted()
     var calendarGranted = CalendarEvents.isAuthorized
     var calendarAccounts: [CalendarAccount] = []
+    var shownCalendarEvents: [CalendarEvent] = []
     @ObservationIgnored let calendarEvents = CalendarEvents()
     var microphones: [AudioInputDevice] = []
     var automaticMicrophone: AudioInputDevice?
@@ -298,10 +299,10 @@ final class AppModel {
         return microphones + [saved]
     }
 
-    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser()) {
+    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser? = nil) {
         self.store = store
         failedDictationStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
-        self.mediaPauser = mediaPauser
+        self.mediaPauser = mediaPauser ?? (startsServices ? MediaPauser() : MediaPauser(players: NoMediaPlayers(), otherApps: nil))
         self.startsServices = startsServices
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
         transcriptions = TranscriptionModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Transcriptions")))
@@ -323,7 +324,8 @@ final class AppModel {
         meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
-        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        self.mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        if settings.pauseMediaWhileDictating { Task { await AppleEventMediaPlayers.requestPermission() } }
         AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {
@@ -679,6 +681,11 @@ final class AppModel {
             fail(DictationFailure(title: L10n.tr("Download a model first."), message: L10n.tr("Download %@ in Models before recording.", String(selectedModel.localizedName))))
             return
         }
+        guard !formatting || settings.cleanupSettings.notesSelection.formats else {
+            selectedPage = .style
+            fail(Self.formatProviderMissing)
+            return
+        }
         if let cleanup = selectedTextCleanup {
             cleanup.cancel()
             selectedTextCleanup = nil
@@ -1013,7 +1020,7 @@ final class AppModel {
                 var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
                 if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
-                let format = recording.format.flatMap { self.formatIfPossible($0, english: english, settings: writingSettings) }
+                let format = recording.format.flatMap { self.formatIfPossible(self.requested($0, by: spoken), english: english, settings: writingSettings) }
                 var styledFormat: DictationFormat?
                 if let format {
                     self.statusMessage = L10n.tr("Formatting with %@…", String(writingSettings.localizedNotesModelName))
@@ -1022,12 +1029,15 @@ final class AppModel {
                                                                     instructions: mode?.instructions ?? "", format: format)
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
-                    if formatted == nil {
+                    if formatted == nil, format.category == .email, let email = EmailDictation.compose(spoken) {
+                        spoken = email
+                    } else if formatted == nil {
                         ToastWindow.shared.show(Toast(title: L10n.tr("Pasted without formatting"), message: L10n.tr("%@ didn’t return a usable edit, so the cleaned dictation was used.", String(writingSettings.localizedNotesModelName)), systemImage: "text.badge.xmark"))
                     } else {
                         styledFormat = format
                     }
                     spoken = StyleFormatter.apply(tone, to: formatted ?? spoken)
+                    Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Formatting completed: category=\(format.category.rawValue, privacy: .public) accepted=\(formatted != nil)")
                 } else if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
                 } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
@@ -1129,9 +1139,18 @@ final class AppModel {
 
     /// The format when it can run; otherwise tells the user why this dictation gets the usual cleanup.
     private func formatIfPossible(_ format: DictationFormat, english: Bool, settings: AppSettings) -> DictationFormat? {
-        guard format.rules != nil else { return nil }
+        guard settings.notesSelection.formats else {
+            ToastWindow.shared.show(Toast(title: Self.formatProviderMissing.title, message: Self.formatProviderMissing.message, systemImage: "exclamationmark.triangle", isError: true,
+                                          action: Toast.Action(title: L10n.tr("Open Style")) { [weak self] in
+                                              self?.selectedPage = .style
+                                              self?.onShowDashboard?()
+                                          }))
+            return nil
+        }
         let reason: String
-        if !english {
+        if format.rules == nil {
+            reason = L10n.tr("Dictate and format has no layout for this app yet. This dictation got the usual cleanup.")
+        } else if !english {
             reason = L10n.tr("Dictate and format works in English. This dictation got the usual cleanup.")
         } else if case .unavailable(let why) = MeetingNotesGenerator.availability(settings: settings) {
             reason = L10n.tr("%@ Until then, Dictate and format gives the usual cleanup.", String(why))
@@ -1140,6 +1159,17 @@ final class AppModel {
         }
         ToastWindow.shared.show(Toast(title: L10n.tr("Not formatted"), message: reason, systemImage: "exclamationmark.triangle"))
         return nil
+    }
+
+    static var formatProviderMissing: DictationFailure {
+        DictationFailure(title: L10n.tr("Connect a provider to format."),
+                         message: L10n.tr("Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style."))
+    }
+
+    /// An email format when the dictation asks for an email in an app without its own email, chat or prompt layout.
+    private func requested(_ format: DictationFormat, by spoken: String) -> DictationFormat {
+        guard [.other, .documents].contains(format.category), EmailDictation.isRequest(spoken) else { return format }
+        return DictationFormat(category: .email, examples: styleExamples?.recent(for: .email) ?? [])
     }
 
     func cancelRecording() {
@@ -1963,6 +1993,22 @@ final class AppModel {
             }
             calendarAccounts = await calendarEvents.accounts()
         }
+    }
+
+    /// Opens Internet Accounts in System Settings, where Google, Outlook, Exchange, Yahoo and iCloud calendars are added to this Mac.
+    func addCalendarAccount() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
+    }
+
+    /// Re-reads the events in `interval` from the calendars meeting notes use, for the Calendar page.
+    func refreshCalendarEvents(in interval: DateInterval) async {
+        calendarGranted = CalendarEvents.isAuthorized
+        guard settings.useCalendar, calendarGranted else { shownCalendarEvents = []; return }
+        let accounts = await calendarEvents.accounts()
+        let events = await calendarEvents.events(excluding: settings.excludedCalendarIDs, in: interval)
+        guard !Task.isCancelled else { return }
+        calendarAccounts = accounts
+        shownCalendarEvents = events
     }
 
     func refreshPermissions() {
