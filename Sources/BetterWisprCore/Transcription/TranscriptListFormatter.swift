@@ -106,9 +106,7 @@ enum TranscriptListFormatter {
 
     /// Whether an edit is worth a layout call: explicit order, a sentence of three or more parts whose items after the lead-in are short, or a three-word phrase repeated three times.
     /// Each layout call waits for the on-device model, so run-on prose with long clauses must not trigger one.
-    // ponytail: "short" is five words or fewer; short-clause prose ("went in, sat down and left") still makes a call, which the layout answers as prose.
     static func isLikelyList(_ text: String) -> Bool {
-        // Long ordered points, such as a spoken status update, read as paragraphs: a layout call costs seconds after stop and the formatter declines them.
         if hasExplicitOrder(text, itemWords: 15) { return true }
         if text.split(separator: /[.!?]\s+/).contains(where: { sentence in
             let parts = sentence.split(separator: /(?i),(?!\d)(?:\s*(?:and|then)\b)?|;|\band\s+then\b|\b(?:and|then)\b/).map { $0.split(whereSeparator: \.isWhitespace) }.filter { !$0.isEmpty }

@@ -98,8 +98,25 @@ the policy immediately and persist through the existing workspace store.
    streaming while capture is still running. The Parakeet live preview is the
    one exception: `LiveTranscriber` re-recognizes the unconfirmed tail of the
    16 kHz capture copy about once a second while recording and shows the
-   agreed words in the capsule, but the pasted text is always this batch pass.
-   It does not run while the capsule is hidden for dictation.
+   agreed words in the capsule when live text is shown. The passes run for every
+   Parakeet dictation, even with live text or the capsule hidden, because they
+   also cut the recording: once at least four seconds of finished sentences are
+   confirmed, `LiveTranscriber` recognizes that audio with the same
+   `ParakeetProvider.transcribe(samples:)` call the batch pass uses (vocabulary
+   and phrase booster included), cut halfway between the last confirmed word and
+   the next. A piece is kept only when its first and last words match the
+   confirmed preview words; otherwise it and all later audio wait for stop.
+   Stopping recognizes only the file after the kept pieces, and the joined text
+   is used only when the file length matches the live samples within half a
+   second, the recording fit the ten-minute preview buffer, the model and
+   language are unchanged, and the rest starts with the preview's next word.
+   Anything else, and every retry, recognizes the whole file as before. Whisper,
+   Apple Speech and API connections always use the whole-file pass. With Medium
+   cleanup, each kept piece starts its edit while recording;
+   `StreamedDictation.edit` reuses those edits only when the pieces join to the
+   whole dictation on one line and no later piece opens with a correction cue,
+   then lays out the joined edit once. Cancelling or discarding the dictation
+   cancels the pieces and their edits.
    With automatic language and a Whisper model, a non-empty
    `AppSettings.dictationLanguages` limits detection. `WhisperKitProvider`
    runs Whisper's language detection once on the first 30 seconds, allowing
@@ -127,8 +144,10 @@ the policy immediately and persist through the existing workspace store.
    rejected when it answers the dictation, adds new words or changes length too
    much; any failure keeps the Light text, and Medium never picks a different
    model than the one selected. When `TranscriptListFormatter.isLikelyList` finds
-   explicit order, a sentence with three or more parts or phrasing repeated three
-   times, one more model call identifies list items, and
+   explicit order whose first item is at most 15 words, a sentence with three or
+   more parts whose parts after the first are at most five words, or a
+   three-word phrase repeated three times, one more model call identifies list
+   items, and
    `TranscriptListLayout.render` quotes them from the edit. Mode instructions and
    dictated line breaks skip that call, and an edit that loses or adds a dictated
    line keeps the Light text.

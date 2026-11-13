@@ -17,7 +17,9 @@ public struct TimedWord: Sendable, Equatable {
     }
 
     /// Lowercased letters, numbers and spaces only, so punctuation and case never break agreement.
-    var normalized: String {
+    var normalized: String { Self.normalized(text) }
+
+    static func normalized(_ text: String) -> String {
         String(text.lowercased().replacingOccurrences(of: "-", with: " ").filter { $0.isLetter || $0.isNumber || $0.isWhitespace })
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -56,6 +58,10 @@ public struct WordAgreementEngine: Sendable {
     public private(set) var hypothesisStartTime: TimeInterval = 0
 
     public init() {}
+
+    /// Confirmed words followed by the latest provisional ones, in spoken order.
+    var words: [TimedWord] { confirmed + previous }
+    var confirmedCount: Int { confirmed.count }
 
     /// Where the next pass should start reading audio, in seconds.
     public var seekTime: TimeInterval { hypothesisStartTime > 0 ? hypothesisStartTime : confirmedEndTime }

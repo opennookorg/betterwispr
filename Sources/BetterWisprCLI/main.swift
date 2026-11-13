@@ -343,7 +343,7 @@ func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocab
         }
         transcriber.beginBuffering()
         transcriber.start(pass: { try await provider.liveTranscribe($0, language: spoken) }) {
-            try await provider.transcribe(samples: $0, language: spoken, vocabulary: vocabulary, screenTerms: []).text
+            try await provider.transcribe(samples: $0, language: spoken, vocabulary: vocabulary, screenTerms: [])
         }
         let chunk = LiveTranscriber.sampleRate / 10
         for start in stride(from: 0, to: samples.count, by: chunk) {
@@ -354,21 +354,27 @@ func latency(manifest: URL, provider: ParakeetProvider, language: String?, vocab
         await transcriber.stop()
         let stopSeconds = seconds(stopped.duration(to: clock.now))
         var pieces = [String]()
-        if let rest = StreamedDictation.remainder(of: samples, segmentedSamples: transcriber.segmentedSamples, receivedSamples: transcriber.receivedSamples) {
-            pieces = transcriber.segments + [try await provider.transcribe(samples: rest, language: spoken, vocabulary: vocabulary, screenTerms: []).text]
-        } else {
+        var fellBack = transcriber.hasPieces
+        if transcriber.hasPieces, let rest = StreamedDictation.remainder(of: samples, segmentedSamples: transcriber.segmentedSamples, receivedSamples: transcriber.receivedSamples) {
+            let last = try await provider.transcribe(samples: rest, language: spoken, vocabulary: vocabulary, screenTerms: []).text
+            if StreamedDictation.joins(last, startingWith: transcriber.wordAfterPieces) {
+                pieces = transcriber.segments + [last]
+                fellBack = false
+            }
+        }
+        if pieces.isEmpty {
             pieces = [try await provider.transcribe(audioURL: URL(fileURLWithPath: clip.audio), language: spoken, vocabulary: vocabulary)]
         }
         pieces = pieces.filter { !$0.isEmpty }
         let raw = pieces.joined(separator: " ")
         let recognized = clock.now
         let whole = prepared(raw)
-        let (edited, reused) = settings.cleanup == .medium && TranscriptPolisher.needsEdit(whole)
+        let (edited, reused) = settings.cleanup == .medium
             ? await StreamedDictation.edit(whole, pieces: pieces.map(prepared), ahead: ahead, editingPiece: { await polish($0, laysOutLists: false) },
                                            editingWhole: { await polish($0) }, layingOut: { await TranscriptPolisher.layOutList($0, of: whole, settings: settings) })
-            : (settings.cleanup == .medium ? await TranscriptPolisher.layOutList(whole, of: whole, settings: settings) : nil, 0)
+            : (nil, 0)
         let result: [String: String] = [
-            "id": clip.id, "pieces": "\(pieces.count)", "reused": "\(reused)",
+            "id": clip.id, "pieces": "\(pieces.count)", "reused": "\(reused)", "fellBack": "\(fellBack)",
             "liveStop": String(format: "%.2f", stopSeconds),
             "recognition": String(format: "%.2f", seconds(stopped.duration(to: recognized))),
             "total": String(format: "%.2f", seconds(stopped.duration(to: clock.now))),

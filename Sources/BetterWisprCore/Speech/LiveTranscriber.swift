@@ -48,7 +48,7 @@ extension TimedWord {
 public final class LiveTranscriber {
     public enum State: Sendable, Equatable { case idle, buffering, running, stopping, stopped }
     public typealias Pass = @MainActor @Sendable ([Float]) async throws -> LivePass
-    public typealias Segment = @MainActor @Sendable ([Float]) async throws -> String
+    public typealias Segment = @MainActor @Sendable ([Float]) async throws -> (text: String, vocabularyFixes: Int)
 
     public nonisolated static let sampleRate = 16_000
     /// The preview stops following after ten minutes to bound memory; the dictation itself keeps recording.
@@ -69,6 +69,9 @@ public final class LiveTranscriber {
     public private(set) var segmentedSamples = 0
     /// Every sample delivered while buffering or running, including those past the buffer limit.
     public private(set) var receivedSamples = 0
+    /// Vocabulary fixes made while recognizing `segments`.
+    public private(set) var vocabularyFixes = 0
+    private var segmentedWords = 0
     private var segmenting = false
     private var segmentsFailed = false
     private let interval: Duration
@@ -118,6 +121,15 @@ public final class LiveTranscriber {
         state = .stopped
     }
 
+    /// Whether stopping can recognize only the audio after `segments`: there are pieces and the buffer holds the whole recording.
+    public var hasPieces: Bool { !segments.isEmpty && receivedSamples <= Self.maximumSamples }
+
+    /// The preview's first word after `segmentedSamples`, which the recognized rest of the recording must start with.
+    public var wordAfterPieces: String? {
+        let words = engine.words
+        return words.indices.contains(segmentedWords) ? words[segmentedWords].text : nil
+    }
+
     public func cancel() {
         loop?.cancel()
         loop = nil
@@ -143,19 +155,20 @@ public final class LiveTranscriber {
         guard state == .running, !segmentsFailed else { return }
         let gapEnd = max(engine.confirmedEndTime, engine.hypothesisStartTime)
         let cut = min(samples.count, Int((engine.confirmedEndTime + gapEnd) / 2 * Double(Self.sampleRate)))
-        guard cut - segmentedSamples >= Self.minimumSegmentSamples else { return }
+        let expected = engine.words[segmentedWords..<engine.confirmedCount]
+        guard cut - segmentedSamples >= Self.minimumSegmentSamples, let first = expected.first, let last = expected.last else { return }
         segmenting = true
         defer { segmenting = false }
-        do {
-            let text = try await segment(Array(samples[segmentedSamples..<cut]))
-            guard state == .running || state == .stopping else { return }
-            segments.append(text)
-            segmentedSamples = cut
-            onSegment?(text)
-        } catch {
-            // Stopping recognizes everything from `segmentedSamples` on, so a failed piece only stops further pieces.
+        guard let result = try? await segment(Array(samples[segmentedSamples..<cut])), state == .running || state == .stopping,
+              StreamedDictation.joins(result.text, startingWith: first.text, endingWith: last.text) else {
             segmentsFailed = true
+            return
         }
+        segments.append(result.text)
+        vocabularyFixes += result.vocabularyFixes
+        segmentedSamples = cut
+        segmentedWords = engine.confirmedCount
+        onSegment?(result.text)
     }
 }
 
@@ -184,7 +197,7 @@ public enum StreamedDictation {
             let edited: String?
             if let task = ahead[piece] {
                 reused += 1
-                edited = await task.value
+                edited = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
             } else {
                 edited = await editingPiece(piece)
             }
@@ -195,11 +208,21 @@ public enum StreamedDictation {
         return (await layingOut(parts.joined(separator: " ")), reused)
     }
 
+    /// Whether recognized text starts with the word `first` and ends with `last`, ignoring case and punctuation, so a piece cut from the recording neither lost nor repeated a word at a cut.
+    /// A nil word is not checked.
+    public static func joins(_ text: String, startingWith first: String?, endingWith last: String? = nil) -> Bool {
+        let words = spokenWords(text)
+        return first.map { spokenWords($0).first == words.first } ?? true && last.map { spokenWords($0).last == words.last } ?? true
+    }
+
+    static func spokenWords(_ text: String) -> [String] {
+        TimedWord.normalized(text).split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
     static let correctionCues = ["actually", "wait", "sorry", "scratch that", "i mean", "no", "never mind"]
 
     /// Whether each piece can be edited on its own: together they read as `whole` on one line,
     /// and no piece after the first opens with a self-correction that may revise the one before.
-    // ponytail: a cue at the start of a piece is the only cross-piece correction caught; a correction later in the piece that reaches back is edited without the earlier piece.
     public static func editsSeparately(_ pieces: [String], whole: String) -> Bool {
         let words = { (text: String) in text.split(whereSeparator: \.isWhitespace) }
         guard pieces.count > 1, words(pieces.joined(separator: " ")) == words(whole), !whole.contains(where: \.isNewline) else { return false }

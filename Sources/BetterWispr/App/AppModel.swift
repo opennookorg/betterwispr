@@ -129,6 +129,8 @@ struct StreamedPieces {
     let pieces: [String]
     let segmentedSamples: Int
     let receivedSamples: Int
+    /// The live preview's first word after the pieces, which the recognized rest must start with.
+    let wordAfterPieces: String?
     let vocabularyFixes: Int
     /// Edits of prepared pieces, keyed by the prepared text, started with `editSettings`.
     let edits: [String: Task<String?, Never>]
@@ -245,7 +247,6 @@ final class AppModel {
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var live: LiveTranscriber?
-    @ObservationIgnored private var pieceFixes = 0
     @ObservationIgnored private var pieceEdits: (settings: AppSettings, tasks: [String: Task<String?, Never>])?
     @ObservationIgnored private var cardDismissal: Task<Void, Never>?
     @ObservationIgnored private var shortcutPressedAt: Date?
@@ -658,7 +659,6 @@ final class AppModel {
         }
         pieceEdits?.tasks.values.forEach { $0.cancel() }
         pieceEdits = nil
-        pieceFixes = 0
         live?.beginBuffering()
         self.live = live
         var onSamples: (@Sendable ([Float]) -> Void)?
@@ -747,9 +747,7 @@ final class AppModel {
             live.start(pass: { try await parakeet.liveTranscribe($0, language: language) }, segment: { [weak self] samples in
                 let context = self?.dictationContext
                 let screenTerms = spellsScreenNames ? await context?.value(within: .milliseconds(300), cancellingOnTimeout: false)?.spellingTerms() ?? [] : []
-                let result = try await parakeet.transcribe(samples: samples, language: language, vocabulary: hints, screenTerms: screenTerms)
-                self?.pieceFixes += result.vocabularyFixes
-                return result.text
+                return try await parakeet.transcribe(samples: samples, language: language, vocabulary: hints, screenTerms: screenTerms)
             })
         }
     }
@@ -817,16 +815,20 @@ final class AppModel {
                 let edits = self.pieceEdits
                 self.pieceEdits = nil
                 let streamed = live.flatMap { live in
-                    live.segments.isEmpty ? nil : StreamedPieces(
+                    live.hasPieces ? StreamedPieces(
                         modelID: model.id, language: settings.language, pieces: live.segments, segmentedSamples: live.segmentedSamples,
-                        receivedSamples: live.receivedSamples, vocabularyFixes: self.pieceFixes, edits: edits?.tasks ?? [:], editSettings: edits?.settings ?? settings)
+                        receivedSamples: live.receivedSamples, wordAfterPieces: live.wordAfterPieces, vocabularyFixes: live.vocabularyFixes,
+                        edits: edits?.tasks ?? [:], editSettings: edits?.settings ?? settings) : nil
                 }
+                if streamed == nil { edits?.tasks.values.forEach { $0.cancel() } }
                 guard self.generation == token, !Task.isCancelled else {
+                    streamed?.edits.values.forEach { $0.cancel() }
                     try? FileManager.default.removeItem(at: audio.url)
                     return
                 }
                 self.recordingDuration = audio.duration
                 guard audio.hasSpeech else {
+                    streamed?.edits.values.forEach { $0.cancel() }
                     try? FileManager.default.removeItem(at: audio.url)
                     self.noSpeechHeard()
                     return
@@ -873,6 +875,8 @@ final class AppModel {
         }
         let token = generation
         activeRecording = recording
+        let streamed = recording.streamed
+        recording.streamed = nil
         let audio = recording.audio
         let model = recording.model
         let language = recording.settings.language == "auto" ? nil : recording.settings.language
@@ -885,6 +889,7 @@ final class AppModel {
         statusMessage = !model.processingLocation.isOnDevice ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
         operation = Task { [weak self] in
             defer {
+                streamed?.edits.values.forEach { $0.cancel() }
                 if self?.generation == token { self?.activeRecording = nil }
             }
             guard let self else { return }
@@ -900,13 +905,15 @@ final class AppModel {
                 let recognitionStarted = ContinuousClock.now
                 var pieces: [String] = []
                 var recognitionFixes = 0
-                if let streamed = recording.streamed, streamed.modelID == model.id, streamed.language == recording.settings.language,
+                if let streamed, streamed.modelID == model.id, streamed.language == recording.settings.language,
                    let parakeet = provider as? ParakeetProvider,
                    let rest = StreamedDictation.remainder(of: try await Task.detached { try ParakeetProvider.samples(of: audio.url) }.value,
                                                           segmentedSamples: streamed.segmentedSamples, receivedSamples: streamed.receivedSamples) {
                     let last = try await parakeet.transcribe(samples: rest, language: language, vocabulary: hints, screenTerms: screenTerms)
-                    pieces = (streamed.pieces + [last.text]).filter { !$0.isEmpty }
-                    recognitionFixes = streamed.vocabularyFixes + last.vocabularyFixes
+                    if StreamedDictation.joins(last.text, startingWith: streamed.wordAfterPieces) {
+                        pieces = (streamed.pieces + [last.text]).filter { !$0.isEmpty }
+                        recognitionFixes = streamed.vocabularyFixes + last.vocabularyFixes
+                    }
                 }
                 let raw: String
                 if pieces.isEmpty {
@@ -934,13 +941,12 @@ final class AppModel {
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
-                } else if english, cleanup == .medium, TranscriptPolisher.needsEdit(spoken, instructions: mode?.instructions ?? ""),
-                          MeetingNotesGenerator.availability(settings: writingSettings) == .available {
+                } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
                     let editStarted = ContinuousClock.now
                     let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
                     let prepared = trigger == nil ? pieces.map { Self.prepared($0, settings: recording.settings, entries: entries, language: language) } : []
-                    let ahead = recording.streamed.flatMap { $0.editSettings == writingSettings ? $0.edits : nil } ?? [:]
+                    let ahead = streamed.flatMap { $0.editSettings == writingSettings ? $0.edits : nil } ?? [:]
                     let instructions = mode?.instructions ?? ""
                     let (polished, reused) = await StreamedDictation.edit(spoken, pieces: prepared, ahead: ahead, editingPiece: {
                         await TranscriptPolisher.polish($0, settings: writingSettings, vocabulary: hints, context: editContext, instructions: instructions, laysOutLists: false)
@@ -953,12 +959,6 @@ final class AppModel {
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
                     spoken = StyleFormatter.apply(tone, to: polished ?? spoken)
-                } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
-                    // A clean dictation skips the edit; a likely list still gets its one layout call, anything else returns at once.
-                    let listed = await TranscriptPolisher.layOutList(spoken, of: spoken, settings: writingSettings, instructions: mode?.instructions ?? "")
-                    try Task.checkCancellation()
-                    guard self.generation == token else { return }
-                    spoken = StyleFormatter.apply(tone, to: listed)
                 } else if english {
                     spoken = StyleFormatter.apply(tone, to: spoken)
                 }

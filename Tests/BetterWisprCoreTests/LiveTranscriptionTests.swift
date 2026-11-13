@@ -194,3 +194,50 @@ private final class PassLog {
                                                  editingPiece: { _ in Issue.record("edited a piece"); return nil }, editingWhole: { _ in "whole" }, layingOut: { $0 })
     #expect(noneAhead.text == "whole" && noneAhead.reused == 0)
 }
+
+@Test func recognizedTextJoinsOnlyWhenItStartsAndEndsWithTheExpectedWords() {
+    #expect(StreamedDictation.joins("Hello, world.", startingWith: "hello", endingWith: "World!"))
+    #expect(StreamedDictation.joins("Hello world.", startingWith: nil))
+    #expect(!StreamedDictation.joins("world.", startingWith: "Hello", endingWith: "world."))
+    #expect(!StreamedDictation.joins("Hello world. Again", startingWith: "Hello", endingWith: "world."))
+    #expect(!StreamedDictation.joins("", startingWith: "Hello"))
+}
+
+@MainActor
+private func segmentFirstSentence(answering text: String) async throws -> (LiveTranscriber, calls: Int) {
+    let transcriber = LiveTranscriber(interval: .milliseconds(20))
+    transcriber.beginBuffering()
+    var calls = 0
+    transcriber.start(pass: { _ in LivePass(words: words("One two three four five six. Seven eight"), confidence: 1) }, segment: { _ in
+        calls += 1
+        return (text, 2)
+    })
+    let deadline = ContinuousClock.now + .seconds(3)
+    while calls == 0, ContinuousClock.now < deadline {
+        transcriber.append([Float](repeating: 0, count: 32_000))
+        try await Task.sleep(for: .milliseconds(30))
+    }
+    for _ in 0..<5 {
+        transcriber.append([Float](repeating: 0, count: 32_000))
+        try await Task.sleep(for: .milliseconds(30))
+    }
+    await transcriber.stop()
+    return (transcriber, calls)
+}
+
+@Test @MainActor func confirmedSentenceIsRecognizedAsAPieceWhenItsWordsMatchThePreview() async throws {
+    let (transcriber, calls) = try await segmentFirstSentence(answering: "One two three four five six.")
+    try #require(calls >= 1)
+    #expect(transcriber.segments.first == "One two three four five six.")
+    #expect(transcriber.segmentedSamples >= 6 * LiveTranscriber.sampleRate)
+    #expect(transcriber.vocabularyFixes == 2 * transcriber.segments.count)
+    #expect(transcriber.hasPieces)
+    #expect(transcriber.wordAfterPieces != nil)
+}
+
+@Test @MainActor func pieceThatLostAWordAtTheCutIsDroppedAndStopsFurtherPieces() async throws {
+    let (transcriber, calls) = try await segmentFirstSentence(answering: "two three four five six.")
+    #expect(calls == 1)
+    #expect(transcriber.segments.isEmpty && transcriber.segmentedSamples == 0 && transcriber.vocabularyFixes == 0)
+    #expect(!transcriber.hasPieces)
+}

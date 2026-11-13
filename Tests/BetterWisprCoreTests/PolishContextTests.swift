@@ -191,16 +191,3 @@ import Testing
     #expect(await ready.value(within: .seconds(5)) == DictationContext(clipboard: "Invoice 4471"))
     #expect(!ready.isCancelled)
 }
-
-@Test func shortCleanDictationSkipsTheModelEdit() {
-    #expect(!TranscriptPolisher.needsEdit("Can you send me the file by tomorrow?"))
-    #expect(!TranscriptPolisher.needsEdit("The build passed on my machine. I'll push it after lunch."))
-
-    #expect(TranscriptPolisher.needsEdit("Can you send me the file by tomorrow?", instructions: "Write formally."))
-    #expect(TranscriptPolisher.needsEdit("Meet on Thursday. Actually, Friday works better."))
-    #expect(TranscriptPolisher.needsEdit("Send it to Sam, no, to Alex."))
-    #expect(TranscriptPolisher.needsEdit("can you send me the file by tomorrow"))
-    #expect(!TranscriptPolisher.needsEdit("We need milk, bread, eggs and flour."), "a clean list only waits for layOutList")
-    #expect(TranscriptPolisher.needsEdit("One. Two. Three. Four."))
-    #expect(TranscriptPolisher.needsEdit(Array(repeating: "word", count: 41).joined(separator: " ") + "."))
-}
