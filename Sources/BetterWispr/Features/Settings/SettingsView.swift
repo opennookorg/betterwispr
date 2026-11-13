@@ -18,6 +18,14 @@ struct SettingsView: View {
         ("“write an email to Sam saying …, best regards, Kartik”", L10n.tr("Hi Sam, body and sign-off")),
     ]
 
+    private var styleExamplesCaption: String {
+        guard let examples = model.styleExamples else { return L10n.tr("Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept.") }
+        let learned = examples.count == 1 ? L10n.tr("1 example learned.") : L10n.tr("%d examples learned.", examples.count)
+        return learned + " " + (model.settings.saveHistory
+            ? L10n.tr("When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app.")
+            : L10n.tr("New examples are kept only while Save dictation history is on."))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
@@ -41,6 +49,8 @@ struct SettingsView: View {
                     ShortcutRecorder(model: model, kind: .cancel)
                     RowDivider()
                     ShortcutRecorder(model: model, kind: .selectedText)
+                    RowDivider()
+                    ShortcutRecorder(model: model, kind: .format)
                     RowDivider()
                     SettingRow(L10n.tr("Behavior"), caption: behaviorCaption) {
                         Picker(L10n.tr("Behavior"), selection: setting(\.dictationMode)) {
@@ -277,6 +287,13 @@ struct SettingsView: View {
                             .fixedSize()
                         }
                     }
+                    if model.settings.formatShortcut != nil || model.styleExamples?.count ?? 0 > 0 {
+                        RowDivider()
+                        SettingRow(L10n.tr("Writing examples"), caption: styleExamplesCaption) {
+                            Button(L10n.tr("Forget"), role: .destructive) { model.forgetStyleExamples() }
+                                .disabled(model.styleExamples?.count ?? 0 == 0)
+                        }
+                    }
                 }
 
                 SettingsSection(L10n.tr("Calendar")) {
@@ -488,7 +505,7 @@ struct SettingsView: View {
 }
 
 private struct ShortcutRecorder: View {
-    enum Kind { case dictation, cancel, selectedText }
+    enum Kind { case dictation, cancel, selectedText, format }
 
     let model: AppModel
     let kind: Kind
@@ -504,6 +521,7 @@ private struct ShortcutRecorder: View {
         case .dictation: model.settings.shortcut
         case .cancel: model.settings.cancelShortcut
         case .selectedText: model.settings.selectedTextShortcut
+        case .format: model.settings.formatShortcut
         }
     }
     private var title: String {
@@ -511,6 +529,7 @@ private struct ShortcutRecorder: View {
         case .dictation: L10n.tr("Keyboard shortcut")
         case .cancel: L10n.tr("Cancel shortcut")
         case .selectedText: L10n.tr("Clean up selected text")
+        case .format: L10n.tr("Dictate and format")
         }
     }
     private var placeholder: String { kind == .dictation ? "" : L10n.tr("Set Shortcut…") }
@@ -533,7 +552,7 @@ private struct ShortcutRecorder: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help(kind == .cancel ? L10n.tr("Remove the cancel shortcut") : L10n.tr("Remove the clean up shortcut"))
+                    .help(clearHelp)
                     .transition(.opacity)
                 }
                 recordButton
@@ -552,6 +571,14 @@ private struct ShortcutRecorder: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
     }
 
+    private var clearHelp: String {
+        switch kind {
+        case .cancel: L10n.tr("Remove the cancel shortcut")
+        case .format: L10n.tr("Remove the Dictate and format shortcut")
+        default: L10n.tr("Remove the clean up shortcut")
+        }
+    }
+
     private var caption: String? {
         if isCapturing {
             return feedback ?? (kind == .dictation ? L10n.tr("Press and release ⌃, ⌥, ⇧, ⌘ or Fn alone, use a key combination, or press an F-key. Esc cancels.")
@@ -563,6 +590,7 @@ private struct ShortcutRecorder: View {
             return shortcut?.isModifierOnly == true ? L10n.tr("Needs Accessibility. Uses the left or right key you recorded.") : L10n.tr("Starts dictation from any app.")
         case .cancel: return L10n.tr("Also cancels a dictation from any app. Esc always does.")
         case .selectedText: return L10n.tr("Edits the text you select in any app with your cleanup provider from Style. English only.")
+        case .format: return L10n.tr("Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.")
         }
     }
 
@@ -601,6 +629,7 @@ private struct ShortcutRecorder: View {
         case .dictation: if let shortcut { model.changeShortcut(shortcut) }
         case .cancel: model.changeCancelShortcut(shortcut)
         case .selectedText: model.changeSelectedTextShortcut(shortcut)
+        case .format: model.changeFormatShortcut(shortcut)
         }
     }
 
