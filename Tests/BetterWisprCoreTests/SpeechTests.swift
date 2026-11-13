@@ -172,6 +172,37 @@ func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) thr
     #expect(ready.chunks.allSatisfy { $0.hasSpeech })
 }
 
+@Test func mutedMicrophoneDropsAudioAndClosesTheChunkSpokenBefore() throws {
+    let buffer = microphoneTone(1, rate: 48_000, channels: 1)
+    let writer = try MeetingChunkWriter(speaker: .me, format: buffer.format, threshold: 0.002,
+                                        policy: ChunkPolicy(), startOffset: 0)
+    _ = writer.write(buffer, at: 2)
+    writer.setMuted(true)
+    #expect(writer.takeReady().chunks.map { [$0.start, $0.duration] } == [[2, 1]])
+    #expect(writer.write(buffer, at: 3).rms == 0)
+    writer.setMuted(false)
+    _ = writer.write(buffer, at: 4)
+    writer.finish()
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.chunks.map { [$0.start, $0.duration] } == [[4, 1]])
+}
+
+@Test func mutedMicrophoneKeepsTheGapWhenBuffersHaveNoTime() throws {
+    let buffer = microphoneTone(1, rate: 48_000, channels: 1)
+    let writer = try MeetingChunkWriter(speaker: .me, format: buffer.format, threshold: 0.002,
+                                        policy: ChunkPolicy(), startOffset: 0)
+    _ = writer.write(buffer)
+    writer.setMuted(true)
+    _ = writer.write(buffer)
+    writer.setMuted(false)
+    _ = writer.write(buffer)
+    writer.finish()
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.chunks.map { [$0.start, $0.duration] } == [[0, 1], [2, 1]])
+}
+
 @Test func meetingClosesTheOpenChunkOnceSystemAudioStopsArriving() throws {
     let buffer = microphoneTone(1, rate: 48_000, channels: 1)
     let writer = try MeetingChunkWriter(speaker: .them, format: buffer.format, threshold: 0.002,
