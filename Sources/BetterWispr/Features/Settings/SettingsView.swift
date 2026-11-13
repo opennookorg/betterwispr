@@ -131,6 +131,8 @@ struct SettingsView: View {
                 }
 
                 SettingsSection("After you speak") {
+                    SettingToggle("Write numbers as digits", caption: "“Two tickets for PR forty-two” becomes “2 tickets for PR 42”, in any language. Turn off to keep numbers as spoken words.", isOn: setting(\.writesNumbersAsDigits))
+                    RowDivider()
                     SettingToggle("Paste into the active app", caption: "Needs Accessibility. Otherwise, text is copied.", isOn: setting(\.autoPaste))
                     RowDivider()
                     SettingToggle("Add a space after pasting", caption: "So the next dictation doesn’t run into this one. Skipped after Chinese or Japanese.", isOn: setting(\.appendTrailingSpace))

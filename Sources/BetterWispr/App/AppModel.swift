@@ -840,7 +840,9 @@ final class AppModel {
                 let sharesContext = recording.settings.sharesContext(startedIn: recording.mode, trigger: trigger?.mode)
                 if !sharesContext { context?.cancel() }
                 let heard = VocabularyProcessor.correctedCommands(entries, in: cleaned)
-                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
+                let digits = recording.settings.writesNumbersAsDigits
+                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
+                if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 if english, let email = EmailDictation.compose(spoken) {
                     spoken = email

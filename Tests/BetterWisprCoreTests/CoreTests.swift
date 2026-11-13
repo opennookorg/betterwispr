@@ -341,18 +341,25 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
 
 @Test func voiceCommandsWriteSpokenNumbersAsDigits() {
     let expected = [
-        "The budget is two hundred and fifty thousand dollars.": "The budget is 250,000 dollars.",
+        "The budget is two hundred and fifty thousand dollars.": "The budget is 250000 dollars.",
         "We have one hundred people and two hundred chairs.": "We have 100 people and 200 chairs.",
         "one hundred or two hundred": "100 or 200",
         "one hundred and two hundred": "100 and 200",
-        "from zero to twenty seven": "from zero to 27",
+        "from zero to twenty seven": "from 0 to 27",
+        "two or three": "2 or 3",
+        "give me five minutes": "give me 5 minutes",
+        "nineteen ninety nine": "1999",
+        "call five five five now": "call 555 now",
+        "PR number one": "PR number 1",
+        "twenty one twenty second": "21 twenty second",
+        "issue forty four thousand nine hundred eight": "issue 44908",
         "twenty-seven": "27",
         "Two hundred people came.": "200 people came.",
         "It cost two hundred.": "It cost 200.",
         "I waited ten minutes": "I waited 10 minutes",
         "one thousand two hundred": "1200",
         "two thousand twenty six": "2026",
-        "one million two hundred thousand": "1,200,000",
+        "one million two hundred thousand": "1200000",
         "five million": "5 million",
         "two point five million": "2.5 million",
         "The value is three point five.": "The value is 3.5.",
@@ -367,26 +374,85 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         "twenty, thirty": "20, 30",
         "I have one lakh followers.": "I have 1 lakh followers.",
         "The flat costs fifty lakhs.": "The flat costs 50 lakhs.",
-        "We raised two lakh fifty thousand rupees.": "We raised 2,50,000 rupees.",
-        "The budget is one crore twenty lakh.": "The budget is 1,20,00,000.",
+        "We raised two lakh fifty thousand rupees.": "We raised 250000 rupees.",
+        "The budget is one crore twenty lakh.": "The budget is 12000000.",
         "Revenue was two point five crore.": "Revenue was 2.5 crore.",
         "It costs twelve hundred dollars.": "It costs 1200 dollars.",
         "twenty five hundred": "2500",
-        "I have over ten thousand hundred followers.": "I have over 10,000 hundred followers.",
-        "Ten thousand one lakh.": "10,000 1 lakh.",
+        "I have over ten thousand hundred followers.": "I have over 10000 hundred followers.",
+        "Ten thousand one lakh.": "10000 1 lakh.",
         "five thousand million": "5000 million",
     ]
     for (spoken, written) in expected {
         #expect(VoiceCommands.apply(spoken) == written)
     }
     let unchanged = [
-        "one of them", "no one", "at one point we", "two or three", "give me five minutes", "at one point we left",
-        "a hundred times", "a thousand thanks", "what percentage of users", "nineteen ninety nine", "fifty fifty",
-        "eleven thirty", "twenty first century", "call 5 5 5 now",
+        "one of them", "no one", "at one point we", "at one point we left",
+        "a hundred times", "a thousand thanks", "what percentage of users", "twenty first century", "call 5 5 5 now",
     ]
     for text in unchanged {
         #expect(VoiceCommands.apply(text) == text)
     }
+}
+
+@Test func spokenNumbersBecomeDigitsInOtherLanguages() {
+    let expected: [(String, String?, String)] = [
+        ("PR número quatro mil quinhentos e sessenta e sete", "pt", "PR número 4567"),
+        ("PR número quatro cinco seis sete", nil, "PR número 4567"),
+        ("Na PR quarenta e quatro noventa e oito.", "pt", "Na PR 4498."),
+        ("Aposta o número seis também.", nil, "Aposta o número 6 também."),
+        ("depois merja quatro mil quatrocentos setenta e nove", "pt", "depois merja 4479"),
+        ("quatro mil oitocentos novecentos e oito", "pt", "4800 908"),
+        ("Cinco oito onze foi merjada.", "pt", "5811 foi merjada."),
+        ("Eu tenho dois gatos e três cachorros", "pt", "Eu tenho 2 gatos e 3 cachorros"),
+        ("dois e três", "pt", "2 e 3"),
+        ("um milhão de reais", "pt", "1 milhão de reais"),
+        ("PR número um", "pt", "PR número 1"),
+        ("Na PR quarenta e quatro mil novecentos e oito.", "pt", "Na PR 44908."),
+        ("dois ponto cinco", "pt", "2.5"),
+        ("Subiu três vírgula cinco por cento.", "pt", "Subiu 3,5%."),
+        ("versão zero ponto um ponto seis", "pt", "versão 0.1.6"),
+        ("mil duzentos ponto trinta e quatro", "pt", "1200.34"),
+        ("ponto de vista", "pt", "ponto de vista"),
+        ("tengo dos gatos y tres perros", "es", "tengo 2 gatos y 3 perros"),
+        ("j'ai deux chats et trois chiens", "fr", "j'ai 2 chats et 3 chiens"),
+        ("ich habe zwei Katzen", "de", "ich habe 2 Katzen"),
+        ("O orçamento é duzentos e cinquenta mil reais.", "pt", "O orçamento é 250000 reais."),
+        ("Esperei dez minutos", "pt", "Esperei 10 minutos"),
+        ("mil e quinhentos", "pt", "1500"),
+        ("Em dois mil e vinte e seis,", "pt", "Em 2026,"),
+        ("cento e vinte", "pt", "120"),
+        ("duzentas e quatorze pessoas", "pt", "214 pessoas"),
+        ("cinco milhões", "pt", "5 milhões"),
+        ("Cresceu dez por cento.", "pt", "Cresceu 10%."),
+        ("vinte e cinco, trinta", "pt", "25, 30"),
+        ("PR número cuatro mil quinientos sesenta y siete", "es", "PR número 4567"),
+        ("doscientos cincuenta mil euros", "es", "250000 euros"),
+        ("le ticket numéro quatre cinq six sept", "fr", "le ticket numéro 4567"),
+        ("quatre mille cinq cent soixante-sept", "fr", "4567"),
+        ("PR Nummer viertausendfünfhundertsiebenundsechzig", "de", "PR Nummer 4567"),
+        ("il numero quattromilacinquecentosessantasette", "it", "il numero 4567"),
+        ("четыре тысячи пятьсот шестьдесят семь", "ru", "4567"),
+        ("dwa tysiące dwadzieścia sześć", "pl", "2026"),
+    ]
+    for (spoken, language, written) in expected {
+        #expect(LocalizedSpokenNumbers.apply(spoken, language: language) == written)
+    }
+    let unchanged: [(String, String?)] = [
+        ("uma coisa", "pt"), ("Ele é um dos melhores", "pt"), ("Mil desculpas", "pt"), ("PR5809", "pt"), ("a PR tem cheques", "pt"),
+        ("una vez", "es"), ("un jour", "fr"), ("espera um segundo", "pt"), ("vou para o quarto", "pt"), ("un segundo por favor", "es"),
+        ("die zweite Version", "de"), ("le dixième étage", "fr"), ("secondo me è giusto", "it"), ("die Entwicklung", "de"),
+        ("twenty five people", "en"), ("I have twenty five people here today", nil),
+    ]
+    for (text, language) in unchanged {
+        #expect(LocalizedSpokenNumbers.apply(text, language: language) == text)
+    }
+    #expect(VoiceCommands.apply("twenty seven people", digits: false) == "twenty seven people")
+    #expect(VoiceCommands.apply("PR number four five six seven") == "PR number 4567")
+    #expect(VoiceCommands.apply("queue the PR number four eight.") == "queue the PR number 48.")
+    #expect(VoiceCommands.apply("ticket four thousand five hundred sixty seven") == "ticket 4567")
+    #expect(VoiceCommands.apply("issue zero one") == "issue 01")
+    #expect(try! JSONDecoder().decode(AppSettings.self, from: jsonDroppingKey(AppSettings(), "writesNumbersAsDigits")).writesNumbersAsDigits)
 }
 
 @Test func voiceCommandsWriteSpokenSymbols() {
