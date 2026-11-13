@@ -154,3 +154,15 @@ import Testing
     #expect(model.settings.formatShortcut == nil)
     try other.register(f16)
 }
+
+@Test func anEmailEditMayAddTheGreetingAndSignOffItsReferencesUse() {
+    let spoken = "can we move the review to Thursday afternoon"
+    let email = DictationFormat(category: .email, examples: ["Hey team,\nThe deck is ready.\nBest,\nSam"])
+    let reply = "Hey team,\n\nCan we move the review to Thursday afternoon?\n\nBest,\nSam"
+
+    #expect(TranscriptPolisher.accepted(reply, for: spoken) == nil)
+    #expect(TranscriptPolisher.accepted(reply, for: spoken, adding: email.addableLines, words: email.addableWords) == reply)
+    #expect(TranscriptPolisher.accepted("Hey team,\n\nCan we move the review to Thursday afternoon? The budget doubled.\n\nBest,\nSam", for: spoken,
+                                        adding: email.addableLines, words: email.addableWords) == nil)
+    #expect(DictationFormat(category: .work, examples: ["Hey team,\nok"]).addableWords == 0)
+}

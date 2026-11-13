@@ -37,6 +37,22 @@ public struct DictationFormat: Equatable, Sendable {
     ]
 
     public var rules: String? { Self.registry[category] }
+
+    /// Unspoken lines the rules let an edit add: an email's greeting and the sign-off lines its style references open and end with.
+    var addableLines: [String] {
+        guard category == .email else { return [] }
+        let lines = examples.map { $0.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+        return ["Hi,"] + lines.flatMap { Array($0.prefix(1)) + Array($0.suffix(2)) }
+    }
+
+    /// How many unspoken words those lines may add: the longest greeting plus the longest two-line sign-off.
+    var addableWords: Int {
+        guard category == .email else { return 0 }
+        let lines = examples.map { $0.split(whereSeparator: \.isNewline).map { $0.split(whereSeparator: \.isWhitespace).count }.filter { $0 > 0 } }
+        let greeting = max(1, lines.compactMap(\.first).max() ?? 0)
+        let signOff = lines.map { $0.suffix(2).reduce(0, +) }.max() ?? 0
+        return greeting + signOff
+    }
 }
 
 extension AppCategory: Codable, CodingKeyRepresentable {

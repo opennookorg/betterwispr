@@ -434,7 +434,7 @@ final class AppModel {
 
     private func armCancelShortcut(_ busy: Bool) {
         if busy {
-            cancelShortcut.register(keyCode: UInt32(kVK_Escape), modifiers: settings.shortcut.cancelModifiers)
+            cancelShortcut.register(keyCode: UInt32(kVK_Escape), modifiers: activeShortcut.cancelModifiers)
             if let custom = settings.cancelShortcut { try? customCancelShortcut.register(custom) }
         } else {
             cancelShortcut.unregister()
@@ -505,7 +505,7 @@ final class AppModel {
     }
 
     /// Shift held while starting or finishing a dictation pastes it without sending.
-    private var shiftHeld: Bool { !settings.shortcut.usesShift && NSEvent.modifierFlags.contains(.shift) }
+    private var shiftHeld: Bool { !activeShortcut.usesShift && NSEvent.modifierFlags.contains(.shift) }
 
     /// Waits for the paste and any takeover by a new dictation, then posts the key the target still asks for, if any.
     func pressSendKey(in app: NSRunningApplication, after delay: Duration, using paste: FocusedAppIntegration,
@@ -1016,6 +1016,7 @@ final class AppModel {
                 if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 let format = recording.format.flatMap { self.formatIfPossible($0, english: english, settings: writingSettings) }
+                var styledFormat: DictationFormat?
                 if let format {
                     self.statusMessage = L10n.tr("Formatting with %@…", String(writingSettings.localizedNotesModelName))
                     let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
@@ -1025,6 +1026,8 @@ final class AppModel {
                     guard self.generation == token else { return }
                     if formatted == nil {
                         ToastWindow.shared.show(Toast(title: L10n.tr("Pasted without formatting"), message: L10n.tr("%@ didn’t return a usable edit, so the cleaned dictation was used.", String(writingSettings.localizedNotesModelName)), systemImage: "text.badge.xmark"))
+                    } else {
+                        styledFormat = format
                     }
                     spoken = StyleFormatter.apply(tone, to: formatted ?? spoken)
                 } else if english, let email = EmailDictation.compose(spoken) {
@@ -1094,12 +1097,13 @@ final class AppModel {
                     switch result {
                     case .pasted:
                         self.phase = .idle
-                        let learnsStyle = format?.rules != nil && writingSettings.saveHistory
+                        let styleFormat = styledFormat
+                        let learnsStyle = styleFormat?.rules != nil && writingSettings.saveHistory
                         let watchCorrections = { [weak self] in
                             guard writingSettings.learnCorrections || learnsStyle, let app = recording.target else { return }
                             self?.correctionWatcher.watch(text, in: app) { [weak self] original, edited in
                                 if writingSettings.learnCorrections { self?.learn(from: original, to: edited) }
-                                if learnsStyle, let format { self?.rememberStyle(edited, replacing: original, for: format.category) }
+                                if learnsStyle, let styleFormat { self?.rememberStyle(edited, replacing: original, for: styleFormat.category) }
                             }
                         }
                         if let returnDelay, let app = recording.target {

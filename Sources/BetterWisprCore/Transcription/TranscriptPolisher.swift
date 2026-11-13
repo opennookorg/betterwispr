@@ -161,7 +161,7 @@ public enum TranscriptPolisher {
         for attempt in 1...attempts {
             let outcome = await respond(within: timeout) { try await editor.respond(to: request) }
             if case .reply(let reply) = outcome {
-                guard let edited = accepted(filtered(reply), for: text) else { return nil }
+                guard let edited = accepted(filtered(reply), for: text, adding: format?.addableLines ?? [], words: format?.addableWords ?? 0) else { return nil }
                 guard let formatter else { return listMarkerCount(in: edited) == listMarkerCount(in: text) ? edited : nil }
                 guard extra.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, format?.rules == nil else { return edited }
                 guard !text.contains(where: \.isNewline) else { return keepingDictatedBreaks(edited, of: text) }
@@ -254,7 +254,7 @@ public enum TranscriptPolisher {
         if let format, let rules = format.rules {
             sections.append("""
                 # Format
-                Shape <TRANSCRIPT> for the app it will be pasted into. Follow these rules instead of writing general-purpose text, together with all the rules above. Never add facts, names, dates, numbers or details that were not spoken:
+                Shape <TRANSCRIPT> for the app it will be pasted into. Follow these rules instead of writing general-purpose text, together with the rules above; where they differ, these rules win. Never add facts, names, dates, numbers or details that were not spoken:
                 <FORMAT_RULES>
                 \(rules)
                 </FORMAT_RULES>
@@ -337,8 +337,8 @@ public enum TranscriptPolisher {
         return zip(breaks, lines.dropFirst()).reduce(lines[0]) { $0 + $1.0 + $1.1 }
     }
 
-    /// Rejects replies that answer the dictation, add new content or change its length too much to be an edit.
-    static func accepted(_ reply: String, for text: String) -> String? {
+    /// Rejects replies that answer the dictation, add new content or change its length too much to be an edit, besides up to `words` words from the `adding` lines.
+    static func accepted(_ reply: String, for text: String, adding lines: [String] = [], words extra: Int = 0) -> String? {
         var edited = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         if edited.count > 1, let first = edited.first, let last = edited.last,
            "\"“".contains(first), "\"”".contains(last), !text.hasPrefix(String(first)) {
@@ -347,9 +347,9 @@ public enum TranscriptPolisher {
         let words = withoutListMarkers(edited)
         let before = text.split(whereSeparator: \.isWhitespace).count
         let after = words.split(whereSeparator: \.isWhitespace).count
-        guard after >= max(1, before * 2 / 5), after <= before + max(2, before / 5) else { return nil }
+        guard after >= max(1, before * 2 / 5), after <= before + max(2, before / 5) + extra else { return nil }
         guard !text.contains("?") || edited.contains("?") else { return nil }
-        let said = Set(CorrectionLearner.tokenize(text).map { $0.lowercased() })
+        let said = Set(CorrectionLearner.tokenize(([text] + lines).joined(separator: "\n")).map { $0.lowercased() })
         let meaningful = CorrectionLearner.tokenize(words).map { $0.lowercased() }.filter { $0.count > 3 || $0.contains(where: \.isNumber) }
         guard meaningful.filter({ !said.contains($0) }).count * 4 <= meaningful.count else { return nil }
         return edited
