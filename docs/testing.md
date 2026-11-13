@@ -121,6 +121,28 @@ Still manual:
   scrolls a long list. The dictation is transcribed, and the log shows
   "Main thread lag" for it rather than "Dictation failed".
 
+## Interfaces with more than two inputs, 2026-11-13
+
+Issue #71 reported "No microphone input is available" with a Focusrite Scarlett
+for both Automatic and the explicit device. `AVAudioFormat` returns nil for a
+float format with more than two channels and no channel layout, which this Mac
+confirmed for 3, 4 and 18 channels, and the capture path turned that into the
+error. Capture now asks the Audio Queue for at most the first two channels.
+`microphoneCaptureRecordsAtMostTheFirstTwoInputsOfAnInterface` covers the
+format. No interface with more than two inputs was available, so the Audio
+Queue's channel reduction has not been exercised on hardware.
+
+Still manual:
+
+- [ ] With a Scarlett or another interface with more than two inputs, dictate
+  with a microphone on input 1, then on input 2, with Automatic and with the
+  interface chosen. Both are transcribed, and the log shows
+  "Started input queue: ... channels=2".
+- [ ] With a Scarlett 4th gen, play audio on the Mac while dictating. The
+  loopback audio is not transcribed.
+- [ ] Dictate once with the built-in microphone and once with a 2-input
+  interface. Both behave as before.
+
 ## Send to Claude check, 2026-10-22
 
 The original contributor reported manual checks on macOS 26. During PR review,
