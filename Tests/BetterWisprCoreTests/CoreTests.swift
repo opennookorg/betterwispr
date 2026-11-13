@@ -85,7 +85,35 @@ import Testing
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     toggled.cancelShortcut = DictationShortcut(keyCode: 53, modifiers: .control, key: "Esc")
     toggled.selectedTextShortcut = DictationShortcut(keyCode: 8, modifiers: [.control, .option], key: "C")
+    toggled.capsulePosition = .bottomRight
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
+}
+
+@Test func savedDictationModesAndCapsulePositionsKeepTheirMeaningAndUnknownOnesFallBack() throws {
+    var settings = AppSettings()
+    settings.dictationMode = .holdOnly
+    settings.capsulePosition = .bottomLeft
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+    #expect(json["dictationMode"] as? String == "holdOnly" && json["capsulePosition"] as? String == "bottomLeft")
+    json["dictationMode"] = "hold"
+    json["capsulePosition"] = nil
+    settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(settings.dictationMode == .hold && settings.capsulePosition == .bottomCenter)
+    json["dictationMode"] = "doubleTap"
+    json["capsulePosition"] = "topLeft"
+    settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(settings.dictationMode == .hold && settings.capsulePosition == .bottomCenter)
+}
+
+@Test func onlyHoldOrTapTurnsAQuickTapIntoHandsFreeDictation() {
+    #expect(DictationMode.hold.release(afterHolding: 0.1, recording: true) == .keepListening)
+    #expect(DictationMode.hold.release(afterHolding: 0.1, recording: false) == .keepListening)
+    #expect(DictationMode.holdOnly.release(afterHolding: 0.1, recording: true) == .abandon)
+    #expect(DictationMode.holdOnly.release(afterHolding: 0.1, recording: false) == .abandon)
+    for mode in [DictationMode.hold, .holdOnly] {
+        #expect(mode.release(afterHolding: 2, recording: true) == .finish)
+        #expect(mode.release(afterHolding: 2, recording: false) == .abandon)
+    }
 }
 
 @Test func pickedDictationSoundsSaveByCueAndOtherCuesKeepTheirDefault() throws {

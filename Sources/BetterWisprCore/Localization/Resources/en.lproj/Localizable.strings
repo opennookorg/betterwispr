@@ -1133,3 +1133,12 @@
 "Same as meeting" = "Same as meeting";
 "Expanded" = "Expanded";
 "Collapsed" = "Collapsed";
+"Hold only" = "Hold only";
+"Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation." = "Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation.";
+"Capsule position" = "Capsule position";
+"Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it." = "Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it.";
+"Bottom left" = "Bottom left";
+"Bottom right" = "Bottom right";
+"Capsule hidden" = "Capsule hidden";
+"Turn on Floating recording capsule in Settings to bring it back. It still appears while you dictate." = "Turn on Floating recording capsule in Settings to bring it back. It still appears while you dictate.";
+"Hide capsule" = "Hide capsule";

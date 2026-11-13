@@ -125,7 +125,7 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label(model.settings.dictationMode == .hold
+            Label(model.settings.dictationMode != .toggle
                 ? L10n.tr("Hold %@ to start dictating", shortcut)
                 : L10n.tr("Press %@ to start dictating", shortcut), systemImage: "keyboard")
             Label(L10n.tr("Built-in models keep your audio on this Mac"), systemImage: "lock.fill")
@@ -283,7 +283,7 @@ struct OnboardingView: View {
     private var practiceText: String {
         if !model.partialTranscript.isEmpty { return model.partialTranscript }
         if model.isBusy { return model.statusMessage }
-        if model.settings.dictationMode == .hold { return L10n.tr("Hold %@, say something, then let go.", String(shortcut)) }
+        if model.settings.dictationMode != .toggle { return L10n.tr("Hold %@, say something, then let go.", String(shortcut)) }
         return L10n.tr("Press %@, say something, then press it again.", String(shortcut))
     }
 

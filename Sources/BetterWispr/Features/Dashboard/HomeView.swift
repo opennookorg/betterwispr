@@ -77,7 +77,7 @@ struct HomeView: View {
                         .font(.headline)
                     if model.settings.saveHistory {
                         ShortcutSentence(
-                            format: model.settings.dictationMode == .hold
+                            format: model.settings.dictationMode != .toggle
                                 ? L10n.tr("Hold %@ in any app and your words will show up here.")
                                 : L10n.tr("Press %@ in any app and your words will show up here."),
                             shortcut: model.settings.shortcut)
@@ -196,7 +196,7 @@ private struct DictationPanel: View {
                 .foregroundStyle(.secondary)
         } else {
             ShortcutSentence(
-                format: model.settings.dictationMode == .hold
+                format: model.settings.dictationMode != .toggle
                     ? L10n.tr("Hold %@ in any app and start talking.")
                     : L10n.tr("Press %@ in any app and start talking."),
                 shortcut: model.settings.shortcut, spacing: 5)
