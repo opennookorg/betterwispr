@@ -79,6 +79,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var notesCLI: NotesCLI?
     public var claudeNotesModel: String = ""
     public var codexNotesModel: String = ""
+    /// Lets Claude Code write meeting notes with any sign-in, such as an API key or a gateway; Ask, cleanup and review always need a Claude subscription.
+    public var claudeCodeAnySignIn: Bool = false
+    /// The Claude Code destination the user confirmed; meeting notes stop and ask again when it no longer matches.
+    public var claudeCodeConfirmedDestination: String?
     public var language: String = "auto"
     /// Nil keeps Chinese in the script the speech model wrote.
     public var chineseScript: ChineseScript?
@@ -87,7 +91,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var autoPaste: Bool = true
     /// Presses Return after pasting into a recognized Claude prompt; see `ClaudePrompt`.
     public var sendToClaude: Bool = false
-    /// Milliseconds before Return, during which another dictation can add more; nil uses `ClaudePrompt.defaultDelay`.
+    /// Apps the user chose a keystroke for, posted after pasting whatever the focused field is; see `SendAfterPaste`.
+    public var sendRules: [AppSendRule] = []
+    /// Milliseconds before the send keystroke, during which another dictation can add more; nil uses `ClaudePrompt.defaultDelay`.
     public var sendDelayMilliseconds: Int?
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
@@ -108,6 +114,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
     public var pauseMediaWhileDictating: Bool = false
+    /// Silences other apps while a dictation records, unless a known call app or a browser is using the microphone.
+    public var muteOtherAppsWhileDictating: Bool = false
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
     /// Names a meeting note after the Calendar event under way when recording starts and lists its invitees.
@@ -199,6 +207,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public func tone(for context: StyleContext) -> StyleTone { styles[context] ?? .formal }
 
+    /// Whether any app gets a keystroke after pasting, through Send to Claude or a rule the user wrote.
+    public var sendsAfterPaste: Bool { sendToClaude || sendRules.contains(where: \.isEnabled) }
+
     public var sendDelay: Duration { .milliseconds(min(max(sendDelayMilliseconds ?? ClaudePrompt.defaultDelay, 0), 5_000)) }
     public func soundName(for cue: DictationSound) -> String { sounds[cue] ?? cue.defaultSoundName }
 
@@ -207,6 +218,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public mutating func setCLIModel(_ model: String, for cli: NotesCLI) {
         if cli == .claudeCode { claudeNotesModel = model } else { codexNotesModel = model }
     }
+
+    public func allowsAnySignIn(_ cli: NotesCLI) -> Bool { cli == .claudeCode && claudeCodeAnySignIn }
 
     public var notesModelName: String {
         switch notesSelection {
@@ -227,11 +240,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
         notesCLI = try container.decodeIfPresent(NotesCLI.self, forKey: .notesCLI)
         claudeNotesModel = try container.decodeIfPresent(String.self, forKey: .claudeNotesModel) ?? ""
         codexNotesModel = try container.decodeIfPresent(String.self, forKey: .codexNotesModel) ?? ""
+        claudeCodeAnySignIn = try container.decodeIfPresent(Bool.self, forKey: .claudeCodeAnySignIn) ?? false
+        claudeCodeConfirmedDestination = try? container.decodeIfPresent(String.self, forKey: .claudeCodeConfirmedDestination)
         language = try container.decode(String.self, forKey: .language)
         chineseScript = try container.decodeIfPresent(ChineseScript.self, forKey: .chineseScript)
         dictationLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .dictationLanguages) ?? []
         autoPaste = try container.decode(Bool.self, forKey: .autoPaste)
         sendToClaude = try container.decodeIfPresent(Bool.self, forKey: .sendToClaude) ?? false
+        sendRules = try container.decodeIfPresent([AppSendRule].self, forKey: .sendRules) ?? []
         sendDelayMilliseconds = try container.decodeIfPresent(Int.self, forKey: .sendDelayMilliseconds)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
@@ -246,6 +262,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
         pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
+        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? false
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         useCalendar = try container.decodeIfPresent(Bool.self, forKey: .useCalendar) ?? false
         excludedCalendarIDs = try container.decodeIfPresent(Set<String>.self, forKey: .excludedCalendarIDs) ?? []

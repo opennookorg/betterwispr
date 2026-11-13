@@ -19,6 +19,12 @@ public enum ClaudePrompt {
     @MainActor
     public static func prepare(_ app: NSRunningApplication) {
         guard [claudeDesktop, vsCode].contains(app.bundleIdentifier) else { return }
+        enableManualAccessibility(app)
+    }
+
+    /// Asks an app to build its full accessibility tree. Apps that don't honour the attribute ignore it.
+    @MainActor
+    public static func enableManualAccessibility(_ app: NSRunningApplication) {
         AXUIElementSetAttributeValue(element(app.processIdentifier), "AXManualAccessibility" as CFString, kCFBooleanTrue)
     }
 

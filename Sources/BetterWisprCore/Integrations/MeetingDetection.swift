@@ -54,6 +54,11 @@ public enum MeetingPlatform: String, CaseIterable, Sendable {
             .max { $0.count < $1.count }
     }
 
+    /// Whether a process using the microphone is a known call app or a browser; browsers count without a title check, because titles need Accessibility and a wrong guess would silence a call.
+    public static func mayBeInCall(recording bundleIDs: [String]) -> Bool {
+        bundleIDs.contains { app(recording: $0) != nil }
+    }
+
     /// The meeting service a browser window shows, judged from a title such as "Meet - Daily Scrum - Google Chrome".
     static func page(titled title: String) -> MeetingPlatform? {
         if title.hasPrefix("Meet - ") || title.hasPrefix("Meet – ") { return .googleMeet }

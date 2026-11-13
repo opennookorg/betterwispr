@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 
 public enum OutputResult: Sendable, Equatable {
     case copied
@@ -25,7 +26,6 @@ public struct ClipboardIntegration: TextOutputIntegration {
 @MainActor
 public struct FocusedAppIntegration: TextOutputIntegration {
     private static var pendingRestore: (contents: (items: [NSPasteboardItem], changeCount: Int), task: Task<Void, Never>)?
-    private static let returnKeyCode: CGKeyCode = 0x24
     private static let screenSharing = "com.apple.ScreenSharing"
     public let keepsCopy: Bool
     private let expectedFocus: AXUIElement?
@@ -77,24 +77,56 @@ public struct FocusedAppIntegration: TextOutputIntegration {
         return .pasted(into: target.localizedName ?? "your app")
     }
 
-    /// Posts a bare Return to `target` only while it is still the frontmost app with the field the dictation started in,
-    /// so a pasted chat or agent prompt submits.
-    public func pressReturn(in target: NSRunningApplication) -> Bool {
-        guard let expectedFocus, !Task.isCancelled, !target.isTerminated, AXIsProcessTrusted(),
+    /// Posts `keystroke` to `target` only while it is still the frontmost app with the field the dictation started in.
+    public func press(_ keystroke: SendKeystroke, in target: NSRunningApplication, requiringRecordedFocus: Bool) -> Bool {
+        guard !Task.isCancelled, !target.isTerminated, AXIsProcessTrusted(),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-              Self.focusMatches(expectedFocus, current: Self.focusedElement(in: target)),
-              let source = CGEventSource(stateID: .combinedSessionState),
-              let down = CGEvent(keyboardEventSource: source, virtualKey: Self.returnKeyCode, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: Self.returnKeyCode, keyDown: false) else { return false }
-        // Clear modifiers still held from the shortcut, which would turn Return into Option- or Shift-Return.
-        down.flags = []
-        up.flags = []
-        down.postToPid(target.processIdentifier)
-        up.postToPid(target.processIdentifier)
+              Self.sendFocusMatches(expectedFocus, current: Self.focusedElement(in: target), requiringRecorded: requiringRecordedFocus),
+              let events = Self.keystrokeEvents(for: keystroke) else { return false }
+        for event in events { event.postToPid(target.processIdentifier) }
         return true
     }
 
     static let leftCommandDeviceFlag = CGEventFlags(rawValue: 0x8)
+
+    /// The device-dependent bits a real keyboard sets alongside each modifier mask, for the left-hand key.
+    static let modifierKeys: [(modifier: ShortcutModifiers, virtualKey: CGKeyCode, flags: CGEventFlags)] = [
+        (.control, CGKeyCode(kVK_Control), [.maskControl, CGEventFlags(rawValue: 0x1)]),
+        (.option, CGKeyCode(kVK_Option), [.maskAlternate, CGEventFlags(rawValue: 0x20)]),
+        (.shift, CGKeyCode(kVK_Shift), [.maskShift, CGEventFlags(rawValue: 0x2)]),
+        (.command, CGKeyCode(kVK_Command), [.maskCommand, leftCommandDeviceFlag]),
+    ]
+
+    /// A keystroke as a physical keyboard sends it: each modifier pressed as its own flags-changed event, the key, then the
+    /// modifiers released. Every event carries explicit flags, so modifiers still held from the dictation shortcut can't
+    /// turn a bare Return into Option- or Shift-Return. For ⌘V this produces exactly `pasteKeystroke`.
+    static func keystrokeEvents(for keystroke: SendKeystroke) -> [CGEvent]? {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else { return nil }
+        let held = modifierKeys.filter { keystroke.modifiers.contains($0.modifier) }
+        var flags: CGEventFlags = []
+        var events: [CGEvent] = []
+        for modifier in held {
+            flags.formUnion(modifier.flags)
+            guard let press = CGEvent(keyboardEventSource: source, virtualKey: modifier.virtualKey, keyDown: true) else { return nil }
+            press.type = .flagsChanged
+            press.flags = flags
+            events.append(press)
+        }
+        guard let keyCode = CGKeyCode(exactly: keystroke.keyCode),
+              let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else { return nil }
+        down.flags = flags
+        up.flags = flags
+        events += [down, up]
+        for modifier in held.reversed() {
+            flags.subtract(modifier.flags)
+            guard let release = CGEvent(keyboardEventSource: source, virtualKey: modifier.virtualKey, keyDown: false) else { return nil }
+            release.type = .flagsChanged
+            release.flags = flags
+            events.append(release)
+        }
+        return events
+    }
 
     /// Presses Screen Sharing's Send Clipboard, turning Use Shared Clipboard off around it because that setting disables the item.
     static func sendClipboard(through app: NSRunningApplication, while isCurrent: () -> Bool) async -> Bool {
@@ -163,6 +195,11 @@ public struct FocusedAppIntegration: TextOutputIntegration {
     static func focusMatches(_ expected: AXUIElement?, current: AXUIElement?) -> Bool {
         guard let expected else { return true }
         return current.map { CFEqual(expected, $0) } ?? false
+    }
+
+    /// Whether a send may fire: Send to Claude needs a recorded field to compare, while a rule also accepts an app that exposed none.
+    static func sendFocusMatches(_ expected: AXUIElement?, current: AXUIElement?, requiringRecorded: Bool) -> Bool {
+        (expected != nil || !requiringRecorded) && focusMatches(expected, current: current)
     }
 
     static func clipboardItems(_ pasteboard: NSPasteboard, pending: (items: [NSPasteboardItem], changeCount: Int)?) -> [NSPasteboardItem] {

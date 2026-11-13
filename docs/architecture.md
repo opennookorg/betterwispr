@@ -172,6 +172,59 @@ running process so a closed app is never launched, and never prompt during
 dictation; consent is asked once when the setting turns on. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
 
+"Mute other apps while dictating" (`AppSettings.muteOtherAppsWhileDictating`, off
+by default, shown on macOS 14.2 and later) is a separate setting. Browsers and
+other players can't be asked whether they play without private MediaRemote APIs,
+which macOS 15.4 closed to other apps, and a play/pause media key could start
+something the user had paused. So `MediaPauser` starts `SystemAudioMute`, a
+private Core Audio process tap with `muteBehavior = .mutedWhenTapped` that excludes
+BetterWispr's own process, and its private aggregate device reads and discards
+what it hears. Every other app keeps playing silently and the capsule sounds stay
+audible. The output device's volume and mute are never read or changed, so a user
+who muted their Mac stays muted.
+
+The mute starts only when the phase enters recording, so other apps stay audible
+during a long model load, and ends when the phase leaves recording for any reason:
+stop, the hard stop, cancel, failure, discard or quit. The long dictation question card comes
+after recording, so nothing is muted while it waits. A dictation that fails while
+preparing, such as a denied permission or a model that won't load, never mutes. A
+mute runs on the `MediaPauser` queue, not in the recording path, so a failure can't
+stop the dictation: it is logged and shown as a toast, and other apps stay audible.
+
+The aggregate device sets `kAudioAggregateDeviceTapAutoStartKey`, and Apple's header
+says `AudioDeviceStart` then waits until a tapped app receives its first audio. With
+nothing playing that can last the whole dictation and beyond, so the mute path runs
+it off the main actor (`SystemAudioTap.startInBackground`) and `SystemAudioMute.mute`
+returns without waiting. The `MediaPauser` queue, resuming Music and quitting never
+wait for a start. An unmute that arrives mid-start only clears `wanted`, and the tap
+is stopped as soon as the start returns, so no Core Audio teardown runs against a
+device that is still starting. Until then nothing is playing and nothing is muted.
+The first sound after that wakes the tap, so it may be withheld for a moment before
+the tap stops. The next dictation reuses a start still in progress, so at most one is
+ever waiting. Meeting notes still use the synchronous `start`.
+macOS may report no error when System Audio Recording is denied, in which case
+nothing is muted and nothing is shown. That case is not exercised.
+
+Muting is skipped while meeting notes record, or when `MicrophoneActivity` reports
+a known call app or a browser using the microphone as the recording starts.
+Browsers count without a window title check, so a browser using the microphone for
+something else also stays audible. The check runs once and has limits: a call in an
+app `MeetingPlatform` doesn't know, a call where the app has released the
+microphone, and a call that starts during the dictation all go silent until the
+recording stops. `MeetingDetector.meeting` isn't used because it only holds the
+prompt on offer, which clears on dismissal and expiry.
+
+Turning the setting on starts an unmuted system audio tap once, so macOS asks for
+System Audio Recording then rather than during a dictation.
+
+If BetterWispr crashes or is force quit while muting, it can't remove the tap, and
+Apple doesn't document that Core Audio does. `.mutedWhenTapped` is chosen because
+Apple's header says audio is withheld only for the duration of read activity on the
+tap, and reads stop with the process, so other apps should become audible without
+a relaunch. This is not verified: see the crash check in `docs/testing.md`. Nothing
+is persisted or restored at the next launch, because BetterWispr changes no saved
+system state and a new process can't see the private tap of the old one.
+
 With "Send to Claude" on (`AppSettings.sendToClaude`, off by default), a pasted
 dictation is followed by a Return key press when `ClaudePrompt` recognizes the
 focused field as a Claude prompt. Anything it does not recognize is only pasted,
@@ -192,18 +245,53 @@ question it is asking, such as a permission prompt; the setting's caption says
 so. VS Code and Claude Desktop expose these fields only after BetterWispr sets
 `AXManualAccessibility`, which can make VS Code offer its screen reader mode.
 
-The field is checked when recording starts, at most once a second while it
-continues, so the capsule shows ↵ only when the dictation will be sent, and
-again when it ends. Shift held at either end, or Shift with the dictation
-shortcut (a second Carbon hot key registered only while the setting is on),
-pastes without sending. After the paste the phase becomes `.sending` for the
-chosen wait (one second by default), during which Escape or Don't send holds the
-Return back, and starting another dictation takes over the send: its text is
-pasted after the first with a space (`TextJoin`) and its own Return sends both.
-Return is pressed only if the field is still a Claude prompt and the target app
-and focused element are unchanged, as a bare key press with modifier flags
-cleared. Otherwise the capsule says "Pasted, not sent". Sleep, quitting and
-turning the setting off cancel a pending Return. Starting selected-text cleanup also holds back a pending Return. An explicit cancel or cleanup shortcut takes priority over the optional Shift variant of the dictation shortcut.
+Send keys (`AppSettings.sendRules`, empty by default) cover the apps
+`ClaudePrompt` cannot recognize. A rule pairs a bundle identifier with a
+`SendKeystroke` the user records in Settings > Send keys, and
+`SendAfterPaste.keystroke(for:settings:)` resolves what a pasted dictation gets:
+an enabled rule for the frontmost app, else Return when `ClaudePrompt` recognizes
+the field, else nothing. A rule wins over the built-in detection because it names
+its app, and unlike that detection it fires wherever the cursor is in the app:
+the setting's footer says so, since the user is trading the shell safeguard for
+reach. Rules also get the `AXManualAccessibility` nudge, without which an
+Electron target exposes no focused field to record. A rule still sends when no
+field was recorded, so only the frontmost-app check protects it then; Send to
+Claude sends only when the recorded field is still focused.
+
+A `SendKeystroke` takes a bare Return or Tab, because it is never registered as a
+hot key: only a modifier on its own and Fn fail to decode. `SendAfterPaste.refusal`
+names the keys a rule may not use: ⌘Q and ⌘W with any other modifiers, since they
+could quit the app or close its window, Delete and Forward Delete with any
+modifiers, since they would erase the dictation, and the dictation shortcut,
+including its Shift variant. For a modifier-only shortcut only the left-hand key
+clashes, because a posted modifier always comes from that key. Rules also never
+apply to `ClaudePrompt.scriptableTerminals`, where a key could run a shell
+command. The recorder and the picker enforce these, and
+`SendAfterPaste.rule(for:settings:)` enforces them again before sending, because a
+saved rule can be edited by hand or clash with a shortcut changed later. Such a
+rule stays saved, its row says why it does nothing, and the app falls through to
+Send to Claude. `AppModel.beginKeyCapture` lets one recorder capture at a time, and
+a recorder that lost the capture leaves the shortcuts suspended for its successor.
+`FocusedAppIntegration.keystrokeEvents(for:)` posts it the way a keyboard does:
+one `.flagsChanged` event per modifier with the left-hand key's device-dependent
+bit, the key down and up, then the modifiers released, every event carrying
+explicit flags so modifiers still held from the dictation shortcut cannot change
+it. For ⌘V this is exactly `pasteKeystroke`, which a test asserts.
+
+The target is checked when recording starts, at most once a second while it
+continues, so the capsule shows ↵ (or a keyboard glyph for a recorded keystroke)
+only when the dictation will be sent, and again when it ends. Shift held at
+either end, or Shift with the dictation shortcut (a second Carbon hot key
+registered only while something would send), pastes without sending. After the
+paste the phase becomes `.sending` for the chosen wait (one second by default),
+during which Escape or Don't send holds the send back, and starting another
+dictation takes over the send: its text is pasted after the first with a space
+(`TextJoin`) and its own keystroke sends both. The keystroke is posted only if
+the target still asks for one and the target app and focused element are
+unchanged; focus is matched on the same terms as the paste, so an app that
+exposed no element to record still gets its send. Otherwise the capsule says
+"Pasted, not sent". Sleep, quitting, removing the rule and turning the setting
+off cancel a pending send. Starting selected-text cleanup also holds back a pending send. An explicit cancel or cleanup shortcut takes priority over the optional Shift variant of the dictation shortcut.
 
 The optional Clean up selected text shortcut (`AppSettings.selectedTextShortcut`,
 `GlobalShortcut` id 4) edits text outside a dictation and is refused while one
@@ -580,10 +668,26 @@ no request and clears a typed key. Anthropic's OpenAI compatibility ignores
 `response_format`, so notes from it rely on the prompt alone for JSON.
 
 Claude Code uses `claude --print` and its existing Claude subscription sign-in;
-Codex uses `codex exec` with ChatGPT authentication required. BetterWispr does not
-extract OAuth tokens. These CLI routes strip inherited provider/key environment
-variables, run in a private temporary directory, disable tools/customizations as
-supported by each CLI, and disable session persistence. Codex also uses read-only
+Codex uses `codex exec` with ChatGPT authentication required. Claude Code must
+report a `claude.ai` sign-in from `claude auth status`, with no custom base URL in
+its settings files. Models' "Allow any Claude Code sign-in"
+(`AppSettings.claudeCodeAnySignIn`, off by default) relaxes that for meeting notes
+only: `MeetingNotesGenerator.meetingNotesModel` is the one route that sets it, and
+`languageModel`, used by Ask, cleanup and correction review, never does.
+`ClaudeCodeDestination` builds the destination from `authMethod`, `apiProvider` and
+any `ANTHROPIC_*BASE_URL` in the `env` of Claude Code's user and managed settings
+files. Text is sent only when that label equals
+`AppSettings.claudeCodeConfirmedDestination`, checked before every request. A missing
+or corrupt stored value, an unreadable settings file or a missing `authMethod` asks
+again or refuses. Remotely managed settings and managed preferences aren't read, so
+the label is what Claude Code and those files report, not a verified destination, and
+the HTTPS and loopback rule of `SpeechConnection.validatedURL` doesn't apply to it.
+This route passes `--max-budget-usd 1.00` per request and names the destination in
+`MeetingSummary.modelName`. A long meeting takes several requests. BetterWispr
+does not extract OAuth tokens. These CLI routes strip inherited provider/key
+environment variables, though not Claude Code's own settings files, run in a private
+temporary directory, disable tools/customizations as supported by each CLI, and
+disable session persistence. Codex also uses read-only
 sandboxing. A timeout or cancellation terminates the child and removes temporary
 input/output files. Install/update and sign in to the CLIs separately. Subscription
 limits and model access remain the provider's responsibility. Models discovers

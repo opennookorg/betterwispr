@@ -139,9 +139,9 @@ struct SettingsView: View {
                     SettingToggle("Send to Claude", caption: "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt.", isOn: sendToClaude)
                         .task(id: permissionCheck) { await loadTerminals() }
                         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in permissionCheck += 1 }
-                    if model.settings.sendToClaude {
+                    if model.settings.sendsAfterPaste {
                         RowDivider()
-                        SettingRow("Wait before sending", caption: "The capsule counts down before Return. Dictate again during it to add more, and the next dictation sends both, or click Don’t send.") {
+                        SettingRow("Wait before sending", caption: "The capsule counts down before the send key. Dictate again during it to add more, and the next dictation sends both, or click Don’t send.") {
                             Picker("Wait before sending", selection: setting(\.sendDelayMilliseconds)) {
                                 ForEach(ClaudePrompt.delayChoices, id: \.self) { milliseconds in
                                     let label = milliseconds < 1_000 ? "\(milliseconds) ms" : milliseconds == 1_000 ? "1 second" : "\(milliseconds / 1_000) seconds"
@@ -152,6 +152,8 @@ struct SettingsView: View {
                             .labelsHidden()
                             .fixedSize()
                         }
+                    }
+                    if model.settings.sendToClaude {
                         ForEach(terminals, id: \.bundleID) { terminal in
                             RowDivider()
                             SettingRow(terminal.name, caption: terminal.allowed ? "Allowed to tell BetterWispr which tab is in front." : "BetterWispr asks \(terminal.name) which tab is in front, to send only where Claude Code runs. Open \(terminal.name) to allow it.") {
@@ -171,6 +173,8 @@ struct SettingsView: View {
                         SettingToggle("Notify when a word is learned", caption: "Show what was added to Vocabulary, with Undo. When off, words are still learned quietly; review them in Vocabulary.", isOn: setting(\.notifyLearnedCorrections))
                     }
                 }
+
+                SendKeysSection(model: model)
 
                 SettingsSection("App") {
                     SettingToggle("Show in Dock", caption: "When off, use the menu bar to open BetterWispr. Your dictation shortcut still works.", isOn: setting(\.showInDock))
@@ -204,6 +208,10 @@ struct SettingsView: View {
                     }
                     RowDivider()
                     SettingToggle("Pause music while dictating", caption: "Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on.", isOn: pauseMediaWhileDictating)
+                    if #available(macOS 14.2, *) {
+                        RowDivider()
+                        SettingToggle("Mute other apps while dictating", caption: "Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. macOS asks to use system audio when you turn this on. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested.", isOn: muteOtherAppsWhileDictating)
+                    }
                     RowDivider()
                     SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))
                     RowDivider()
@@ -406,6 +414,15 @@ struct SettingsView: View {
         })
     }
 
+    private var muteOtherAppsWhileDictating: Binding<Bool> {
+        Binding(get: { model.settings.muteOtherAppsWhileDictating }, set: { isOn in
+            model.settings.muteOtherAppsWhileDictating = isOn
+            model.saveSettings()
+            guard isOn, #available(macOS 14.2, *) else { return }
+            Task { await SystemAudioMute.requestPermission() }
+        })
+    }
+
     private func includes(_ calendar: CalendarInfo) -> Binding<Bool> {
         Binding(
             get: { !model.settings.excludedCalendarIDs.contains(calendar.id) },
@@ -440,6 +457,7 @@ private struct ShortcutRecorder: View {
     @State private var held: ShortcutModifiers = []
     @State private var modifierCandidate: DictationShortcut?
     @State private var feedback: String?
+    @State private var recorderID = UUID()
 
     private var isCapturing: Bool { monitor != nil }
     private var shortcut: DictationShortcut? {
@@ -488,6 +506,9 @@ private struct ShortcutRecorder: View {
         }
         .animation(.ui, value: isCapturing)
         .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
+        .onChange(of: model.capturingRecorder) { _, recorder in
+            if recorder != recorderID { stop() }
+        }
         .onDisappear(perform: stop)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
     }
@@ -521,7 +542,7 @@ private struct ShortcutRecorder: View {
         held = []
         modifierCandidate = nil
         feedback = nil
-        model.suspendShortcut()
+        model.beginKeyCapture(recorderID)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             MainActor.assumeIsolated { capture(event) }
             return nil
@@ -533,7 +554,7 @@ private struct ShortcutRecorder: View {
         NSEvent.removeMonitor(monitor)
         self.monitor = nil
         modifierCandidate = nil
-        model.registerShortcut()
+        model.endKeyCapture(recorderID)
     }
 
     private func change(_ shortcut: DictationShortcut?) {

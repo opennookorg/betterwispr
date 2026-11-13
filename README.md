@@ -25,6 +25,7 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 - **Transcribe files and links**: drop in an audio or video file or paste a video link and get a timestamped transcript with the model you choose, to copy or export as text or Markdown. Links use yt-dlp, which BetterWispr installs only when you click Install.
 - **Connected apps**: let Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. Off by default and read-only.
 - **Send to Claude**: optionally press Return after pasting, only into Claude Desktop or Claude Code in the VS Code panel, Terminal or iTerm2. Off by default.
+- **Send keys**: for any other app, add it under Settings > Send keys and record the key that submits there, such as Return, ⌘Return or Tab, and BetterWispr presses it after pasting. No rules by default. Terminal and iTerm2 aren't offered, since Send to Claude covers them.
 - **History**: raw and corrected transcripts, stored locally (can be turned off).
 - **Bring your own model**: optional Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.
 
@@ -73,6 +74,7 @@ For optional subscription transcription, see [Codex subscription setup](docs/cod
 - With Remember named voices on, voice profiles of the speakers you name live in `Voices.json` next to it (not encrypted). Forget Voices in Models deletes them, and deleting a meeting deletes the profiles named in it.
 - Audio is written to temporary files and deleted after each recording. A dictation that fails to transcribe, or is still in progress when BetterWispr quits, is kept in the `Failed Dictations` folder next to it, readable only by your macOS user, unless Save dictation history is off. It is deleted once it is transcribed, after 7 days or a shorter Keep history age limit, when more than 20 are kept or they pass 1 GB (oldest first), or when you turn Save dictation history off. The folder is left out of backups, and History lists each one under Not transcribed. When the selected speech model is an API connection, its button names where the audio will be sent.
 - Built-in models only touch the network when you explicitly download one.
+- Claude Code as a notes, Ask or cleanup provider needs a Claude subscription sign-in. For meeting notes only, you can turn on Allow any Claude Code sign-in in Models, off by default. Meeting text then goes to the destination Claude Code reports, such as an API account, a company cloud account or a gateway, and is billed there. Models shows that destination, including a custom base URL in Claude Code's settings files, and nothing is sent until you confirm it or after it changes. Ask, Medium cleanup and correction review never use this switch.
 - Send to Claude is off by default. When it is on, BetterWispr reads the list of running processes on this Mac to find Claude Code, and asks Terminal and iTerm2 which tab is in front once you allow it. Nothing is stored or sent.
 - Connected apps is off by default. When you turn it on, apps you connect read your meetings through `BetterWispr --mcp` on this Mac and send what they read to their own AI provider.
 

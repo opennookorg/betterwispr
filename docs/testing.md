@@ -166,6 +166,41 @@ verify real event delivery or terminal consent.
 - [ ] Find the shortest wait that sends a long paste in full in each app, and
   record it here.
 
+## Send keys check
+
+Per-app send keys post a recorded keystroke after pasting. Builds and tests cover
+the event sequence but not real delivery, so these need a live run.
+
+- [ ] Add an app under Settings > Send keys. Its row shows Return, and Wait before
+  sending appears even with Send to Claude off.
+- [ ] Record each kind of key and check the row's label and the capsule glyph:
+  a bare Return (↵), ⌘Return, Tab and an F-key (keyboard glyph, with the tooltip
+  naming the key). Press a modifier on its own: it beeps and nothing is recorded.
+  Press Esc: recording stops with the previous key kept.
+- [ ] With only a throwaway app focused, press ⌘Q, ⌘W, Delete, Forward Delete and
+  the dictation shortcut while recording. Each beeps, leaves recording on, keeps the
+  previous key and says why in the row, and nothing quits or closes.
+- [ ] Start recording in one row, then click another row's key or a shortcut under
+  Settings > Shortcut: the first stops and only the second captures.
+- [ ] Settings > Send keys > Add App… doesn't list Terminal or iTerm2 while they are
+  open. Send to Claude still sends to Claude Code in them.
+- [ ] Change the dictation shortcut to a rule's key: the row says it clashes, and a
+  dictation into that app is pasted, not sent.
+- [ ] Dictate into that app. The text is pasted and the recorded key arrives, with
+  no stray modifier: a bare Return must not land as ⇧Return or ⌥Return, including
+  when the shortcut's Option is still held after the paste.
+- [ ] Turn the rule's switch off and dictate again: pasted, not sent. Turn it back
+  on without re-recording: the key is still there.
+- [ ] Remove the rule during the countdown: nothing is sent.
+- [ ] Add a rule for an Electron app, quit and reopen it, then dictate into it
+  first. The text is pasted and sent, not copied.
+- [ ] Add a rule for an app that also matches Send to Claude (VS Code) with a
+  different key. The rule's key is used, and it fires outside the Claude Code
+  panel too, as the footer warns. Remove it and the built-in detection is back.
+- [ ] Hold Shift as you dictate into a rule's app: pasted, not sent.
+- [ ] Uninstall or rename a rule's app: the row shows the bundle identifier and
+  says it isn't installed, and nothing is sent there.
+
 ## Combined 0.1.6 checks, 2026-10-20
 
 After combining the Codex subscription changes with the dictation and Ask fixes,
@@ -1373,6 +1408,55 @@ player; real playback and the Automation prompt need these steps.
   the microphone is open.
 - [ ] Start meeting notes while Music plays. Music keeps playing.
 
+## Muting other apps while dictating
+
+Manual checks. Unit tests cover the mute bookkeeping and every exit with a fake;
+the real tap, real audio, call detection and the permission prompt need these
+steps.
+
+- [ ] Off by default: with the setting off, or a workspace saved before it existed,
+  a video stays audible during a dictation and no System Audio Recording prompt
+  appears, including with Pause music while dictating on.
+- [ ] Browser video: turn on Settings → App → Mute other apps while dictating. Play
+  a YouTube video in Safari, then in Chrome, and dictate. The video goes silent once
+  recording starts, keeps playing, and is audible again as soon as the recording
+  stops. Repeat with a cancelled dictation and with "No speech heard."
+- [ ] Nothing playing: dictate with no app playing audio. The capsule and the
+  shortcut respond normally, and the dictation stops when asked. With Pause music
+  while dictating on and Music playing, Music resumes when the recording stops.
+- [ ] After a silent dictation: dictate with nothing playing, stop, then start a
+  video. It is audible, apart from at most a moment at the very start. Note how long
+  that moment is. Quit during a silent dictation: the app quits without waiting.
+- [ ] Model load: with a model that takes a while to load and a video playing, start
+  a dictation. The video stays audible until recording starts.
+- [ ] Question card: record a dictation long enough to reach the question card. The
+  video is audible while the card waits.
+- [ ] Quit: quit from the menu bar while dictating with a video playing. The video is
+  audible again.
+- [ ] Own sounds: with Dictation sounds on and a video playing, dictate. The Start,
+  Finish and Cancel sounds are heard while the video is silent.
+- [ ] System Audio Recording: with BetterWispr not yet allowed under Privacy &
+  Security → Screen & System Audio Recording (`tccutil reset AudioCapture
+  org.betterwispr.app`), turn the setting off and on. macOS asks once, and no
+  prompt appears during dictation. Note whether the video is silenced and whether
+  a message appears after denying the prompt.
+- [ ] Your own mute: mute the Mac, then dictate and stop. The Mac is still muted.
+- [ ] Volume untouched: the menu bar Sound icon and the output volume don't change
+  during a dictation. Press the volume keys mid-dictation; the video stays
+  silent until the recording stops.
+- [ ] Output switch: start a video on the speakers, connect AirPods mid-dictation.
+  The video stays silent on the AirPods until the recording stops.
+- [ ] Crash: start dictating with a video playing and run `killall -9 BetterWispr`.
+  The video should be audible again without relaunching. This has not been
+  verified; if it stays silent, record it in `docs/architecture.md`.
+- [ ] Calls: dictate during a Zoom or FaceTime call, and during a Google Meet call in
+  a browser, with the microphone in use. The call stays audible. Repeat with the
+  call muted in the app, which may release the microphone, and note what happens.
+- [ ] Meeting notes recording: dictate during meeting notes with a call or video
+  playing. It stays audible.
+- [ ] macOS 14.0 or 14.1, if available: the setting isn't shown and no System Audio
+  Recording prompt appears.
+
 ## Clipboard and insertion
 
 - [ ] Start with a known clipboard string, dictate into TextEdit and verify final
@@ -1714,6 +1798,15 @@ Additional regression checks:
   and test. Refresh the catalog and relaunch: the chosen ID should stay selected,
   and generated summaries should name it. Signed-out, missing/outdated CLI and subscription-limit failures should
   be actionable without exposing provider output or starting another provider.
+- [ ] With Claude Code signed in with an API key or gateway, leave Allow any Claude
+  Code sign-in off: notes and Ask report the switch and send nothing. Turn it on and
+  the notes picker says Any sign-in while Ask and Cleanup say Subscription. Sends to
+  shows the destination, and notes send nothing until you confirm it. Change the
+  sign-in or add `ANTHROPIC_BASE_URL` to Claude Code's settings: Check again and the
+  next notes run ask you to confirm again. Corrupt that settings file: notes and
+  Medium cleanup send nothing. Medium dictation with this sign-in sends nothing and
+  gets Light cleanup, and generated summaries name the destination. A request that
+  reaches the spending limit reports it and keeps the meeting.
 - [ ] Edit thoughts during summary generation. The completed summary should be
   marked for update until regenerated with the new text. Cancel generation and
   verify the previous summary remains intact with no late replacement.
