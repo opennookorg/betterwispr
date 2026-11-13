@@ -1651,7 +1651,7 @@ final class AppModel {
     }
 
     private func refreshModels() {
-        installedModelIDs = Set(models.filter { WhisperKitProvider.isInstalled($0) || ParakeetProvider.isInstalled($0) }.map(\.id))
+        installedModelIDs = Set(models.filter { WhisperKitProvider.isInstalled($0) || ParakeetProvider.isInstalled($0) || CohereProvider.isInstalled($0) }.map(\.id))
         phraseBoosterInstalled = ParakeetProvider.isPhraseBoosterInstalled()
         speakerDetectionInstalled = SpeakerDetection.isInstalled()
         meetings.builtInModelInstalled = BuiltInModel.isInstalled()

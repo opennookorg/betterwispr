@@ -22,7 +22,7 @@ struct ModelsView: View {
             } header: {
                 Text(L10n.tr("On this Mac"))
             } footer: {
-                Label(L10n.tr("These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared."), systemImage: "internaldrive")
+                Label(L10n.tr("These models process audio on your Mac. Parakeet, Whisper and Cohere need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared."), systemImage: "internaldrive")
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
@@ -339,6 +339,7 @@ struct ModelsView: View {
         case .apple: L10n.tr("System speech")
         case .whisperKit: "WhisperKit · Apple Silicon"
         case .parakeet: "Parakeet · Neural Engine"
+        case .cohere: "Cohere · Neural Engine"
         case .api: L10n.tr("API connection")
         case .codex: L10n.tr("Codex subscription")
         }

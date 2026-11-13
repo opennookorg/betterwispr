@@ -147,6 +147,37 @@ other cleanup providers were not run.
 The structured layout is currently bounded to 20 items. Model output can vary; a likely list may take several seconds longer because it needs a separate layout call. A passing text trial does not establish general
 recognition accuracy or verify microphone, shortcut and paste permissions.
 
+## Cohere Transcribe check, 2026-11-13
+
+Environment: Apple M4 Pro, macOS 27.2.1, `BetterWisprCLI` from the working tree.
+
+- `.build/debug/BetterWisprCLI --download-model cohere-transcribe` installed the
+  q8 encoder, v2 decoder and vocabulary in 197.8 s, using 2,166,452 KB on disk.
+- With the network denied by `sandbox-exec`, the release CLI ran `--bench` over
+  four `say` clips in one process. The model loaded in 2.7 s. The first clip
+  took 60.5 s and later clips 0.58 to 1.02 s. Separate `--transcribe-file` runs
+  each took about 64 s whatever the clip length, so the cost is the first
+  prediction in each process rather than the audio.
+- A 6 s English clip and a French clip came back word for word. An 18.8 s
+  English clip came back with every word, with "Yesterday," and "Next week,"
+  punctuated and the commas around "longer than planned" dropped. A clip made by
+  repeating the 6 s English clip three times came back as one sentence.
+- After review, the provider decodes windows of at most 15 s, cut at the
+  quietest tenth of a second, and blocks only repeated 8-token phrases. A 37.5 s
+  clip made of the 18.8 s clip twice came back with both copies in full. The
+  three-times clip came back as one full sentence plus its second half, so the
+  model still drops some deliberate repetition.
+- `swift build`, `python3 scripts/localization.py check` and the new Cohere
+  tests passed. `swift test` failed in timing-sensitive tests
+  (`pendingSendStaysCancellableThroughTheFinalPromptCheck`,
+  `liveTranscriberPassesOnlyWhileRunningAndOnlyOverNewAudio`,
+  `ytDLPDownloadsIntoAPrivateFolderItDeletesAfterSuccessErrorAndCancel` and
+  others), which also failed on the base commit 3e29be8 on this Mac and passed
+  when run alone.
+- **Not exercised:** the app's Models install button, the idle warm-up and
+  live dictation with Cohere, macOS 14 (where the model should not be listed)
+  and macOS 15, and a representative accuracy corpus.
+
 ## Microphone silence and stop stall check, 2026-10-31
 
 Diagnosis came from the installed 0.1.6 build with Codex transcription, macOS

@@ -75,7 +75,7 @@ struct SettingsView: View {
                     RowDivider()
                     SettingRow(L10n.tr("Spoken language"), caption: L10n.tr("A fixed language gives more consistent results.")) {
                         Picker(L10n.tr("Spoken language"), selection: setting(\.language)) {
-                            Text(model.selectedModel.engine == .apple ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
+                            Text([.apple, .cohere].contains(model.selectedModel.engine) ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
                             ForEach(languageChoices, id: \.code) { Text($0.name).tag($0.code) }
                         }
                         .labelsHidden()

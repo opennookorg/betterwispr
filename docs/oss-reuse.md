@@ -24,6 +24,12 @@ as a SwiftPM dependency to run NVIDIA Parakeet TDT on the Neural Engine. No
 FluidAudio source is copied. Models load with `AsrModels.loadLocal`, which never
 fetches missing files; downloads only run from an explicit model installation.
 
+`Sources/BetterWisprCore/Speech/CohereProvider.swift` uses the same FluidAudio
+dependency's `CoherePipeline` to run Cohere Transcribe. No FluidAudio source is
+copied. `CoherePipeline.loadModels` reads the encoder, decoder and vocabulary
+from the installed folder and never downloads; `ModelHub.download` runs only
+from an explicit model installation.
+
 `Sources/BetterWisprCore/Speech/SpeakerDetection.swift` uses SpeakerKit from
 [argmax-oss-swift](https://github.com/argmaxinc/argmax-oss-swift) 1.1.0 (MIT,
 license and notices shipped in the app bundle) as a SwiftPM dependency to tell
@@ -308,7 +314,7 @@ the VoiceInk code adapted elsewhere is listed in the entries above.
 | --- | --- | --- |
 | [codex-asr](https://github.com/Wangnov/codex-asr) | [MIT](https://github.com/Wangnov/codex-asr/blob/479f6a7/LICENSE-MIT) | Native Swift adaptation of file-backed ChatGPT authentication, JWT account fallback, multipart transcription, and Codex Desktop request headers from version 0.1.2, revision `479f6a7`. `CodexSpeechProvider.swift` uses URLSession directly. No Rust runtime, helper, server, credential refresh, or proxy subprocess is included. The upstream MIT notice is retained in `Resources/Licenses/codex-asr-MIT.txt` and copied into the app bundle by `scripts/build-app.sh`. |
 | [WhisperKit / Argmax OSS](https://github.com/argmaxinc/argmax-oss-swift) | [MIT](https://github.com/argmaxinc/argmax-oss-swift/blob/main/LICENSE); bundled third-party notices also apply | Native Swift on-device inference; use the OSS library rather than copying an entire app. The old WhisperKit repository URL redirects here. Argmax Pro is a separate product and is not included. |
-| [FluidAudio](https://github.com/FluidInference/FluidAudio) | [Apache-2.0](https://github.com/FluidInference/FluidAudio/blob/main/LICENSE) | Core ML Parakeet TDT inference, used for the Parakeet models. |
+| [FluidAudio](https://github.com/FluidInference/FluidAudio) | [Apache-2.0](https://github.com/FluidInference/FluidAudio/blob/main/LICENSE) | Core ML Parakeet TDT and Cohere Transcribe inference, used for the Parakeet and Cohere models. |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | [MIT](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE) | Local C/C++ inference and CLI integration; useful for a separately installed local engine and GGML models. |
 | [Handy](https://github.com/cjpais/Handy) | [MIT](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/LICENSE) | Reviewed its separation of recording, model management and transcription. Its [VAD smoother](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/src-tauri/src/audio_toolkit/vad/smoothed.rs) buffers speech onset and trailing frames. No Handy source is vendored by this research task. |
 | [VoiceInk](https://github.com/Beingpax/VoiceInk) | [GPL-3.0](https://github.com/Beingpax/VoiceInk/blob/main/LICENSE) | Adapted at revision `c09cc1f677f40f2ee665843a61f07670210f012e`, as described above: the dictation edit prompt with vocabulary, selected text, clipboard and window context; AutoLearn's anchored edit reading, AI reviewer and Undo; the speech and editing model warm-ups and low-latency reasoning settings; the Parakeet word-agreement live preview; and writing modes per app, per website and by trigger word. Its per-app Power Mode also informed the per-app writing styles, whose rules and app registry were written for BetterWispr. |
@@ -334,7 +340,12 @@ according to the publisher's model cards. BetterWispr downloads the
 which keep that attribution obligation. The optional Parakeet phrase booster
 downloads [FluidInference/parakeet-ctc-110m-coreml](https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml),
 a conversion of [nvidia/parakeet-tdt_ctc-110m](https://huggingface.co/nvidia/parakeet-tdt_ctc-110m)
-that its model card lists as CC-BY-4.0. Do not infer weight terms
+that its model card lists as CC-BY-4.0. Cohere Transcribe downloads the q8
+encoder, the v2 decoder and `vocab.json` from
+[FluidInference/cohere-transcribe-03-2026-coreml](https://huggingface.co/FluidInference/cohere-transcribe-03-2026-coreml)
+(revision `main`, at `e1ce10d4cae2ca9a8b36cef5786fa3660f070050` when added),
+a conversion of [CohereLabs/cohere-transcribe-03-2026](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026).
+Both model cards list Apache-2.0. Do not infer weight terms
 from an ONNX/Core ML/MLX conversion library's license.
 
 The copied BetterShot development skills have separate provenance documented in

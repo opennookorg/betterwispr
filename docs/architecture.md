@@ -19,7 +19,7 @@ cancellable task. Redirects, cookies, cached responses, and stored URL credentia
 are disabled. Preparation checks only the bounded local Codex sign-in file.
 Transcription reads credentials again before audio conversion and never refreshes
 or persists them. Errors exclude service bodies and credentials.
-Only Parakeet and Whisper permit synthetic warm-up. Processing-location metadata
+Only Parakeet, Whisper and Cohere permit synthetic warm-up. Processing-location metadata
 supplies the UI audio disclosure. The `codex` selection uses the existing
 selected-model string without a schema change. See [setup](codex-subscription.md).
 
