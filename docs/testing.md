@@ -1819,6 +1819,24 @@ These checks do not establish live provider acceptance or recognition quality.
 
 ## Updates
 
+`./scripts/test-update.sh` checks a real update from an older build to a newer
+one on this Mac. It builds the app, makes 0.0.1 and 0.0.2 copies with the
+`org.betterwispr.app.updatetest` bundle identifier, and signs them the way
+`release.sh` does, but without a timestamp or notarization. It packages 0.0.2
+as a DMG and signs it with `sign_update --account betterwispr`, then serves an
+appcast on `127.0.0.1`. The script installs 0.0.1 in a temporary folder and
+points it at that appcast with the `SUFeedURL`, `SUEnableAutomaticChecks` and
+`SUAutomaticallyUpdate` defaults. It waits until the app logs "Update ready to
+install on quit", then quits the app. It passes when the installed bundle
+reports 0.0.2 and passes `codesign --verify --deep --strict`. The app runs with
+`CFFIXED_USER_HOME` set to a temporary folder, so it leaves your Application
+Support data alone. The real `org.betterwispr.app` defaults and installed app
+are never touched. On exit, the script removes the test defaults, caches,
+launchd jobs and temporary files. If the shell cannot script Finder, the DMG
+skips the window layout from `create-dmg.sh`, because Sparkle does not use it.
+The script does not cover the permission prompt, the toast buttons, relaunch,
+Gatekeeper or notarization.
+
 - [ ] Settings shows the installed version under About. "Check for Updates…" in
   About and in the app menu opens Sparkle's update window and is disabled while
   a check is already running.
