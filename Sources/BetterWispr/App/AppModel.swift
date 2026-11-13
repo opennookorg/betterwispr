@@ -1994,6 +1994,11 @@ final class AppModel {
         }
     }
 
+    /// Opens Internet Accounts in System Settings, where Google, Outlook, Exchange, Yahoo and iCloud calendars are added to this Mac.
+    func addCalendarAccount() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
+    }
+
     /// Re-reads the events in `interval` from the calendars meeting notes use, for the Calendar page.
     func refreshCalendarEvents(in interval: DateInterval) async {
         calendarGranted = CalendarEvents.isAuthorized

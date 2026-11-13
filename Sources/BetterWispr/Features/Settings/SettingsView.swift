@@ -327,6 +327,10 @@ struct SettingsView: View {
                                 SettingToggle(calendar.title, isOn: includes(calendar))
                             }
                         }
+                        RowDivider()
+                        SettingRow(L10n.tr("Add a calendar account"), caption: L10n.tr("Opens Internet Accounts in System Settings, where you sign in to Google, Outlook, Exchange, Yahoo or iCloud. The calendars appear here once this Mac syncs them. For Outlook, choose Microsoft Exchange.")) {
+                            Button(L10n.tr("Add Account…"), action: model.addCalendarAccount)
+                        }
                     }
                 } footer: {
                     Text(L10n.tr("Reads the accounts in the Calendar app on this Mac, including shared and subscribed calendars, and works offline. The event title and invitees go to your notes model with the transcript."))

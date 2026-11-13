@@ -1180,11 +1180,13 @@
 "Allow BetterWispr under Privacy & Security, Calendars in System Settings, then come back here." = "Allow BetterWispr under Privacy & Security, Calendars in System Settings, then come back here.";
 "Open System Settings" = "Open System Settings";
 "No calendars on this Mac" = "No calendars on this Mac";
-"Calendar access is on, but the Calendar app has no accounts. Add iCloud, Google or Exchange under Internet Accounts in System Settings." = "Calendar access is on, but the Calendar app has no accounts. Add iCloud, Google or Exchange under Internet Accounts in System Settings.";
-"Open Internet Accounts" = "Open Internet Accounts";
 "Reading 1 calendar from %@." = "Reading 1 calendar from %@.";
 "Reading %d calendars from %@." = "Reading %d calendars from %@.";
 "Choose calendars" = "Choose calendars";
+"Add Account…" = "Add Account…";
+"Add a calendar account" = "Add a calendar account";
+"Calendar access is on, but this Mac has no calendar accounts yet. Sign in to Google, Outlook, Exchange, Yahoo or iCloud in Internet Accounts, and the calendars appear here once they sync. For Outlook, choose Microsoft Exchange." = "Calendar access is on, but this Mac has no calendar accounts yet. Sign in to Google, Outlook, Exchange, Yahoo or iCloud in Internet Accounts, and the calendars appear here once they sync. For Outlook, choose Microsoft Exchange.";
+"Opens Internet Accounts in System Settings, where you sign in to Google, Outlook, Exchange, Yahoo or iCloud. The calendars appear here once this Mac syncs them. For Outlook, choose Microsoft Exchange." = "Opens Internet Accounts in System Settings, where you sign in to Google, Outlook, Exchange, Yahoo or iCloud. The calendars appear here once this Mac syncs them. For Outlook, choose Microsoft Exchange.";
 "Day" = "Day";
 "Week" = "Week";
 "Month" = "Month";

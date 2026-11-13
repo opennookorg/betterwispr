@@ -1180,11 +1180,13 @@
 "Allow BetterWispr under Privacy & Security, Calendars in System Settings, then come back here." = "Autorisez BetterWispr dans Confidentialité et sécurité, Calendriers, dans Réglages Système, puis revenez ici.";
 "Open System Settings" = "Ouvrir Réglages Système";
 "No calendars on this Mac" = "Aucun calendrier sur ce Mac";
-"Calendar access is on, but the Calendar app has no accounts. Add iCloud, Google or Exchange under Internet Accounts in System Settings." = "L’accès à Calendrier est activé, mais l’app Calendrier n’a aucun compte. Ajoutez iCloud, Google ou Exchange dans Comptes Internet, dans Réglages Système.";
-"Open Internet Accounts" = "Ouvrir Comptes Internet";
 "Reading 1 calendar from %@." = "Lecture d’un calendrier de %@.";
 "Reading %d calendars from %@." = "Lecture de %d calendriers de %@.";
 "Choose calendars" = "Choisir les calendriers";
+"Add Account…" = "Ajouter un compte…";
+"Add a calendar account" = "Ajouter un compte de calendrier";
+"Calendar access is on, but this Mac has no calendar accounts yet. Sign in to Google, Outlook, Exchange, Yahoo or iCloud in Internet Accounts, and the calendars appear here once they sync. For Outlook, choose Microsoft Exchange." = "L’accès au calendrier est activé, mais ce Mac n’a encore aucun compte de calendrier. Connectez-vous à Google, Outlook, Exchange, Yahoo ou iCloud dans Comptes Internet : les calendriers apparaissent ici une fois synchronisés. Pour Outlook, choisissez Microsoft Exchange.";
+"Opens Internet Accounts in System Settings, where you sign in to Google, Outlook, Exchange, Yahoo or iCloud. The calendars appear here once this Mac syncs them. For Outlook, choose Microsoft Exchange." = "Ouvre Comptes Internet dans Réglages Système, où vous vous connectez à Google, Outlook, Exchange, Yahoo ou iCloud. Les calendriers apparaissent ici une fois synchronisés par ce Mac. Pour Outlook, choisissez Microsoft Exchange.";
 "Day" = "Jour";
 "Week" = "Semaine";
 "Month" = "Mois";

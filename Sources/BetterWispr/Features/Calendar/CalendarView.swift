@@ -103,6 +103,8 @@ struct CalendarView: View {
                         .foregroundStyle(.secondary)
                     Button(L10n.tr("Choose calendars")) { model.selectedPage = .settings }
                         .buttonStyle(.link)
+                    Button(L10n.tr("Add Account…"), action: model.addCalendarAccount)
+                        .buttonStyle(.link)
                 }
                 .font(.callout)
                 .lineLimit(1)
@@ -167,11 +169,9 @@ struct CalendarView: View {
 
     private var noCalendars: some View {
         unavailable(L10n.tr("No calendars on this Mac"), systemImage: "calendar",
-                    detail: L10n.tr("Calendar access is on, but the Calendar app has no accounts. Add iCloud, Google or Exchange under Internet Accounts in System Settings.")) {
-            Button(L10n.tr("Open Internet Accounts")) {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
-            }
-            .buttonStyle(.borderedProminent)
+                    detail: L10n.tr("Calendar access is on, but this Mac has no calendar accounts yet. Sign in to Google, Outlook, Exchange, Yahoo or iCloud in Internet Accounts, and the calendars appear here once they sync. For Outlook, choose Microsoft Exchange.")) {
+            Button(L10n.tr("Add Account…"), action: model.addCalendarAccount)
+                .buttonStyle(.borderedProminent)
         }
     }
 
