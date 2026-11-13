@@ -11,7 +11,7 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        Form {
+        List {
             if query.isEmpty, !model.failedDictations.isEmpty {
                 Section {
                     let action = model.transcriptionModel.recordingAction(onDevice: (L10n.tr("Transcribe"), L10n.tr("Transcribe this recording on the Transcribe page")))
@@ -30,12 +30,9 @@ struct HistoryView: View {
                         }
                         .buttonStyle(.borderless)
                     }
+                    footnote(L10n.tr("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups."))
                 } header: {
                     Text(L10n.tr("Not transcribed"))
-                } footer: {
-                    Text(L10n.tr("When a dictation can’t be transcribed, BetterWispr keeps its audio on this Mac for up to 7 days, or less if Keep history is shorter. It keeps the newest 20, up to 1 GB, and leaves them out of backups."))
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if !filteredHistory.isEmpty {
@@ -50,18 +47,15 @@ struct HistoryView: View {
                             expanded: true
                         )
                     }
+                    if model.settings.learnCorrections {
+                        footnote(L10n.tr("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time."))
+                    }
                 } header: {
                     Text(L10n.tr("%ld dictations", filteredHistory.count))
-                } footer: {
-                    if model.settings.learnCorrections {
-                        Text(L10n.tr("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time."))
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
                 }
             }
         }
-        .formStyle(.grouped)
+        .listStyle(.inset)
         .overlay {
             if filteredHistory.isEmpty {
                 if query.isEmpty, !model.failedDictations.isEmpty {
@@ -91,6 +85,13 @@ struct HistoryView: View {
             Text(L10n.tr("This removes the saved text from this Mac. It cannot be undone."))
         }
     }
+
+    /// List gives a section footer one line, so explanations go in a last row that can wrap.
+    private func footnote(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
 }
 
 struct TranscriptRow: View {
@@ -101,6 +102,7 @@ struct TranscriptRow: View {
     var onRestore: (() -> Void)?
     var expanded = false
     @State private var draft: String?
+    @State private var showsOriginal = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -157,13 +159,26 @@ struct TranscriptRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if expanded && transcript.text != transcript.rawText {
-                DisclosureGroup(L10n.tr("Original transcription")) {
-                    Text(transcript.rawText)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if let onRestore, transcript.text != transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines) {
-                        Button(L10n.tr("Use Original"), action: onRestore)
-                            .help(L10n.tr("Replace the cleaned-up text with exactly what was transcribed"))
+                VStack(alignment: .leading, spacing: 6) {
+                    Button { showsOriginal.toggle() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.right")
+                                .imageScale(.small)
+                                .rotationEffect(.degrees(showsOriginal ? 90 : 0))
+                            Text(L10n.tr("Original transcription"))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityValue(showsOriginal ? L10n.tr("Expanded") : L10n.tr("Collapsed"))
+                    if showsOriginal {
+                        Text(transcript.rawText)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let onRestore, transcript.text != transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines) {
+                            Button(L10n.tr("Use Original"), action: onRestore)
+                                .help(L10n.tr("Replace the cleaned-up text with exactly what was transcribed"))
+                        }
                     }
                 }
                 .font(.caption)

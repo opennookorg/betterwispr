@@ -1131,3 +1131,5 @@
 "Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most." = "« Comme la réunion » rédige les notes dans la langue parlée définie lors de l’enregistrement. Avec la détection automatique, elles suivent la langue la plus parlée.";
 "Summary language" = "Langue du résumé";
 "Same as meeting" = "Comme la réunion";
+"Expanded" = "Développé";
+"Collapsed" = "Réduit";

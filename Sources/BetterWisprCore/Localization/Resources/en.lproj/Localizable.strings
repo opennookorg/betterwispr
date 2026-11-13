@@ -1131,3 +1131,5 @@
 "Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most." = "Same as meeting uses the Spoken language set when the meeting was recorded. With automatic detection, notes follow the language spoken most.";
 "Summary language" = "Summary language";
 "Same as meeting" = "Same as meeting";
+"Expanded" = "Expanded";
+"Collapsed" = "Collapsed";
