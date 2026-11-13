@@ -757,7 +757,9 @@ final class AppModel {
     private static func prepared(_ raw: String, settings: AppSettings, entries: [VocabularyEntry], language: String?) -> String {
         let recognized = settings.chineseScript?.convert(raw, language: language) ?? raw
         let heard = VocabularyProcessor.correctedCommands(entries, in: TranscriptCleaner.clean(recognized, language: language))
-        return language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
+        let digits = settings.writesNumbersAsDigits
+        let spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
+        return digits ? LocalizedSpokenNumbers.apply(spoken, language: language) : spoken
     }
 
     /// Starts Medium cleanup of a piece recognized while recording, so stopping only waits for the edit of the last piece.
