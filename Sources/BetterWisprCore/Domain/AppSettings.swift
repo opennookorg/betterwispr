@@ -143,9 +143,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// macOS system sound names picked per cue; missing cues use `DictationSound.defaultSoundName`.
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
-    public var pauseMediaWhileDictating: Bool = false
+    public var pauseMediaWhileDictating: Bool = true
     /// Silences other apps while a dictation records, unless a known call app or a browser is using the microphone.
-    public var muteOtherAppsWhileDictating: Bool = false
+    public var muteOtherAppsWhileDictating: Bool = true
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
     public var meetingPromptPosition: MeetingPromptPosition = .bottom
@@ -308,8 +308,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
-        pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
-        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? false
+        pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? true
+        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? true
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         meetingPromptPosition = (try? container.decodeIfPresent(MeetingPromptPosition.self, forKey: .meetingPromptPosition)) ?? .bottom
         meetingPromptTimeout = (try? container.decodeIfPresent(MeetingPromptTimeout.self, forKey: .meetingPromptTimeout)) ?? .thirtySeconds

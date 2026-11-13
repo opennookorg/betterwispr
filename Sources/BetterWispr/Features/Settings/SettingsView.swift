@@ -230,10 +230,10 @@ struct SettingsView: View {
                         }
                     }
                     RowDivider()
-                    SettingToggle(L10n.tr("Pause music while dictating"), caption: L10n.tr("Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on."), isOn: pauseMediaWhileDictating)
+                    SettingToggle(L10n.tr("Pause music while dictating"), caption: L10n.tr("Pauses Music and Spotify while you speak, then resumes them. On by default. macOS asks for permission for each of these apps that is open when BetterWispr starts or when you turn this on."), isOn: pauseMediaWhileDictating)
                     if #available(macOS 14.2, *) {
                         RowDivider()
-                        SettingToggle(L10n.tr("Mute other apps while dictating"), caption: L10n.tr("Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. macOS asks to use system audio when you turn this on. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested."), isOn: muteOtherAppsWhileDictating)
+                        SettingToggle(L10n.tr("Mute other apps while dictating"), caption: L10n.tr("Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. On by default. macOS asks to use system audio the first time it mutes. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested."), isOn: muteOtherAppsWhileDictating)
                     }
                     RowDivider()
                     SettingToggle(L10n.tr("Floating recording capsule"), caption: L10n.tr("A small voice control at the bottom of your screen."), isOn: setting(\.showCapsule))

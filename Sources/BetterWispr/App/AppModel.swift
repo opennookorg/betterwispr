@@ -299,10 +299,10 @@ final class AppModel {
         return microphones + [saved]
     }
 
-    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser()) {
+    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser? = nil) {
         self.store = store
         failedDictationStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
-        self.mediaPauser = mediaPauser
+        self.mediaPauser = mediaPauser ?? (startsServices ? MediaPauser() : MediaPauser(players: NoMediaPlayers(), otherApps: nil))
         self.startsServices = startsServices
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
         transcriptions = TranscriptionModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Transcriptions")))
@@ -324,7 +324,8 @@ final class AppModel {
         meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
-        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        self.mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        if settings.pauseMediaWhileDictating { Task { await AppleEventMediaPlayers.requestPermission() } }
         AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {

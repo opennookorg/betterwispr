@@ -28,13 +28,13 @@ import Testing
     #expect(try String(contentsOf: store.stateURL, encoding: .utf8) == "broken")
 }
 
-@Test func aWorkspaceSavedWithMediaPausingOnLoadsWithMutingOff() throws {
+@Test func aWorkspaceSavedBeforeMutingExistedLoadsWithMutingOn() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: folder) }
     let store = LocalStore(directory: folder)
     var state = SavedState()
-    state.settings.pauseMediaWhileDictating = true
-    state.settings.muteOtherAppsWhileDictating = true
+    state.settings.pauseMediaWhileDictating = false
+    state.settings.muteOtherAppsWhileDictating = false
     try store.save(state)
     var saved = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: store.stateURL)) as? [String: Any])
     var settings = try #require(saved["settings"] as? [String: Any])
@@ -42,8 +42,8 @@ import Testing
     saved["settings"] = settings
     try JSONSerialization.data(withJSONObject: saved).write(to: store.stateURL)
     let loaded = try store.load().settings
-    #expect(loaded.pauseMediaWhileDictating)
-    #expect(!loaded.muteOtherAppsWhileDictating)
+    #expect(!loaded.pauseMediaWhileDictating)
+    #expect(loaded.muteOtherAppsWhileDictating)
 }
 
 @Test func settingsSavedBeforeDictationModesStillLoad() throws {
@@ -57,8 +57,8 @@ import Testing
     #expect(!settings.hideCapsuleWhileDictating)
     #expect(settings.showNoSpeechNotice)
     #expect(DictationSound.allCases.map(settings.soundName) == ["Tink", "Purr", "Bottle", "Basso"])
-    #expect(!settings.pauseMediaWhileDictating)
-    #expect(!settings.muteOtherAppsWhileDictating)
+    #expect(settings.pauseMediaWhileDictating)
+    #expect(settings.muteOtherAppsWhileDictating)
     #expect(!settings.showInDock)
     #expect(settings.theme == .dark)
     #expect(settings.shortcut == .optionSpace)
@@ -78,8 +78,8 @@ import Testing
     toggled.hideCapsuleWhileDictating = true
     toggled.showNoSpeechNotice = false
     toggled.sounds = [.started: "Pop", .attention: "Funk"]
-    toggled.pauseMediaWhileDictating = true
-    toggled.muteOtherAppsWhileDictating = true
+    toggled.pauseMediaWhileDictating = false
+    toggled.muteOtherAppsWhileDictating = false
     toggled.showInDock = true
     toggled.theme = .system
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")

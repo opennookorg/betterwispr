@@ -94,6 +94,8 @@ private func dictationModel(_ players: FakeMediaPlayers, in folder: URL, callInP
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false,
                          mediaPauser: MediaPauser(players: players, otherApps: players, callInProgress: callInProgress))
     model.settings.soundEffects = false
+    model.settings.pauseMediaWhileDictating = false
+    model.settings.muteOtherAppsWhileDictating = false
     return model
 }
 

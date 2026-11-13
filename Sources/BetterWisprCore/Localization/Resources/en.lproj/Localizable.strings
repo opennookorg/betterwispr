@@ -636,7 +636,7 @@
 "Pasted, not sent" = "Pasted, not sent";
 "Pastes into apps" = "Pastes into apps";
 "Pause music while dictating" = "Pause music while dictating";
-"Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on." = "Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on.";
+"Pauses Music and Spotify while you speak, then resumes them. On by default. macOS asks for permission for each of these apps that is open when BetterWispr starts or when you turn this on." = "Pauses Music and Spotify while you speak, then resumes them. On by default. macOS asks for permission for each of these apps that is open when BetterWispr starts or when you turn this on.";
 "Pauses count toward pace" = "Pauses count toward pace";
 "Peak around %@" = "Peak around %@";
 "Period" = "Period";
@@ -759,7 +759,7 @@
 "Sign in to your ChatGPT account with codex login in Terminal, then try again." = "Sign in to your ChatGPT account with codex login in Terminal, then try again.";
 "Sign in with codex login in Terminal" = "Sign in with codex login in Terminal";
 "Sign in with codex login in Terminal." = "Sign in with codex login in Terminal.";
-"Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. macOS asks to use system audio when you turn this on. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested." = "Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. macOS asks to use system audio when you turn this on. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested.";
+"Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. On by default. macOS asks to use system audio the first time it mutes. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested." = "Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. On by default. macOS asks to use system audio the first time it mutes. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested.";
 "Simplified" = "Simplified";
 "Skip" = "Skip";
 "Slack huddle" = "Slack huddle";

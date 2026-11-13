@@ -1648,10 +1648,11 @@ Manual checks. Unit tests cover the mute bookkeeping and every exit with a fake;
 the real tap, real audio, call detection and the permission prompt need these
 steps.
 
-- [ ] Off by default: with the setting off, or a workspace saved before it existed,
-  a video stays audible during a dictation and no System Audio Recording prompt
-  appears, including with Pause music while dictating on.
-- [ ] Browser video: turn on Settings → App → Mute other apps while dictating. Play
+- [ ] On by default: with a workspace saved before the setting existed, the first
+  dictation while a video plays asks for System Audio Recording, and once allowed
+  the video goes silent while you speak. With the setting off, a video stays audible
+  and no prompt appears, including with Pause music while dictating on.
+- [ ] Browser video: with Settings → App → Mute other apps while dictating on, play
   a YouTube video in Safari, then in Chrome, and dictate. The video goes silent once
   recording starts, keeps playing, and is audible again as soon as the recording
   stops. Repeat with a cancelled dictation and with "No speech heard."
