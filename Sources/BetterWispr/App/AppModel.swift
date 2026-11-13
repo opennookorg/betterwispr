@@ -220,7 +220,7 @@ final class AppModel {
     var accessibilityGranted = AXIsProcessTrusted()
     var calendarGranted = CalendarEvents.isAuthorized
     var calendarAccounts: [CalendarAccount] = []
-    var upcomingEvents: [CalendarEvent] = []
+    var shownCalendarEvents: [CalendarEvent] = []
     @ObservationIgnored let calendarEvents = CalendarEvents()
     var microphones: [AudioInputDevice] = []
     var automaticMicrophone: AudioInputDevice?
@@ -1991,16 +1991,18 @@ final class AppModel {
                 return
             }
             calendarAccounts = await calendarEvents.accounts()
-            await refreshUpcomingEvents()
         }
     }
 
-    /// Re-reads the next seven days of events from the calendars meeting notes use.
-    func refreshUpcomingEvents() async {
+    /// Re-reads the events in `interval` from the calendars meeting notes use, for the Calendar page.
+    func refreshCalendarEvents(in interval: DateInterval) async {
         calendarGranted = CalendarEvents.isAuthorized
-        guard settings.useCalendar, calendarGranted else { upcomingEvents = []; return }
-        calendarAccounts = await calendarEvents.accounts()
-        upcomingEvents = await calendarEvents.upcoming(excluding: settings.excludedCalendarIDs)
+        guard settings.useCalendar, calendarGranted else { shownCalendarEvents = []; return }
+        let accounts = await calendarEvents.accounts()
+        let events = await calendarEvents.events(excluding: settings.excludedCalendarIDs, in: interval)
+        guard !Task.isCancelled else { return }
+        calendarAccounts = accounts
+        shownCalendarEvents = events
     }
 
     func refreshPermissions() {

@@ -42,9 +42,17 @@ public struct CalendarEvent: Equatable, Sendable {
             .max { ($0.videoURL == nil ? 0 : 1, $0.start) < ($1.videoURL == nil ? 0 : 1, $1.start) }
     }
 
-    /// The events the user attends that have not ended at `now`, soonest first.
-    public static func upcoming(_ events: [CalendarEvent], at now: Date) -> [CalendarEvent] {
-        events.filter { $0.isAttending && now < $0.end }.sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
+    /// Identifies one occurrence, since every occurrence of a repeating event shares `id`.
+    public var occurrenceID: String { "\(id)@\(start.timeIntervalSinceReferenceDate)" }
+
+    /// Whether any part of the event falls in `interval`; an event with no duration counts at its start.
+    public func occurs(in interval: DateInterval) -> Bool {
+        start < interval.end && (end > interval.start || start == interval.start)
+    }
+
+    /// The events the user attends, earliest first.
+    public static func attended(_ events: [CalendarEvent]) -> [CalendarEvent] {
+        events.filter(\.isAttending).sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
     }
 
     /// How a meeting lists an invitee: the name on the invite, else the email address, else nothing.
@@ -64,6 +72,44 @@ public struct CalendarEvent: Equatable, Sendable {
                 guard let host = url.host()?.lowercased() else { return false }
                 return videoHosts.contains { host == $0 || host.hasSuffix("." + $0) }
             }
+    }
+}
+
+/// Pure layout for the Day, Week and Month calendar views.
+public enum CalendarLayout {
+    /// The days a month grid shows: whole weeks from the one holding the 1st through the one holding the last day.
+    public static func monthDays(containing date: Date, calendar: Calendar = .current) -> [Date] {
+        guard let month = calendar.dateInterval(of: .month, for: date),
+              let first = calendar.dateInterval(of: .weekOfYear, for: month.start)?.start,
+              let last = calendar.dateInterval(of: .weekOfYear, for: month.end.addingTimeInterval(-1))?.end else { return [] }
+        return Array(sequence(first: first) { calendar.date(byAdding: .day, value: 1, to: $0) }.prefix { $0 < last })
+    }
+
+    /// Side-by-side columns for overlapping events: each occurrence maps to its column and the column count of its overlap group.
+    public static func columns(_ events: [CalendarEvent]) -> [String: (index: Int, count: Int)] {
+        var result: [String: (index: Int, count: Int)] = [:]
+        var group: [(id: String, column: Int)] = []
+        var columnEnds: [Date] = []
+        var groupEnd = Date.distantPast
+        func close() {
+            for item in group { result[item.id] = (item.column, columnEnds.count) }
+            group = []
+            columnEnds = []
+        }
+        for event in events.sorted(by: { ($0.start, $1.end) < ($1.start, $0.end) }) {
+            if event.start >= groupEnd { close() }
+            let end = max(event.end, event.start.addingTimeInterval(15 * 60))
+            if let column = columnEnds.firstIndex(where: { $0 <= event.start }) {
+                columnEnds[column] = end
+                group.append((event.occurrenceID, column))
+            } else {
+                columnEnds.append(end)
+                group.append((event.occurrenceID, columnEnds.count - 1))
+            }
+            groupEnd = max(groupEnd, end)
+        }
+        close()
+        return result
     }
 }
 
@@ -114,13 +160,13 @@ public actor CalendarEvents {
         return CalendarEvent.current(store.events(matching: predicate).map(CalendarEvent.init), at: now)
     }
 
-    /// The events from now until the end of the `days`-th day, in the calendars the user did not exclude.
-    public func upcoming(excluding excluded: Set<String>, from now: Date = .now, days: Int = 7) -> [CalendarEvent] {
+    /// The attended events in `interval`, from the calendars the user did not exclude.
+    public func events(excluding excluded: Set<String>, in interval: DateInterval) -> [CalendarEvent] {
         guard Self.isAuthorized else { return [] }
         let calendars = freshCalendars().filter { !excluded.contains($0.calendarIdentifier) }
-        guard !calendars.isEmpty, let end = Calendar.current.date(byAdding: .day, value: days, to: Calendar.current.startOfDay(for: now)) else { return [] }
-        let predicate = store.predicateForEvents(withStart: now, end: end, calendars: calendars)
-        return CalendarEvent.upcoming(store.events(matching: predicate).map(CalendarEvent.init), at: now)
+        guard !calendars.isEmpty else { return [] }
+        let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: calendars)
+        return CalendarEvent.attended(store.events(matching: predicate).map(CalendarEvent.init))
     }
 
     /// The event calendars re-read from the Calendar database, so access granted again after a revoke takes effect without a relaunch.

@@ -38,15 +38,56 @@ private func event(_ id: String, from start: TimeInterval, to end: TimeInterval,
     #expect(CalendarEvent.current(ignored + [standup, review, call], at: now) == call)
 }
 
-@Test func upcomingEventsKeepOnlyUnfinishedAttendedEventsSoonestFirst() {
+@Test func attendedEventsDropDeclinedOnesAndSortEarliestFirst() {
     let finished = event("finished", from: -60, to: 0)
     let declined = event("declined", from: 30, to: 60, attending: false)
-    let ongoing = event("ongoing", from: -10, to: 20)
     let allDay = event("all day", from: -600, to: 600, allDay: true)
-    let tomorrow = event("tomorrow", from: 1440, to: 1500, video: true)
     let soon = event("soon", from: 10, to: 40)
 
-    #expect(CalendarEvent.upcoming([tomorrow, finished, soon, declined, ongoing, allDay], at: now).map(\.id) == ["all day", "ongoing", "soon", "tomorrow"])
+    #expect(CalendarEvent.attended([soon, finished, declined, allDay]).map(\.id) == ["all day", "finished", "soon"])
+}
+
+@Test func eventsOccurInAnIntervalWhenAnyPartOverlapsIt() {
+    let hour = DateInterval(start: now, duration: 3600)
+
+    #expect(event("inside", from: 10, to: 20).occurs(in: hour))
+    #expect(event("spanning", from: -60, to: 120).occurs(in: hour))
+    #expect(event("instant", from: 0, to: 0).occurs(in: hour))
+    #expect(!event("ends at start", from: -30, to: 0).occurs(in: hour))
+    #expect(!event("starts at end", from: 60, to: 90).occurs(in: hour))
+}
+
+@Test func repeatingOccurrencesGetDistinctIDs() {
+    let monday = event("standup", from: 0, to: 15)
+    let tuesday = event("standup", from: 1440, to: 1455)
+
+    #expect(monday.id == tuesday.id)
+    #expect(monday.occurrenceID != tuesday.occurrenceID)
+}
+
+@Test func overlappingEventsShareColumnsOnlyWithinTheirGroup() {
+    let long = event("long", from: 0, to: 120)
+    let first = event("first", from: 0, to: 30)
+    let second = event("second", from: 30, to: 60)
+    let alone = event("alone", from: 180, to: 210)
+    let columns = CalendarLayout.columns([second, alone, first, long])
+
+    #expect(columns[long.occurrenceID]! == (0, 2))
+    #expect(columns[first.occurrenceID]! == (1, 2))
+    #expect(columns[second.occurrenceID]! == (1, 2))
+    #expect(columns[alone.occurrenceID]! == (0, 1))
+}
+
+@Test func monthGridCoversWholeWeeksAroundTheMonth() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    calendar.firstWeekday = 1
+    let november = calendar.date(from: DateComponents(year: 2026, month: 11, day: 13))!
+    let days = CalendarLayout.monthDays(containing: november, calendar: calendar)
+
+    #expect(days.count == 35)
+    #expect(days.first == calendar.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+    #expect(days.last == calendar.date(from: DateComponents(year: 2026, month: 12, day: 5)))
 }
 
 @Test func videoLinksComeOnlyFromKnownCallHostsInTheURLLocationOrNotes() {
