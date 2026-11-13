@@ -5,7 +5,7 @@ public enum LocalizedSpokenNumbers {
     private enum Kind { case unit, tens, small, hundreds, multiplier, scale }
     private typealias Word = (value: Int, kind: Kind)
 
-    /// Words after which "um" or "uno" is a number rather than an article, as in "PR número um".
+    /// Words after which "um" or "uno" is a number rather than an article and numbers read one after another always join, as in "PR número um".
     private static let anchors: Set<String> = ["numero", "nummer", "numer", "nr", "nº", "n°", "номер", "pr", "issue", "ticket"]
     /// Decimal and grouping marks spoken between numbers, written as said: "três vírgula cinco" is "3,5" and "zero ponto um ponto seis" "0.1.6".
     private static let separators: [String: String] = [
@@ -61,11 +61,9 @@ public enum LocalizedSpokenNumbers {
                     add(hundred[0], 100 * k, .hundreds)
                     if ["pt", "es"].contains(language), hundred[0].hasSuffix("os") { add(String(hundred[0].dropLast(2)) + "as", 100 * k, .hundreds) }
                 } else if let last = hundred.last {
-                    // A feminine or counting form, such as Romanian "două sute" or Czech "dvě stě".
                     if hundred.count == 2, !known(hundred[0]) { add(hundred[0], k, .unit) }
                     add(last, 100, .multiplier)
                 }
-                // "cento e um", "ciento uno" and "deux cent un" show the forms used before more digits.
                 let more = spelled(100 * k + 1)
                 for (i, word) in more.enumerated() where more.count > 1 && !known(word) {
                     if i == 0 { add(word, 100 * k, .hundreds) } else if words[key(more[i - 1])]?.kind == .unit { add(word, 100, .multiplier) } else { connectors.insert(key(word)) }
@@ -93,9 +91,7 @@ public enum LocalizedSpokenNumbers {
             compounds = spelled(67).joined().contains("\u{AD}")
         }
 
-        /// A whole number written as one word, such as German "viertausendfünfhundertsiebenundsechzig".
-        /// Only words that start and end with a number word are parsed, which keeps the slow lenient parse off ordinary words,
-        /// and only a value the system spells back as the same word counts, which rejects ordinals such as "segundo" or "zweite".
+        /// A one-word number such as German "viertausendfünfhundertsiebenundsechzig", parsed only when it starts and ends with a number word and spells back the same, which rejects ordinals such as "zweite".
         func compoundValue(_ word: String) -> Int? {
             let wordKey = key(word)
             guard compounds, wordKey.count >= 6, word.allSatisfy(\.isLetter),
@@ -141,7 +137,6 @@ public enum LocalizedSpokenNumbers {
         mutating func read(_ word: Word) -> Bool {
             switch word.kind {
             case .scale:
-                // A scale word alone means one of it, as in "mil e quinhentos" or "тысяча двести".
                 let count = group > 0 ? group : words == 0 ? 1 : 0
                 guard count > 0, word.value < scale else { return false }
                 total += count * word.value
@@ -150,7 +145,6 @@ public enum LocalizedSpokenNumbers {
                 scale = word.value
                 scales += 1
             case .hundreds where word.value == 100 && last == .unit && (1...9).contains(group), .multiplier:
-                // French "cinq cent": the word for one hundred also multiplies a count before it.
                 guard last == .unit, (1...9).contains(group) else { return false }
                 group *= 100
                 limit = 100
@@ -169,8 +163,7 @@ public enum LocalizedSpokenNumbers {
         }
     }
 
-    /// Writes number words as digits in `language`, or in the text's detected language when it is nil: "quatro mil quinhentos e sessenta e sete" becomes "4567",
-    /// "dois gatos" "2 gatos", "doscientos cincuenta mil" "250000" and "dix pour cent" "10%". English is left to `SpokenNumbers`.
+    /// Writes number words as digits in `language`, or the text's detected language when nil, so "quatro mil quinhentos e sessenta e sete" becomes "4567" and "dix pour cent" "10%".
     public static func apply(_ text: String, language: String?) -> String {
         guard let code = TranscriptCleaner.languageCode(of: text, language: language), !skipped.contains(code), let lexicon = Lexicon(language: code) else { return text }
         let tokens = text.split(separator: " ").map(Token.init)
@@ -214,21 +207,27 @@ public enum LocalizedSpokenNumbers {
                 i += 1
                 continue
             }
-            // Numbers spoken one after another, such as "quatro cinco seis sete", are one run of digits, and a "vírgula" or "ponto" said between them is written as said.
-            // A later number of 100 or more starts a new one. Nothing else adds separators, since whether "." or "," groups thousands depends on the reader.
+            let anchored = i > 0 && tokens[i - 1].trailing.isEmpty && anchors.contains(tokens[i - 1].key)
             var digits = String(number.value)
+            var values = [number.value]
+            var marked = false
             while joined(end) {
                 let mark = separators[tokens[end].key]
                 let start = mark == nil ? end : end + 1
                 guard mark == nil || joined(start), case let (next, after) = reading(at: start), after > start, mark != nil || next.value < 100 else { break }
                 digits += (mark ?? "") + String(next.value)
+                values.append(next.value)
+                marked = marked || mark != nil
                 end = after
+            }
+            if !marked, values.count > 1, !SpokenNumbers.joins(values, anchored: anchored) {
+                out += tokens[i..<end].map(\.text)
+                i = end
+                continue
             }
             let percent = percents.first { words in words.indices.allSatisfy { joined(end + $0) && tokens[end + $0].key == words[$0] } }
             let last = end + (percent?.count ?? 0)
             if end == firstEnd {
-                let anchored = i > 0 && tokens[i - 1].trailing.isEmpty && anchors.contains(tokens[i - 1].key)
-                // "um", "une" or "eine" alone is usually an article, and "mil" or "mille" alone an exaggeration.
                 if percent == nil, end - i == 1, number.value == 1 && !anchored || number.last == .scale {
                     out += tokens[i..<end].map(\.text)
                     i = end

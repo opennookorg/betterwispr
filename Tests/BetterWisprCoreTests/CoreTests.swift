@@ -341,7 +341,7 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
 
 @Test func voiceCommandsWriteSpokenNumbersAsDigits() {
     let expected = [
-        "The budget is two hundred and fifty thousand dollars.": "The budget is 250000 dollars.",
+        "The budget is two hundred and fifty thousand dollars.": "The budget is 250,000 dollars.",
         "We have one hundred people and two hundred chairs.": "We have 100 people and 200 chairs.",
         "one hundred or two hundred": "100 or 200",
         "one hundred and two hundred": "100 and 200",
@@ -349,6 +349,8 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         "two or three": "2 or 3",
         "give me five minutes": "give me 5 minutes",
         "nineteen ninety nine": "1999",
+        "twenty twenty six": "2026",
+        "PR number four eight": "PR number 48",
         "call five five five now": "call 555 now",
         "PR number one": "PR number 1",
         "twenty one twenty second": "21 twenty second",
@@ -359,7 +361,7 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         "I waited ten minutes": "I waited 10 minutes",
         "one thousand two hundred": "1200",
         "two thousand twenty six": "2026",
-        "one million two hundred thousand": "1200000",
+        "one million two hundred thousand": "1,200,000",
         "five million": "5 million",
         "two point five million": "2.5 million",
         "The value is three point five.": "The value is 3.5.",
@@ -374,13 +376,13 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         "twenty, thirty": "20, 30",
         "I have one lakh followers.": "I have 1 lakh followers.",
         "The flat costs fifty lakhs.": "The flat costs 50 lakhs.",
-        "We raised two lakh fifty thousand rupees.": "We raised 250000 rupees.",
-        "The budget is one crore twenty lakh.": "The budget is 12000000.",
+        "We raised two lakh fifty thousand rupees.": "We raised 2,50,000 rupees.",
+        "The budget is one crore twenty lakh.": "The budget is 1,20,00,000.",
         "Revenue was two point five crore.": "Revenue was 2.5 crore.",
         "It costs twelve hundred dollars.": "It costs 1200 dollars.",
         "twenty five hundred": "2500",
-        "I have over ten thousand hundred followers.": "I have over 10000 hundred followers.",
-        "Ten thousand one lakh.": "10000 1 lakh.",
+        "I have over ten thousand hundred followers.": "I have over 10,000 hundred followers.",
+        "Ten thousand one lakh.": "10,000 1 lakh.",
         "five thousand million": "5000 million",
     ]
     for (spoken, written) in expected {
@@ -389,13 +391,14 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     let unchanged = [
         "one of them", "no one", "at one point we", "at one point we left",
         "a hundred times", "a thousand thanks", "what percentage of users", "twenty first century", "call 5 5 5 now",
+        "fifty fifty", "eleven thirty", "meet at two thirty", "ten fifteen", "two three days", "seven eleven", "one two punch",
     ]
     for text in unchanged {
         #expect(VoiceCommands.apply(text) == text)
     }
 }
 
-@Test func spokenNumbersBecomeDigitsInOtherLanguages() {
+@Test func spokenNumbersBecomeDigitsInOtherLanguages() throws {
     let expected: [(String, String?, String)] = [
         ("PR número quatro mil quinhentos e sessenta e sete", "pt", "PR número 4567"),
         ("PR número quatro cinco seis sete", nil, "PR número 4567"),
@@ -434,6 +437,8 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         ("il numero quattromilacinquecentosessantasette", "it", "il numero 4567"),
         ("четыре тысячи пятьсот шестьдесят семь", "ru", "4567"),
         ("dwa tysiące dwadzieścia sześć", "pl", "2026"),
+        ("o ticket número dois três", "pt", "o ticket número 23"),
+        ("em mil novecentos e noventa e nove", "pt", "em 1999"),
     ]
     for (spoken, language, written) in expected {
         #expect(LocalizedSpokenNumbers.apply(spoken, language: language) == written)
@@ -443,6 +448,9 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
         ("una vez", "es"), ("un jour", "fr"), ("espera um segundo", "pt"), ("vou para o quarto", "pt"), ("un segundo por favor", "es"),
         ("die zweite Version", "de"), ("le dixième étage", "fr"), ("secondo me è giusto", "it"), ("die Entwicklung", "de"),
         ("twenty five people", "en"), ("I have twenty five people here today", nil),
+        ("un chat et une souris", "fr"), ("il y a un problème", "fr"), ("uno de ellos", "es"), ("una vez más", "es"), ("um dia desses", "pt"),
+        ("ein Hund und eine Katze", "de"), ("uno dei migliori", "it"), ("un giorno", "it"), ("son las dos treinta", "es"),
+        ("às onze trinta", "pt"), ("deux trois jours", "fr"), ("o primeiro lugar", "pt"),
     ]
     for (text, language) in unchanged {
         #expect(LocalizedSpokenNumbers.apply(text, language: language) == text)
@@ -452,7 +460,7 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(VoiceCommands.apply("queue the PR number four eight.") == "queue the PR number 48.")
     #expect(VoiceCommands.apply("ticket four thousand five hundred sixty seven") == "ticket 4567")
     #expect(VoiceCommands.apply("issue zero one") == "issue 01")
-    #expect(try! JSONDecoder().decode(AppSettings.self, from: jsonDroppingKey(AppSettings(), "writesNumbersAsDigits")).writesNumbersAsDigits)
+    #expect(try JSONDecoder().decode(AppSettings.self, from: jsonDroppingKey(AppSettings(), "writesNumbersAsDigits")).writesNumbersAsDigits)
 }
 
 @Test func voiceCommandsWriteSpokenSymbols() {
