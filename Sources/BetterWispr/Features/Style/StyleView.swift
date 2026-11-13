@@ -104,7 +104,7 @@ struct StyleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 8, style: .continuous))
                     .padding([.horizontal, .bottom], 16)
-                    if model.settings.cleanup == .medium || model.settings.selectedTextShortcut != nil {
+                    if model.settings.cleanup == .medium || model.settings.selectedTextShortcut != nil || model.settings.formatShortcut != nil {
                         RowDivider()
                         VStack(alignment: .leading, spacing: 8) {
                             NotesModelPicker(model: model, title: L10n.tr("Cleanup provider"), overrideSelection: \.cleanupSelection)
@@ -209,6 +209,7 @@ struct StyleView: View {
     private var cleanupFooter: String {
         let original = L10n.tr("Your original words are never lost. In History, open Original transcription and choose Use Original.")
         guard model.settings.cleanup == .medium else {
+            if model.settings.formatShortcut != nil { return L10n.tr("Dictate and format sends your English dictation to the cleanup provider. %@", String(original)) }
             return model.settings.selectedTextShortcut == nil ? original : L10n.tr("Clean up selected text sends your selection to the cleanup provider. %@", String(original))
         }
         let provider = model.settings.cleanupSettings
