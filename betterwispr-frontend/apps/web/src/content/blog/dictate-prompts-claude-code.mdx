@@ -1,0 +1,44 @@
+export const meta = {
+  title: "Voice coding on Mac: dictate prompts to Claude Code hands-free",
+  description:
+    "Speak a prompt into Claude Code, Claude Desktop or any chat app and have BetterWispr paste it and press Return for you, with Send to Claude and Send keys in 0.1.6.",
+  date: "2026-11-13",
+};
+
+Talking is faster than typing, especially for long prompts to an AI coding agent. Even so, voice coding has always had one annoying step at the end: after the text lands, you still reach for Return. BetterWispr 0.1.6 removes that step.
+
+## Send to Claude
+
+Turn on **Send to Claude** in Settings > After you speak. After it pastes your dictation, BetterWispr presses Return when the cursor is in:
+
+- Claude Desktop's message box
+- the Claude Code panel in VS Code
+- a Terminal or iTerm2 tab where Claude Code is running
+
+Anywhere else, such as a shell prompt or a file, the text is only pasted. A Terminal tab counts only while Claude Code is the process in front, so Return never runs a shell command by accident. Return also answers Claude Code's permission prompts.
+
+For a second, the capsule shows ↵ and counts down before sending.
+
+- **Dictate again** during the countdown to add more. Both parts are sent together.
+- **Press Escape** or click Don't send to keep the text unsent.
+- **Hold Shift** as you finish to paste without sending.
+
+If you switch apps or fields, nothing is sent.
+
+## Send keys for every other app
+
+Not every chat or agent app can be recognized. **Send keys** in Settings lets you add any app and record the key that submits in it: Return, Tab or ⌘Return. Then BetterWispr presses that key after each paste there. It refuses keys that could do damage, such as ⌘Q, ⌘W or Delete, and it doesn't offer Terminal, where a key could run a command. Mike Lyons contributed this feature.
+
+## Dictation built for prompts
+
+- **Write numbers as digits** types "PR four five six seven" as "PR 4567" and "issue twelve" as "issue 12".
+- **Use screen context** fixes names you said using the names visible in the window, so "superbase" becomes Supabase when Supabase is on screen. That text stays on your Mac.
+- **Dictate and format** keeps AI prompts literal and plain. See [voice to formatted text](/blog/voice-to-formatted-text-mac).
+- **Escape cancels** a dictation from any app, and an optional second shortcut does the same.
+- **Hold only** finishes the moment you let go, so a quick tap never starts hands-free dictation by mistake.
+
+## Your prompts stay yours
+
+Speech is turned into text on your Mac with Parakeet, Whisper or Cohere Transcribe. Only the pasted prompt goes to Claude, the same as if you had typed it.
+
+[Download BetterWispr 0.1.6](https://github.com/opennookorg/betterwispr/releases/tag/v0.1.6), free and open source.

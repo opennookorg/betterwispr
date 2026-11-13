@@ -1,0 +1,60 @@
+export const meta = {
+  title: "A free, local AI meeting note taker for Mac with speaker labels",
+  description:
+    "BetterWispr 0.1.6 records calls without a bot, labels who spoke on your Mac, writes notes with a model you choose, and answers questions about your meetings with cited lines.",
+  date: "2026-11-13",
+};
+
+Most AI meeting note takers join your call as a bot, upload the recording and send you a summary from their servers. BetterWispr's notetaker works differently. It records the call audio and your microphone on your Mac, transcribes them with a local speech model, and writes notes with a notes model you pick. Nothing joins the call, and you don't need an account.
+
+Version 0.1.6 adds a lot to the notetaker. This post covers what's new and where each part runs.
+
+## Bot-free recording on your Mac
+
+Start a meeting note from the capsule, the menu bar or the dashboard. BetterWispr records the other side of the call (Them) from your Mac's audio on macOS 14.2 and later, and your microphone (Me). It works with Zoom, Google Meet, Microsoft Teams, Webex and any other app that plays sound, because it never joins the meeting itself.
+
+New in 0.1.6:
+
+- **Mute your microphone** from the meeting toolbar. While muted, only the call audio is recorded.
+- **Start the next meeting right away.** The last one keeps transcribing, finding speakers and writing notes on its own.
+- **Long meetings no longer fail** with "The model couldn't condense this meeting enough". BetterWispr shrinks a long transcript in more rounds, and if that's still not enough, it writes notes for each part and joins them in order.
+
+## Speaker labels, on device
+
+Download Speaker detection (about 15 MB) under Models > Meeting speakers. It uses Argmax SpeakerKit models, runs on your Mac, and now works on macOS 14 too.
+
+- **Labels during the call.** Lines from the other side show Speaker 1, Speaker 2 and so on while the meeting records. These are a first guess. A pass after the meeting replaces them.
+- **Tell apart people in the room.** An optional setting also separates the voices on your microphone, so the people sitting with you get their own speaker numbers.
+- **My voice.** Record 30 seconds of yourself, and BetterWispr saves a voice profile so your voice stays Me even when someone beside you talks more. The recording is deleted, and the profile never leaves your Mac.
+- **Correct and merge speakers.** Click a speaker's name on any line to move that line to another speaker, or merge two speakers into one.
+- **Name speakers after invitees.** When Calendar added the meeting's invitees, you can pick a speaker's name from that list.
+- **Remember named voices.** This is optional and off by default. Later meetings suggest "Sounds like" with that name, but nothing is filled in until you pick it. A voice profile can count as biometric data, so ask people before you name them.
+
+Our 0.1.6 tests of live labels used only synthetic voices, not real calls, and the [changelog](/changelog) gives the exact numbers. Expect live labels to be rougher than the labels written after the meeting.
+
+## Notes from the model you choose
+
+The summary uses the notes provider you choose in Models. That can be Apple Intelligence, Ollama, Claude Code, Codex or an API connection. 0.1.6 adds two more options:
+
+- **A built-in notes model.** Download Qwen3.5 2B (1.28 GB) and it writes meeting notes on your Mac with no Apple Intelligence, Ollama, CLI or API key. It works on macOS 14, uses about 1.5 GB of memory while it runs, and unloads after five idle minutes. A 2B model can repeat points, so check its notes.
+- **Provider presets** for OpenAI, Anthropic, Google Gemini and OpenRouter API connections. Your key is stored in the macOS Keychain.
+
+**Summary language** sets the language of your notes. By default, notes are written in the language the meeting was held in.
+
+## Ask your meetings, with citations
+
+Each meeting now has an **Ask** tab, and the Notetaker page can answer questions across all your meetings. Answers cite the transcript lines they came from. Click a citation to jump to that line.
+
+- **What did I miss?** answers from the last five minutes of a meeting that's still recording.
+- **Filters** limit Ask to meetings from today, the past 7 days or the past 30 days, or to meetings with one invitee.
+- Your questions and answers are saved on your Mac, and each answer names the model that wrote it.
+
+Ask sends your question, plus the meeting lines that best match it, to the notes provider you chose. With the built-in model or Ollama, that stays on your Mac.
+
+## Share meetings with Claude, Cursor and other MCP apps
+
+Turn on **Connected apps** in Settings, and Claude Desktop, Claude Code, Cursor and other apps that support MCP can search your meetings and read their summaries and transcripts. They can only read. Turn the setting off and sharing stops right away. BetterWispr itself sends nothing, but the app you connect sends what it reads to its own AI provider.
+
+## Try it
+
+BetterWispr is free and open source. [Download 0.1.6 from GitHub](https://github.com/opennookorg/betterwispr/releases/tag/v0.1.6), and read [where your voice goes](/blog/where-your-voice-goes) for the full privacy picture.
