@@ -1,0 +1,6 @@
+"Choose a supported translation language." = "Choisissez une langue de traduction prise en charge.";
+"Apple Intelligence can’t translate into %@ on this Mac." = "Apple Intelligence ne peut pas traduire en %@ sur ce Mac.";
+"There’s no text to translate." = "Il n’y a aucun texte à traduire.";
+"This dictation is too long to translate in one request." = "Cette dictée est trop longue pour être traduite en une seule requête.";
+"The translation model took too long to respond." = "Le modèle de traduction a mis trop de temps à répondre.";
+"The model returned an empty or incomplete translation." = "Le modèle a renvoyé une traduction vide ou incomplète.";

@@ -2177,3 +2177,50 @@ are willing to send to that app's provider.
 - [ ] Separate language/accent/device groups and latency measurements. Record
   settings and model hashes; do not report another project's paper numbers as
   BetterWispr results.
+
+## Dictation translation
+
+- [ ] In Settings > Shortcut, choose F5 and enable the internal microphone key.
+  With standard function keys off, press the microphone key without Fn from
+  TextEdit. Test toggle and hold modes, and verify automatic paste. Turn the
+  option off and verify that the same key opens Apple Dictation when configured
+  to do so. Repeat with an unrelated keyboard remapping, then with a conflicting
+  mapping. Check that the unrelated rule survives and the conflict is refused.
+  Quit normally with the option enabled. The key should open Apple Dictation
+  while BetterWispr is closed, and work in BetterWispr again after relaunch.
+  After a forced quit with the option active, reopen BetterWispr and verify
+  the key returns to Apple until manually enabled again. Turn the option off,
+  quit, and verify it stays off on the next launch.
+
+- [ ] From the menu bar, choose English for the next dictation. Focus an editor,
+  dictate in French with Parakeet, and verify the live preview remains French.
+  Stop and verify English is pasted and History can copy the French source.
+  The next dictation should use the normal delivery path.
+- [ ] Start a longer dictation. After the first sentence, turn on translation
+  with the globe and choose a target in the language menu. Finish speaking and
+  verify both sentences are translated. Start another dictation and verify that
+  the target is remembered and translation starts off. Repeat in hold and toggle
+  modes, including releasing the shortcut with the language menu still open.
+- [ ] In TextEdit, use hold mode with translation off. While holding ⌥ Space,
+  dictate, open the language list, and move the highlight with the arrow keys.
+  Release ⌥ Space without closing the list. Verify it closes, the dictation
+  stops, and the original text is pasted with Accessibility enabled. Type `X`
+  without clicking again; it should appear at the cursor in TextEdit even if
+  Accessibility is off and BetterWispr could only copy the dictated text.
+- [ ] With a custom Cancel shortcut configured, open the language list during
+  dictation. Escape should close only the list. Reopen it and press the custom
+  shortcut: the recording should cancel and releasing ⌥ Space should paste
+  nothing. In toggle mode, also switch to another app with the list open and
+  verify the list closes without pulling keyboard focus back to BetterWispr.
+- [ ] With spoken translation commands on, dictate “Dans le mail écris traduis
+  en anglais et ajoute le lien”. The text should be transcribed as one ordinary
+  sentence. Try “Traduis en anglais. Le build est prêt.” with the switch on and
+  off. With it on, the command should be recognized if the speech engine
+  punctuates the opening clause.
+- [ ] For a remote translation provider, decline the confirmation. Copy the
+  original from the capsule. Retry and confirm, then verify the translated
+  result can be pasted manually. During a new translation, press Escape and
+  verify a late reply never appears in History, the clipboard or the editor.
+- [ ] Change the focused field while translating. Verify the result is copied
+  for manual paste. With Send after paste on, verify a translation in the
+  original field is pasted for review without sending it.

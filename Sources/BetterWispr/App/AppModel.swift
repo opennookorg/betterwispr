@@ -15,6 +15,7 @@ enum RecordingPhase: Equatable {
     case sending
     case failed(DictationFailure)
     case unpasted(String)
+    case translationFailed
     /// Waiting, with no timeout, for the user to approve what happens to a long dictation.
     case asking(DictationQuestion)
 
@@ -28,10 +29,12 @@ enum RecordingPhase: Equatable {
 enum DictationQuestion: Equatable {
     case send(duration: TimeInterval, model: SpeechModel)
     case paste(duration: TimeInterval, app: String?)
+    case translate(destination: String)
 
     var title: String {
         switch self {
         case .send(let duration, let model): L10n.tr("Send %@ of audio to %@?", String(Self.length(duration)), String(model.audioDestination ?? model.localizedName))
+        case .translate(let destination): L10n.tr("Send this transcript to %@ for translation?", destination)
         case .paste(let duration, let app): L10n.tr("Paste this %@ dictation into %@?", String(Self.length(duration)), String(app ?? L10n.tr("the focused app")))
         }
     }
@@ -39,17 +42,19 @@ enum DictationQuestion: Equatable {
         switch self {
         case .send: L10n.tr("If you don’t send it, the recording stays on your Mac.")
         case .paste: L10n.tr("Copy instead leaves the text on your clipboard.")
+        case .translate: L10n.tr("You can copy the original if you decline.")
         }
     }
     var approval: String {
         switch self {
         case .send(_, let model): model.recordingAction(onDevice: (title: L10n.tr("Send"), help: "")).title
         case .paste: L10n.tr("Paste")
+        case .translate: L10n.tr("Translate")
         }
     }
     var refusal: String {
         switch self {
-        case .send: L10n.tr("Don’t send")
+        case .send, .translate: L10n.tr("Don’t send")
         case .paste: L10n.tr("Copy instead")
         }
     }
@@ -98,6 +103,8 @@ final class DictationRecording {
     let continuesIn: pid_t?
     /// Pieces recognized, and edits started, while recording.
     var streamed: StreamedPieces?
+    var translationLanguage: String?
+    var suppressesVoiceTranslation = false
     /// When recording stopped, for timing logs.
     var stoppedAt = ContinuousClock.now
 
@@ -137,6 +144,13 @@ struct StreamedPieces {
     let editSettings: AppSettings
 }
 
+@MainActor
+protocol SegmentedSpeechProvider: SpeechProvider {
+    func transcribe(samples: [Float], language: String?, vocabulary: [String], screenTerms: [String]) async throws -> (text: String, vocabularyFixes: Int)
+}
+
+extension ParakeetProvider: SegmentedSpeechProvider {}
+
 struct ModelInstallation: Equatable {
     let id: String
     let token = UUID()
@@ -162,9 +176,16 @@ final class AppModel {
         didSet {
             cardDismissal?.cancel()
             cardDeadline = nil
+            if phase != .recording { showsTranslationLanguages = false }
             if phase.isBusy != oldValue.isBusy {
                 scheduleIdleUnload()
-                if !phase.isBusy { syncShiftShortcut() }
+                if !phase.isBusy {
+                    if microphoneKeyShortcutRetryPending, capturingRecorder == nil {
+                        registerShortcut()
+                    } else {
+                        syncShiftShortcut()
+                    }
+                }
             }
             if phase.armsCancelShortcut != oldValue.armsCancelShortcut { onBusyChange?(phase.armsCancelShortcut) }
             switch (oldValue == .recording, phase == .recording) {
@@ -191,6 +212,20 @@ final class AppModel {
     private(set) var failedDictations: [FailedDictation] = []
     var statusMessage = ""
     var partialTranscript = ""
+    var showsTranslationLanguages = false {
+        didSet {
+            if showsTranslationLanguages != oldValue { onPresentationChange?() }
+        }
+    }
+    private(set) var nextTranslationLanguage: String?
+    private(set) var recordingTranslationLanguage: String?
+    private var suppressesVoiceTranslation = false
+    var translationRecovery: (source: String, language: String, message: String)? {
+        guard phase == .translationFailed, let failedTranslation else { return nil }
+        return (failedTranslation.transcript.text, failedTranslation.language, failedTranslation.message)
+    }
+    @ObservationIgnored private var pendingTranslationSource: Transcript?
+    private var failedTranslation: (transcript: Transcript, language: String, message: String)?
     /// Preview only; the pasted text always comes from the batch recognition.
     var liveTranscript = LiveTranscript()
     var voiceLevels = VoiceLevels()
@@ -199,6 +234,7 @@ final class AppModel {
     private(set) var sendKeystroke: SendKeystroke?
     var recordingDuration: TimeInterval = 0
     var history: [Transcript] = []
+    @ObservationIgnored private var unsavedDictationIDs: Set<UUID> = []
     var vocabulary: [VocabularyEntry] = []
     var settings = AppSettings()
     var notesCLICatalogs: [NotesCLI: NotesCLICatalog] = [:]
@@ -230,8 +266,17 @@ final class AppModel {
     @ObservationIgnored private let failedDictationStore: FailedDictationStore
     @ObservationIgnored private let recorder = AudioRecorder()
     @ObservationIgnored private let startsServices: Bool
+    @ObservationIgnored private let translateDictation: (String, String, AppSettings) async throws -> String
     @ObservationIgnored private let correctionWatcher = CorrectionWatcher()
-    @ObservationIgnored private let globalShortcut = GlobalShortcut()
+    @ObservationIgnored private var globalShortcut: any DictationHotKey
+    @ObservationIgnored private let makeReplacementShortcut: () -> any DictationHotKey
+    @ObservationIgnored private let microphoneKeyRemap: MicrophoneKeyRemap
+    private(set) var microphoneKeyRemapped = false
+    var microphoneKeyOptionEnabled: Bool { microphoneKeyRemapped || settings.usesInternalMicrophoneKey }
+    private(set) var microphoneKeyRecoveryNeeded = false
+    private(set) var microphoneKeyError: String?
+    @ObservationIgnored private var microphoneKeyWaitingForLock = false
+    @ObservationIgnored private var microphoneKeyShortcutRetryPending = false
     @ObservationIgnored private let cancelShortcut = GlobalShortcut(id: 2)
     @ObservationIgnored private let customCancelShortcut = GlobalShortcut(id: 3)
     @ObservationIgnored private let selectedTextShortcut = GlobalShortcut(id: 4)
@@ -288,11 +333,19 @@ final class AppModel {
         return microphones + [saved]
     }
 
-    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser()) {
+    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser(),
+         microphoneKeyRemap: MicrophoneKeyRemap? = nil,
+         globalShortcut: any DictationHotKey = GlobalShortcut(),
+         makeReplacementShortcut: @escaping () -> any DictationHotKey = { GlobalShortcut(id: 5) },
+         translateDictation: @escaping (String, String, AppSettings) async throws -> String = DictationTranslator.translate) {
         self.store = store
+        self.globalShortcut = globalShortcut
+        self.makeReplacementShortcut = makeReplacementShortcut
+        self.microphoneKeyRemap = microphoneKeyRemap ?? MicrophoneKeyRemap(directory: store.directory)
         failedDictationStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
         self.mediaPauser = mediaPauser
         self.startsServices = startsServices
+        self.translateDictation = translateDictation
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
         transcriptions = TranscriptionModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Transcriptions")))
         meetingDetector = MeetingDetector(meetings: meetings)
@@ -323,7 +376,9 @@ final class AppModel {
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         meetings.notesSettings = settings
         meetings.remembersVoices = settings.rememberVoices
-        for cli in Set([settings.notesCLI, settings.askSettings.notesCLI, settings.cleanupSettings.notesCLI].compactMap { $0 }) { Task { await refreshNotesCLIModels(cli) } }
+        var configuredCLIs = Set([settings.notesCLI, settings.askSettings.notesCLI, settings.cleanupSettings.notesCLI].compactMap { $0 })
+        if case .cli(let cli) = settings.translationSelection { configuredCLIs.insert(cli) }
+        for cli in configuredCLIs { Task { await refreshNotesCLIModels(cli) } }
         refreshModels()
         refreshCalendars()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
@@ -333,8 +388,11 @@ final class AppModel {
                 (error as? RecordingInterruption)?.discardAudio()
                 return
             }
+            let language = self.recordingTranslationLanguage
+            let suppressesVoiceTranslation = self.suppressesVoiceTranslation
             self.discardRecording()
-            self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t continue recording."))
+            self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t continue recording."),
+                                      translationLanguage: language, suppressesVoiceTranslation: suppressesVoiceTranslation)
         }
         recorder.onFrameLimit = { [weak self] in self?.recordingReachedLimit() }
         refreshMicrophones()
@@ -342,7 +400,7 @@ final class AppModel {
         meetingDetector.isEnabled = settings.detectMeetings
         globalShortcut.onPress = { [weak self] in self?.shortcutPressed() }
         globalShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
-        cancelShortcut.onPress = { [weak self] in self?.cancelOrHoldBack() }
+        cancelShortcut.onPress = { [weak self] in self?.escapePressed() }
         customCancelShortcut.onPress = { [weak self] in self?.cancelOrHoldBack() }
         selectedTextShortcut.onPress = { [weak self] in self?.cleanUpSelectedText() }
         onBusyChange = { [weak self] busy in self?.armCancelShortcut(busy) }
@@ -381,11 +439,15 @@ final class AppModel {
     }
 
     func registerShortcut() {
+        let retriesMicrophoneKeyShortcut = microphoneKeyShortcutRetryPending
+        microphoneKeyShortcutRetryPending = false
         if let shortcut = settings.selectedTextShortcut { try? selectedTextShortcut.register(shortcut) }
         do {
             try globalShortcut.register(settings.shortcut, withShift: wantsShiftShortcut(for: settings.shortcut))
             if statusMessage == shortcutWarning { statusMessage = "" }
         } catch {
+            if microphoneKeyRemapped { restoreMicrophoneKey() }
+            if retriesMicrophoneKeyShortcut { microphoneKeyError = error.localizedDescription }
             statusMessage = L10n.tr("%@ Use the menu bar or Record button to dictate, or choose another shortcut in Settings.", String(error.localizedDescription))
             shortcutWarning = statusMessage
         }
@@ -406,13 +468,24 @@ final class AppModel {
     func endKeyCapture(_ recorder: UUID) {
         guard capturingRecorder == recorder else { return }
         capturingRecorder = nil
+        if microphoneKeyShortcutRetryPending, isBusy { return }
         registerShortcut()
     }
 
     private func armCancelShortcut(_ busy: Bool) {
         if busy {
-            cancelShortcut.register(keyCode: UInt32(kVK_Escape), modifiers: settings.shortcut.cancelModifiers)
-            if let custom = settings.cancelShortcut { try? customCancelShortcut.register(custom) }
+            var escapeModifiers = settings.shortcut.cancelModifiers
+            if let custom = settings.cancelShortcut {
+                do {
+                    try customCancelShortcut.register(custom)
+                    if custom.keyCode == UInt32(kVK_Escape) {
+                        escapeModifiers.removeAll { $0 == custom.modifiers }
+                    }
+                } catch {
+                    // Keep the default Escape behavior if the custom binding is unavailable.
+                }
+            }
+            cancelShortcut.register(keyCode: UInt32(kVK_Escape), modifiers: escapeModifiers)
         } else {
             cancelShortcut.unregister()
             customCancelShortcut.unregister()
@@ -421,21 +494,172 @@ final class AppModel {
 
     func changeShortcut(_ shortcut: DictationShortcut) {
         guard !isBusy else { return }
+        if microphoneKeyRecoveryNeeded, shortcut == settings.shortcut { return }
         if shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut {
             registerShortcut()
             ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), ShortcutError.alreadyAssigned(shortcut)))
             return
         }
         do {
-            try globalShortcut.register(shortcut, withShift: wantsShiftShortcut(for: shortcut))
+            if microphoneKeyRecoveryNeeded || (microphoneKeyRemapped && shortcut != .f5) {
+                let previousSettings = settings
+                let previousModel = selectedModel
+                let replacement = makeReplacementShortcut()
+                try replacement.register(shortcut, withShift: wantsShiftShortcut(for: shortcut))
+                // Keep the old registration until the new shortcut has been saved.
+                // Journal removal can fail after the save. Use the saved shortcut in that case.
+                restoreMicrophoneKey(disabling: true, replacementShortcut: shortcut)
+                guard settings.shortcut == shortcut else {
+                    replacement.unregister()
+                    return
+                }
+                replacement.onPress = globalShortcut.onPress
+                replacement.onRelease = globalShortcut.onRelease
+                globalShortcut.unregister()
+                globalShortcut = replacement
+                if statusMessage == shortcutWarning { statusMessage = "" }
+                microphoneKeyShortcutRetryPending = false
+                applyRecoveredShortcutSettings(previous: previousSettings, previousModel: previousModel)
+                return
+            } else {
+                try globalShortcut.register(shortcut, withShift: wantsShiftShortcut(for: shortcut))
+            }
         } catch {
-            registerShortcut()
+            if !globalShortcut.isRegistered { registerShortcut() }
             ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
             return
         }
         if statusMessage == shortcutWarning { statusMessage = "" }
+        microphoneKeyShortcutRetryPending = false
         settings.shortcut = shortcut
+        if shortcut != .f5 { settings.usesInternalMicrophoneKey = false }
         saveSettings()
+    }
+
+    func setMicrophoneKeyRemapped(_ enabled: Bool) {
+        guard !isBusy, capturingRecorder == nil else { return }
+        guard enabled else {
+            restoreMicrophoneKey(disabling: true)
+            return
+        }
+        guard settings.shortcut == .f5, !microphoneKeyRemapped,
+              !microphoneKeyRecoveryNeeded else { return }
+        guard ensureMicrophoneKeyShortcut() else { return }
+        do {
+            try microphoneKeyRemap.enable()
+            microphoneKeyRemapped = true
+            microphoneKeyRecoveryNeeded = false
+            microphoneKeyError = nil
+            do { try saveMicrophoneKeyPreference(true) }
+            catch { microphoneKeyError = error.localizedDescription }
+        } catch MicrophoneKeyRemap.RemapError.inUse {
+            microphoneKeyError = MicrophoneKeyRemap.RemapError.inUse.localizedDescription
+        } catch {
+            microphoneKeyRecoveryNeeded = microphoneKeyRemap.needsRecovery
+            microphoneKeyError = error.localizedDescription
+        }
+    }
+
+    private func saveMicrophoneKeyPreference(_ enabled: Bool, replacementShortcut: DictationShortcut? = nil) throws {
+        do {
+            // Recovery can run in an instance that loaded its workspace before the remap.
+            var current = try store.load()
+            let previous = current.settings
+            current.settings.usesInternalMicrophoneKey = enabled
+            if let replacementShortcut {
+                guard replacementShortcut != previous.cancelShortcut,
+                      replacementShortcut != previous.selectedTextShortcut else {
+                    throw ShortcutError.alreadyAssigned(replacementShortcut)
+                }
+                current.settings.shortcut = replacementShortcut
+            }
+            if current.settings != previous {
+                try store.save(current)
+            }
+            if replacementShortcut != nil {
+                settings = current.settings
+                let savedIDs = Set(current.history.map(\.id))
+                unsavedDictationIDs.subtract(savedIDs)
+                let unsaved = history.filter { unsavedDictationIDs.contains($0.id) }
+                history = (unsaved + current.history).sorted { $0.createdAt > $1.createdAt }
+                vocabulary = current.vocabulary
+            } else {
+                settings.usesInternalMicrophoneKey = enabled
+            }
+        } catch {
+            throw MicrophoneKeyPreferenceSaveError(
+                message: L10n.tr("Could not save settings: %@", String(error.localizedDescription))
+            )
+        }
+    }
+
+    @discardableResult
+    func startDictationShortcut(retryDelay: Duration = .seconds(1)) -> Task<Void, Never>? {
+        let restored = restoreMicrophoneKey(recovering: true)
+        registerShortcut()
+        if restored, settings.usesInternalMicrophoneKey { setMicrophoneKeyRemapped(true) }
+        guard !restored, microphoneKeyWaitingForLock else { return nil }
+        return Task { [weak self] in
+            for _ in 0..<3 {
+                try? await Task.sleep(for: retryDelay)
+                guard !Task.isCancelled, let self, self.microphoneKeyWaitingForLock else { return }
+                if self.retryMicrophoneKeyRecovery() { return }
+            }
+        }
+    }
+
+    @discardableResult
+    func retryMicrophoneKeyRecovery() -> Bool {
+        guard restoreMicrophoneKey(recovering: true) else { return false }
+        if settings.shortcut == .f5, !globalShortcut.isRegistered {
+            microphoneKeyShortcutRetryPending = true
+            if !isBusy, capturingRecorder == nil { registerShortcut() }
+        }
+        return true
+    }
+
+    private func ensureMicrophoneKeyShortcut() -> Bool {
+        if !globalShortcut.isRegistered { registerShortcut() }
+        if globalShortcut.isRegistered { return true }
+        microphoneKeyError = ShortcutError.unavailable(.f5).localizedDescription
+        return false
+    }
+
+    @discardableResult
+    func restoreMicrophoneKey(quitting: Bool = false, recovering: Bool = false, disabling: Bool = false,
+                              replacementShortcut: DictationShortcut? = nil) -> Bool {
+        let abandonsPreference = recovering || disabling || (quitting && microphoneKeyRecoveryNeeded)
+        do {
+            let clearedJournal = try microphoneKeyRemap.restore {
+                microphoneKeyRemapped = false
+                if abandonsPreference { try saveMicrophoneKeyPreference(false, replacementShortcut: replacementShortcut) }
+            }
+            microphoneKeyRemapped = false
+            // A manual deactivation also clears a saved preference if there was no journal.
+            if disabling, !clearedJournal { try saveMicrophoneKeyPreference(false, replacementShortcut: replacementShortcut) }
+            microphoneKeyRecoveryNeeded = false
+            microphoneKeyWaitingForLock = false
+            microphoneKeyError = nil
+            if quitting { microphoneKeyShortcutRetryPending = false }
+            return true
+        } catch MicrophoneKeyRemap.RemapError.inUse {
+            // An orphaned writer can hold the lock briefly at launch. A live
+            // owner can keep it longer. Neither should be interrupted.
+            microphoneKeyWaitingForLock = true
+            microphoneKeyRecoveryNeeded = true
+            microphoneKeyError = MicrophoneKeyRemap.RemapError.inUse.localizedDescription
+            return quitting && !microphoneKeyRemapped
+        } catch {
+            microphoneKeyWaitingForLock = false
+            microphoneKeyRecoveryNeeded = microphoneKeyRemap.needsRecovery
+            microphoneKeyError = error.localizedDescription
+            return false
+        }
+    }
+
+    private struct MicrophoneKeyPreferenceSaveError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
     }
 
     func changeCancelShortcut(_ shortcut: DictationShortcut?) {
@@ -475,6 +699,11 @@ final class AppModel {
         let shortcut = settings.shortcut.displayName
         let finish = sendKeystroke != nil ? L10n.tr("send") : L10n.tr("finish")
         return isHeldSession ? L10n.tr("Listening. Release %@ to %@.", String(shortcut), String(finish)) : L10n.tr("Listening. Press %@ or click ✓ to %@.", String(shortcut), String(finish))
+    }
+
+    private func escapePressed() {
+        if showsTranslationLanguages { showsTranslationLanguages = false; return }
+        cancelOrHoldBack()
     }
 
     private func cancelOrHoldBack() {
@@ -524,7 +753,8 @@ final class AppModel {
 
     /// Follows Shift while recording, so the capsule shows whether finishing now would send, and with which key.
     private func updateSendKeystroke(holdingBack: Bool? = nil) {
-        let sends = settings.sendsAfterPaste && !(holdingBack ?? (holdsBackReturn || shiftHeld)) ? targetKeystroke : nil
+        let sends = settings.sendsAfterPaste && recordingTranslationLanguage == nil
+            && !(holdingBack ?? (holdsBackReturn || shiftHeld)) ? targetKeystroke : nil
         guard sendKeystroke != sends else { return }
         sendKeystroke = sends
         if phase == .recording, statusMessage.hasPrefix(L10n.tr("Listening.")) { statusMessage = listeningStatus }
@@ -601,6 +831,37 @@ final class AppModel {
         }))
     }
 
+    func setNextTranslationLanguage(_ language: String?) {
+        nextTranslationLanguage = language
+        if let language { rememberTranslationLanguage(language) }
+    }
+
+    func toggleRecordingTranslation() {
+        guard phase == .recording else { return }
+        suppressesVoiceTranslation = recordingTranslationLanguage != nil
+        recordingTranslationLanguage = suppressesVoiceTranslation ? nil : settings.preferredTranslationLanguage
+        updateSendKeystroke()
+    }
+
+    func chooseRecordingTranslationLanguage(_ language: String) {
+        guard phase == .recording else { return }
+        if recordingTranslationLanguage != nil { recordingTranslationLanguage = language }
+        rememberTranslationLanguage(language)
+    }
+
+    private func rememberTranslationLanguage(_ language: String) {
+        guard language != settings.preferredTranslationLanguage else { return }
+        settings.preferredTranslationLanguage = language
+        // Saving a language must not reconfigure shortcuts while the key is held.
+        do { try persist() }
+        catch { statusMessage = L10n.tr("Could not save settings: %@", String(error.localizedDescription)) }
+    }
+
+    func setVoiceTranslationCommands(_ enabled: Bool) {
+        settings.voiceTranslationCommands = enabled
+        saveSettings()
+    }
+
     func toggleRecording() {
         if phase == .recording { finishRecording(); return }
         startRecording(held: false)
@@ -608,9 +869,11 @@ final class AppModel {
 
     private func startRecording(held: Bool) {
         guard !isBusy else { return }
+        if case .asking(.translate) = phase { return }
         answerQuestion(false)
         cancelledRecording = nil
         failedRecording = nil
+        failedTranslation = nil
         feedbackSound?.stop()
         correctionWatcher.stop()
         guard isModelInstalled(selectedModel) else {
@@ -687,6 +950,8 @@ final class AppModel {
                     self.dictationContext = self.captureContext(for: self.settings.applying(self.writingMode))
                 }
                 self.microphoneGranted = true
+                self.recordingTranslationLanguage = self.nextTranslationLanguage.take()
+                self.suppressesVoiceTranslation = false
                 self.phase = .recording
                 self.playFeedback(.started)
                 self.updateSendKeystroke()
@@ -801,7 +1066,9 @@ final class AppModel {
         let target = targetApplication
         let targetElement = targetElement
         let mode = writingMode
-        let shiftHoldsBack = holdsBackReturn || shiftHeld
+        let translationLanguage = recordingTranslationLanguage.take()
+        let suppressesVoiceTranslation = suppressesVoiceTranslation
+        let shiftHoldsBack = holdsBackReturn || shiftHeld || translationLanguage != nil
         let continuesIn = continuesIn
         updateSendKeystroke(holdingBack: shiftHoldsBack)
         let context = dictationContext.take()
@@ -850,6 +1117,8 @@ final class AppModel {
                                                    vocabulary: entries, target: target, targetElement: targetElement, mode: mode, context: context,
                                                    holdsBackReturn: holdsBackReturn, continuesIn: continuesIn)
                 recording.streamed = streamed
+                recording.translationLanguage = translationLanguage
+                recording.suppressesVoiceTranslation = suppressesVoiceTranslation
                 recording.stoppedAt = stoppedAt
                 self.transcribe(recording)
             } catch {
@@ -859,7 +1128,8 @@ final class AppModel {
                 }
                 self.recorder.cancel()
                 self.endLivePreview()
-                self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t finish recording."))
+                self.recordingInterrupted(by: error, title: L10n.tr("Couldn’t finish recording."),
+                                          translationLanguage: translationLanguage, suppressesVoiceTranslation: suppressesVoiceTranslation)
             }
         }
     }
@@ -911,10 +1181,10 @@ final class AppModel {
                 var pieces: [String] = []
                 var recognitionFixes = 0
                 if let streamed, streamed.modelID == model.id, streamed.language == recording.settings.language,
-                   let parakeet = provider as? ParakeetProvider,
+                   let segmentProvider = provider as? any SegmentedSpeechProvider,
                    let rest = StreamedDictation.remainder(of: try await Task.detached { try ParakeetProvider.samples(of: audio.url) }.value,
                                                           segmentedSamples: streamed.segmentedSamples, receivedSamples: streamed.receivedSamples) {
-                    let last = try await parakeet.transcribe(samples: rest, language: language, vocabulary: hints, screenTerms: screenTerms)
+                    let last = try await segmentProvider.transcribe(samples: rest, language: language, vocabulary: hints, screenTerms: screenTerms)
                     if StreamedDictation.joins(last.text, startingWith: streamed.wordAfterPieces) {
                         pieces = (streamed.pieces + [last.text]).filter { !$0.isEmpty }
                         recognitionFixes = streamed.vocabularyFixes + last.vocabularyFixes
@@ -930,7 +1200,11 @@ final class AppModel {
                 Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recognition completed: elapsed=\(String(describing: recognitionStarted.duration(to: .now)), privacy: .public) pieces=\(pieces.count) empty=\(raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
-                let recognized = recording.settings.chineseScript?.convert(raw, language: language) ?? raw
+                let command = recording.settings.voiceTranslationCommands && !recording.suppressesVoiceTranslation
+                    ? DictationTranslator.voiceCommand(in: raw) : nil
+                let translationLanguage = recording.translationLanguage ?? command?.language
+                let source = command?.text ?? raw
+                let recognized = recording.settings.chineseScript?.convert(source, language: language) ?? source
                 let lightlyCleaned = TranscriptCleaner.clean(recognized, language: language)
                 let trigger = recording.settings.modes.match(transcript: lightlyCleaned)
                 let mode = trigger?.mode ?? recording.mode
@@ -952,7 +1226,7 @@ final class AppModel {
                     self.statusMessage = L10n.tr("Editing with %@…", String(writingSettings.localizedNotesModelName))
                     let editStarted = ContinuousClock.now
                     let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
-                    let prepared = trigger == nil ? pieces.map { Self.prepared($0, settings: recording.settings, entries: entries, language: language) } : []
+                    let prepared = trigger == nil && command == nil ? pieces.map { Self.prepared($0, settings: recording.settings, entries: entries, language: language) } : []
                     let ahead = streamed.flatMap { $0.editSettings == writingSettings ? $0.edits : nil } ?? [:]
                     let instructions = mode?.instructions ?? ""
                     let (polished, reused) = await StreamedDictation.edit(spoken, pieces: prepared, ahead: ahead, editingPiece: {
@@ -973,23 +1247,39 @@ final class AppModel {
                 guard !text.isEmpty else { self.noSpeechHeard(); return }
                 transcribed = true
                 self.forgetFailedDictation(recording)
-                self.partialTranscript = text
-                let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
+                var transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
                                             appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + recognitionFixes)
+                if let translationLanguage {
+                    self.pendingTranslationSource = writingSettings.saveHistory ? transcript : nil
+                    defer {
+                        if self.generation == token { self.pendingTranslationSource = nil }
+                    }
+                    do {
+                        transcript = try await self.translatedTranscript(transcript, to: translationLanguage,
+                                                                          settings: recording.settings, token: token)
+                    } catch {
+                        guard self.generation == token, !Task.isCancelled else { return }
+                        self.showTranslationFailure(transcript, language: translationLanguage, error: error, save: writingSettings.saveHistory)
+                        return
+                    }
+                    guard self.generation == token, !Task.isCancelled else { return }
+                }
+                self.activeRecording = nil
+                let output = transcript.text
+                self.partialTranscript = output
                 var persistenceWarning: String?
-                if writingSettings.saveHistory {
+                if writingSettings.saveHistory && self.settings.saveHistory {
                     do { try self.addToHistory(transcript) } catch { persistenceWarning = error.localizedDescription }
                 }
-                let returnDelay = recording.settings.sendsAfterPaste && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
+                let returnDelay = translationLanguage == nil && recording.settings.sendsAfterPaste && !recording.holdsBackReturn ? recording.settings.sendDelay : nil
                 let paste = FocusedAppIntegration(keepsCopy: writingSettings.copyToClipboard, expectedFocus: recording.targetElement)
                 let integration: (any TextOutputIntegration)? = writingSettings.autoPaste
                     ? paste : writingSettings.copyToClipboard ? ClipboardIntegration() : nil
-                self.activeRecording = nil
                 let continues = recording.continuesIn != nil && recording.continuesIn == recording.target?.processIdentifier
                 self.continuesIn = nil
                 let addsTrailingSpace = writingSettings.autoPaste && writingSettings.appendTrailingSpace
-                let delivered = TextJoin.pasted(text, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
+                let delivered = TextJoin.pasted(output, joining: continues && !self.earlierPasteEndsInSpace, addsTrailingSpace: addsTrailingSpace)
                 self.earlierPasteEndsInSpace = addsTrailingSpace && delivered.last?.isWhitespace == true
                 var approved = true
                 if DictationLimits.asksBeforePasting(duration: audio.duration, autoPaste: writingSettings.autoPaste) {
@@ -1006,7 +1296,7 @@ final class AppModel {
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
                 else if result == .copiedForManualPaste {
                     self.statusMessage = ""
-                    self.present(.unpasted(text), for: Self.unpastedCardSeconds)
+                    self.present(.unpasted(output), for: Self.unpastedCardSeconds)
                     self.playFeedback(.attention)
                 } else {
                     self.statusMessage = ""
@@ -1014,8 +1304,8 @@ final class AppModel {
                     case .pasted:
                         self.phase = .idle
                         let watchCorrections = { [weak self] in
-                            guard writingSettings.learnCorrections, let app = recording.target else { return }
-                            self?.correctionWatcher.watch(text, in: app) { [weak self] in self?.learn(from: $0, to: $1) }
+                            guard translationLanguage == nil, writingSettings.learnCorrections, let app = recording.target else { return }
+                            self?.correctionWatcher.watch(output, in: app) { [weak self] in self?.learn(from: $0, to: $1) }
                         }
                         if let returnDelay, let app = recording.target {
                             self.pressSendKey(in: app, after: returnDelay, using: paste, otherwise: watchCorrections)
@@ -1040,9 +1330,113 @@ final class AppModel {
         }
     }
 
+    private func translatedTranscript(_ source: Transcript, to language: String, settings: AppSettings, token: UUID) async throws -> Transcript {
+        var translationSettings = settings
+        if let selection = settings.translationSelection {
+            translationSettings.notesSelection = selection
+        } else {
+            translationSettings.notesSelection = .apple
+            if DictationTranslator.problem(for: language, settings: translationSettings) != nil, BuiltInModel.isInstalled() {
+                translationSettings.notesSelection = .builtIn
+            }
+        }
+        if case .cli(let cli) = translationSettings.notesSelection {
+            _ = await cli.locateExecutable()
+            try Task.checkCancellation()
+            guard generation == token else { throw CancellationError() }
+        }
+        if let problem = DictationTranslator.problem(for: language, settings: translationSettings) {
+            throw MeetingNotesError.unavailable(problem)
+        }
+        let destination: String? = switch translationSettings.notesSelection {
+        case .connection(let id): translationSettings.notesConnections.first { $0.id == id }?.endpoint
+        case .cli(let cli): cli.name
+        case .ollama(let name): L10n.tr("Ollama (%@)", name)
+        case .apple, .builtIn: nil
+        }
+        if let destination {
+            let approved = await withCheckedContinuation { continuation in
+                ask(.translate(destination: destination)) { continuation.resume(returning: $0) }
+            }
+            try Task.checkCancellation()
+            guard generation == token else { throw CancellationError() }
+            phase = .transcribing
+            guard approved else { throw MeetingNotesError.unavailable(L10n.tr("Translation was not sent.")) }
+        }
+
+        let name = L10n.locale.localizedString(forIdentifier: language) ?? language
+        statusMessage = L10n.tr("Translating to %@…", name)
+        let started = ContinuousClock.now
+        let output: String
+        do {
+            output = try await translateDictation(source.text, language, translationSettings)
+        } catch where settings.translationSelection == nil && translationSettings.notesSelection == .apple
+            && DictationTranslator.isUnsupportedAppleLanguage(error) && BuiltInModel.isInstalled() {
+            try Task.checkCancellation()
+            guard generation == token else { throw CancellationError() }
+            translationSettings.notesSelection = .builtIn
+            output = try await translateDictation(source.text, language, translationSettings)
+        }
+        try Task.checkCancellation()
+        guard generation == token else { throw CancellationError() }
+        Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Translation completed: elapsed=\(String(describing: started.duration(to: .now)), privacy: .public)")
+        var result = source
+        result.translation = DictationTranslation(sourceText: source.text, targetLanguage: language)
+        result.text = output
+        return result
+    }
+
+    private func showTranslationFailure(_ transcript: Transcript, language: String, error: any Error, save: Bool) {
+        continuesIn = nil
+        partialTranscript = transcript.text
+        var message = error.localizedDescription
+        if save && settings.saveHistory {
+            do { try addToHistory(transcript) }
+            catch { message += " " + L10n.tr("History could not be saved: %@", String(error.localizedDescription)) }
+        }
+        failedTranslation = (transcript, language, message)
+        statusMessage = message
+        phase = .translationFailed
+        playFeedback(.attention)
+    }
+
+    func retryTranslation() {
+        guard phase == .translationFailed, let recovery = failedTranslation else { return }
+        let token = UUID()
+        generation = token
+        phase = .transcribing
+        operation = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await self.translatedTranscript(recovery.transcript, to: recovery.language,
+                                                                 settings: self.settings, token: token)
+                guard self.generation == token, !Task.isCancelled else { return }
+                _ = try await ClipboardIntegration().deliver(result.text, to: nil)
+                guard self.generation == token, !Task.isCancelled else { return }
+                self.partialTranscript = result.text
+                self.failedTranslation = nil
+                var persistenceWarning: String?
+                if self.settings.saveHistory, let index = self.history.firstIndex(of: recovery.transcript) {
+                    let original = self.history[index]
+                    self.history[index] = result
+                    do { try self.persist() } catch {
+                        self.history[index] = original
+                        persistenceWarning = error.localizedDescription
+                    }
+                }
+                self.statusMessage = persistenceWarning.map { L10n.tr("History could not be saved: %@", $0) } ?? ""
+                self.present(.completed(L10n.tr("Copied to clipboard")), for: 1.6)
+            } catch {
+                guard self.generation == token, !Task.isCancelled else { return }
+                self.showTranslationFailure(recovery.transcript, language: recovery.language, error: error, save: false)
+            }
+        }
+    }
+
     func cancelRecording() {
         guard isBusy else { return }
         Logger(subsystem: "org.betterwispr.app", category: "Dictation").notice("Dictation cancelled: recording=\(self.phase == .recording)")
+        let recovery = failedTranslation
         let recoverable: DictationRecording?
         if phase == .recording, let audio = try? recorder.stop() {
             let recording = sessionRecording(audio)
@@ -1051,22 +1445,33 @@ final class AppModel {
             recoverable = activeRecording
         }
         discardRecording()
+        if let recovery {
+            failedTranslation = recovery
+            phase = .translationFailed
+            return
+        }
         cancelledRecording = recoverable
         present(.cancelled, for: Self.cancellationSeconds)
         playFeedback(.cancelled)
     }
 
     private func sessionRecording(_ audio: RecordedAudio) -> DictationRecording {
-        DictationRecording(audio: audio, model: selectedModel, settings: settings, vocabulary: vocabulary,
+        let recording = DictationRecording(audio: audio, model: selectedModel, settings: settings, vocabulary: vocabulary,
                            target: targetApplication, targetElement: targetElement, mode: writingMode, context: dictationContext.take(),
                            holdsBackReturn: holdsBackReturn || targetKeystroke == nil, continuesIn: continuesIn)
+        recording.translationLanguage = recordingTranslationLanguage
+        recording.suppressesVoiceTranslation = suppressesVoiceTranslation
+        return recording
     }
 
     /// Reports a recording that capture cut short, keeping any speech that reached the file so it can be transcribed.
-    func recordingInterrupted(by error: any Error, title: String) {
+    func recordingInterrupted(by error: any Error, title: String, translationLanguage: String? = nil,
+                              suppressesVoiceTranslation: Bool = false) {
         var failure = DictationFailure(title: title, message: error.localizedDescription)
         if let audio = (error as? RecordingInterruption)?.audio {
             let recording = sessionRecording(audio)
+            recording.translationLanguage = translationLanguage
+            recording.suppressesVoiceTranslation = suppressesVoiceTranslation
             if audio.hasSpeech {
                 keepFailedDictation(recording)
                 failure.message += L10n.tr(" You can try this same recording again.")
@@ -1096,14 +1501,24 @@ final class AppModel {
         }
     }
 
-    /// Saves a dictation still recording or transcribing to Failed Dictations when history is on, so History lists it after the next launch.
+    /// Preserves unfinished dictation in History when the app quits and history is enabled.
     func keepDictationForQuit() {
+        var savedSource = false
+        if let source = pendingTranslationSource.take(), settings.saveHistory {
+            do {
+                try addToHistory(source)
+                savedSource = true
+            }
+            catch {
+                Logger(subsystem: "org.betterwispr.app", category: "Dictation").error("Couldn’t save the translation source at quit.")
+            }
+        }
         if phase.isAsking {
             answerQuestion(false)
         } else if phase == .recording, let recorded = recorder.stopSalvaging() {
             defer { try? FileManager.default.removeItem(at: recorded.url) }
             if recorded.hasSpeech { keepAtQuit(recorded.url) }
-        } else if let recording = activeRecording, recording.keptURL == nil {
+        } else if !savedSource, let recording = activeRecording, recording.keptURL == nil {
             keepAtQuit(recording.audio.url)
         }
     }
@@ -1211,6 +1626,10 @@ final class AppModel {
         activeRecording = nil
         cancelledRecording = nil
         failedRecording = nil
+        failedTranslation = nil
+        pendingTranslationSource = nil
+        recordingTranslationLanguage = nil
+        suppressesVoiceTranslation = false
         feedbackSound?.stop()
         // A cancelled preparation may leave a partially loaded provider; load cleanly next time.
         if loading == nil, phase == .transcribing || preparedModelID == nil {
@@ -1564,6 +1983,7 @@ final class AppModel {
     func addToHistory(_ transcript: Transcript) throws {
         do { try saveKeeping([transcript] + history) } catch {
             history.insert(transcript, at: 0)
+            unsavedDictationIDs.insert(transcript.id)
             throw error
         }
     }
@@ -1643,7 +2063,7 @@ final class AppModel {
             ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t save edit"), error))
             return
         }
-        if settings.learnCorrections { learn(from: transcript.text, to: text) }
+        if settings.learnCorrections, transcript.translation == nil { learn(from: transcript.text, to: text) }
     }
 
     func restoreOriginal(_ transcript: Transcript) {
@@ -1651,6 +2071,7 @@ final class AppModel {
         guard !original.isEmpty, let index = history.firstIndex(where: { $0.id == transcript.id }), history[index].text != original else { return }
         let previous = history
         history[index].text = original
+        history[index].translation = nil
         do { try persist() } catch {
             history = previous
             ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t restore the original"), error))
@@ -1758,6 +2179,41 @@ final class AppModel {
         registerShortcut()
     }
 
+    private func applyRecoveredShortcutSettings(previous: AppSettings, previousModel: SpeechModel) {
+        if previousModel != selectedModel {
+            warmUp?.cancel()
+            loading?.task.cancel()
+            provider?.cancel()
+            loading = nil
+            provider = nil
+            preparedModelID = nil
+        }
+        if !settings.sendsAfterPaste || previous.sendToClaude != settings.sendToClaude
+            || previous.sendRules != settings.sendRules {
+            holdBackReturn()
+        }
+        if previous.saveHistory, !settings.saveHistory { deleteKeptAudio() }
+        if previous.unloadModelWhenIdle != settings.unloadModelWhenIdle { scheduleIdleUnload() }
+        if previous.selectedTextShortcut != settings.selectedTextShortcut { selectedTextShortcut.unregister() }
+        if previous.selectedTextShortcut != settings.selectedTextShortcut
+            || wantsShiftShortcut(for: settings.shortcut) != globalShortcut.wantsShift {
+            registerShortcut()
+        }
+        if startsServices {
+            if previous.showInDock != settings.showInDock { applyDockVisibility() }
+            if previous.theme != settings.theme { applyAppearance() }
+        }
+        applyMeetingSettings()
+        onPresentationChange?()
+    }
+
+    private func applyMeetingSettings() {
+        if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
+        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
+        meetings.notesSettings = settings
+        meetings.remembersVoices = settings.rememberVoices
+    }
+
     func saveSettings() {
         if !settings.sendsAfterPaste { holdBackReturn() }
         if startsServices { applyDockVisibility() }
@@ -1775,9 +2231,7 @@ final class AppModel {
             statusMessage = L10n.tr("Could not save settings: %@", String(error.localizedDescription))
         }
         applyAppearance()
-        if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
-        meetingDetector.timeout = settings.meetingPromptTimeout.seconds
-        meetings.remembersVoices = settings.rememberVoices
+        applyMeetingSettings()
         onPresentationChange?()
     }
 
@@ -1809,6 +2263,7 @@ final class AppModel {
         state.history = history
         state.vocabulary = vocabulary
         try store.save(state)
+        unsavedDictationIDs.removeAll()
     }
 
     func exportHistory() {
@@ -1837,6 +2292,10 @@ final class AppModel {
     func requestAccessibility() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         accessibilityGranted = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+    }
+
+    func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     /// Turning the integration on asks for Calendar access; a denial turns it back off and opens Privacy settings.
@@ -1923,6 +2382,7 @@ final class AppModel {
         if phase == .sending { holdBackReturn(); return }
         cancelledRecording = nil
         failedRecording = nil
+        failedTranslation = nil
         phase = .idle
     }
 

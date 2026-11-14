@@ -99,6 +99,18 @@ struct ModelsView: View {
             }
 
             Section {
+                NotesModelPicker(model: model, title: L10n.tr("Translation provider"),
+                                 overrideSelection: \.translationSelection, defaultLabel: L10n.tr("Automatic · On this Mac"))
+                    .disabled(!model.canEditConnections)
+            } header: {
+                Text(L10n.tr("Dictation translation"))
+            } footer: {
+                Text(L10n.tr("A remote provider receives the finished dictation text after you approve sending it."))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
                 if model.speakerDetectionInstalled {
                     Label(L10n.tr("Speaker detection is on. After each meeting, BetterWispr tells the voices on the call apart on this Mac and labels them Speaker 1, Speaker 2 and so on. Rename them above the transcript."), systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)

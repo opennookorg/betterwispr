@@ -5,6 +5,8 @@ struct CapsuleView: View {
     @Bindable var model: AppModel
     let hover: CapsuleHover
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var highlightedTranslationLanguage: String?
+    @FocusState private var translationListFocused: Bool
 
     private var isRecording: Bool { model.phase == .recording }
     private var isMeetingCapturing: Bool { model.meetings.capturingID != nil }
@@ -19,7 +21,7 @@ struct CapsuleView: View {
     private var atTop: Bool { model.showsCapsuleAtTop }
     private var showsCard: Bool {
         switch model.phase {
-        case .cancelled, .completed, .unpasted, .failed, .sending, .asking: true
+        case .cancelled, .completed, .unpasted, .failed, .sending, .asking, .translationFailed: true
         default: failure != nil || meetingPrompt != nil
         }
     }
@@ -37,10 +39,12 @@ struct CapsuleView: View {
                 Spacer(minLength: 0)
             } else {
                 Spacer(minLength: 0)
-                if !showsCard, let target = hover.target {
+                if isRecording && model.showsTranslationLanguages {
+                    translationLanguageList
+                } else if !showsCard, let target = hover.target {
                     tooltip(for: target)
                 }
-                if model.isBusy, !model.liveTranscript.isEmpty {
+                if !model.showsTranslationLanguages, model.isBusy, !model.liveTranscript.isEmpty {
                     livePreview
                 }
                 surface
@@ -82,6 +86,8 @@ struct CapsuleView: View {
             case .completed(let message): AccessibilityNotification.Announcement(message).post()
             case .sending: AccessibilityNotification.Announcement(L10n.tr("Sending. Dictate again to add more first.")).post()
             case .asking(let question): AccessibilityNotification.Announcement("\(question.title) \(question.message)").post()
+            case .translationFailed:
+                AccessibilityNotification.Announcement(L10n.tr("Couldn’t translate dictation")).post()
             default: break
             }
         }
@@ -91,6 +97,10 @@ struct CapsuleView: View {
         VStack(spacing: 0) {
             if let failure {
                 failureCard(failure)
+                    .transition(swap)
+            } else if model.phase == .translationFailed, let recovery = model.translationRecovery {
+                failureCard(DictationFailure(title: L10n.tr("Couldn’t translate dictation"), message: recovery.message),
+                            translationSource: recovery.source)
                     .transition(swap)
             } else if let text = model.unpasted {
                 unpastedCard(text)
@@ -174,14 +184,14 @@ struct CapsuleView: View {
         case .dictation:
             switch model.phase {
             case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.settings.shortcut.displayName)) : L10n.tr("Finish dictation")
-            case .transcribing: L10n.tr("Transcribing…")
+            case .transcribing: model.statusMessage.isEmpty ? L10n.tr("Transcribing…") : model.statusMessage
             default: L10n.tr("Starting microphone…")
             }
-        case .surface: ""
+        case .surface, .translationLanguages: ""
         }
     }
 
-    private func failureCard(_ failure: DictationFailure) -> some View {
+    private func failureCard(_ failure: DictationFailure, translationSource: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: model.failure == nil ? "exclamationmark.triangle" : failure.symbol)
@@ -193,7 +203,10 @@ struct CapsuleView: View {
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 4)
-                Button(action: dismissFailure) {
+                Button {
+                    if translationSource == nil { dismissFailure() }
+                    else { model.dismissCard() }
+                } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.85))
@@ -210,8 +223,15 @@ struct CapsuleView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.7))
                 .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(model.failure == nil ? nil : 4)
-            if failure.needsAccessibility {
+                .lineLimit(model.failure == nil && translationSource == nil ? nil : 4)
+            if let translationSource {
+                HStack(spacing: 8) {
+                    Button(L10n.tr("Copy original")) { model.copyText(translationSource) }
+                    Button(L10n.tr("Retry translation"), action: model.retryTranslation)
+                }
+                .buttonStyle(CapsuleCardButtonStyle())
+                .foregroundStyle(.white)
+            } else if failure.needsAccessibility {
                 Button(L10n.tr("Allow Accessibility")) {
                     model.requestAccessibility()
                     model.dismissCard()
@@ -494,13 +514,14 @@ struct CapsuleView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity)
-                    .accessibilityLabel(L10n.tr("Transcribing"))
+                    .accessibilityLabel(model.statusMessage.isEmpty ? L10n.tr("Transcribing") : model.statusMessage)
             } else {
                 CapsuleWaveform(model: model, isNotetaking: isNotetaking, animated: !reduceMotion, count: model.isHeldSession ? 13 : 9)
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel(waveformLabel)
             }
-            if let keystroke = model.sendKeystroke {
+            if isRecording { translationControls }
+            if showsSendKeystroke, let keystroke = model.sendKeystroke {
                 Image(systemName: keystroke == .return ? "return" : "keyboard")
                     .foregroundStyle(.white.opacity(0.75))
                     .frame(width: 14, height: 24)
@@ -526,12 +547,125 @@ struct CapsuleView: View {
         .foregroundStyle(.white)
         .buttonStyle(.plain)
         .padding(.horizontal, 4)
-        .frame(width: (model.isHeldSession ? 96 : 108) + (model.sendKeystroke == nil ? 0 : 18), height: 28)
+        .frame(width: dictationPillWidth, height: 28)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: model.sendKeystroke)
         .contentShape(Capsule())
         .contextMenu { Button(L10n.tr("Cancel dictation"), action: model.cancelRecording) }
         .accessibilityActions { Button(L10n.tr("Cancel dictation"), action: model.cancelRecording) }
         .capsuleRegion(.dictation)
+    }
+
+    private var dictationPillWidth: CGFloat {
+        let base: CGFloat = model.isHeldSession ? 96 : 108
+        return base + (isRecording ? translationControlsWidth + 4 : 0) + (showsSendKeystroke ? 18 : 0)
+    }
+
+    private var showsSendKeystroke: Bool { model.sendKeystroke != nil && model.recordingTranslationLanguage == nil }
+    private var translationControlsWidth: CGFloat { 132 }
+
+    private var translationControls: some View {
+        let selection = model.recordingTranslationLanguage ?? model.settings.preferredTranslationLanguage
+        let language = TranslationLanguageChoices.name(for: selection)
+        let enabled = model.recordingTranslationLanguage != nil
+        let toggleLabel = enabled ? L10n.tr("Turn off translation for this dictation") : L10n.tr("Translate this dictation")
+        return HStack(spacing: 4) {
+            Button(action: model.toggleRecordingTranslation) {
+                Image(systemName: "globe")
+                    .frame(width: 24, height: 24)
+                    .background(.white.opacity(enabled ? 0.24 : 0.09), in: Circle())
+                    .overlay { Circle().strokeBorder(.white.opacity(enabled ? 0.6 : 0), lineWidth: 1) }
+                    .contentShape(Circle())
+            }
+            .help(toggleLabel)
+            .accessibilityLabel(toggleLabel)
+            .accessibilityAddTraits(enabled ? .isSelected : [])
+
+            Button {
+                highlightedTranslationLanguage = selection
+                model.showsTranslationLanguages.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Text(verbatim: language).lineLimit(1)
+                    Image(systemName: model.showsTranslationLanguages ? "chevron.up" : "chevron.down")
+                        .accessibilityHidden(true)
+                }
+                .frame(width: 104, height: 24)
+                .background(.white.opacity(0.09), in: Capsule())
+                .contentShape(Capsule())
+            }
+            .help(L10n.tr("Translation language"))
+            .accessibilityLabel(L10n.tr("Translation language"))
+            .accessibilityValue(language)
+        }
+    }
+
+    // Keep language selection inside the panel so native menu tracking cannot consume shortcut release.
+    private var translationLanguageList: some View {
+        let selection = model.recordingTranslationLanguage ?? model.settings.preferredTranslationLanguage
+        let languages = TranslationLanguageChoices.sortedLanguages
+        return ScrollViewReader { proxy in
+            ScrollView {
+                translationLanguageRows(languages, selection: selection)
+            }
+            .focusable()
+            .focused($translationListFocused)
+            .onAppear {
+                translationListFocused = true
+                proxy.scrollTo(selection, anchor: .center)
+            }
+            .onChange(of: highlightedTranslationLanguage) { _, language in
+                if let language { proxy.scrollTo(language, anchor: .center) }
+            }
+            .onKeyPress(keys: [.upArrow, .downArrow, .return, .escape]) { press in
+                guard isRecording, model.showsTranslationLanguages else { return .ignored }
+                switch press.key {
+                case .escape:
+                    model.showsTranslationLanguages = false
+                case .return:
+                    if let language = highlightedTranslationLanguage { selectTranslationLanguage(language) }
+                default:
+                    let index = languages.firstIndex(of: highlightedTranslationLanguage ?? selection) ?? 0
+                    let offset = press.key == .upArrow ? -1 : 1
+                    let nextIndex = index + offset
+                    if languages.indices.contains(nextIndex) { highlightedTranslationLanguage = languages[nextIndex] }
+                }
+                return .handled
+            }
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 12))
+        .foregroundStyle(.white)
+        .frame(width: 220, height: 150)
+        .background { CapsuleGlass(cornerRadius: 14) }
+        .capsuleRegion(.translationLanguages)
+    }
+
+    private func selectTranslationLanguage(_ code: String) {
+        guard model.showsTranslationLanguages else { return }
+        model.chooseRecordingTranslationLanguage(code)
+        model.showsTranslationLanguages = false
+    }
+
+    private func translationLanguageRows(_ languages: [String], selection: String) -> some View {
+        LazyVStack(spacing: 2) {
+            ForEach(languages, id: \.self) { code in
+                Button {
+                    selectTranslationLanguage(code)
+                } label: {
+                    HStack {
+                        Text(verbatim: TranslationLanguageChoices.name(for: code))
+                        Spacer()
+                        if selection == code { Image(systemName: "checkmark").accessibilityHidden(true) }
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(minHeight: 24)
+                    .background(.white.opacity(highlightedTranslationLanguage == code ? 0.18 : 0), in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                }
+                .accessibilityAddTraits(selection == code ? .isSelected : [])
+            }
+        }
+        .padding(6)
     }
 
     private var notetakingPill: some View {
