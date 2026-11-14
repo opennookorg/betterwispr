@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public struct SavedState: Codable, Equatable, Sendable {
@@ -10,10 +11,18 @@ public struct SavedState: Codable, Equatable, Sendable {
 
 public struct LocalStore: Sendable {
     public let directory: URL
+    private let setWorkspacePermissions: @Sendable (URL) throws -> Void
     public var stateURL: URL { directory.appendingPathComponent("workspace.json") }
 
     public init(directory: URL? = nil) {
-        self.directory = directory ?? URL.applicationSupportDirectory.appendingPathComponent("BetterWispr", isDirectory: true)
+        self.init(directory: directory ?? URL.applicationSupportDirectory.appendingPathComponent("BetterWispr", isDirectory: true)) { url in
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        }
+    }
+
+    init(directory: URL, setWorkspacePermissions: @escaping @Sendable (URL) throws -> Void) {
+        self.directory = directory
+        self.setWorkspacePermissions = setWorkspacePermissions
     }
 
     public func load() throws -> SavedState {
@@ -28,8 +37,17 @@ public struct LocalStore: Sendable {
                                                attributes: [.posixPermissions: 0o700])
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(state).write(to: stateURL, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stateURL.path)
+        let staging = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false,
+                                               attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: staging) }
+        let temporary = staging.appendingPathComponent(stateURL.lastPathComponent)
+        try encoder.encode(state).write(to: temporary)
+        try setWorkspacePermissions(temporary)
+        // The replacement is the last fallible operation affecting the workspace.
+        guard rename(temporary.path, stateURL.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 }
 

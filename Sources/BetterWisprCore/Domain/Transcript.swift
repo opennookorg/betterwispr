@@ -11,10 +11,12 @@ public struct Transcript: Codable, Identifiable, Equatable, Sendable {
     /// The app that received the dictation; nil for dictations saved before 0.1.1.
     public var appBundleID: String?
     public var vocabularyFixes: Int?
+    /// Present when the delivered text was translated.
+    public var translation: DictationTranslation?
 
     public init(id: UUID = UUID(), createdAt: Date = .now, text: String, rawText: String,
                 duration: TimeInterval, modelName: String, language: String,
-                appBundleID: String? = nil, vocabularyFixes: Int? = nil) {
+                appBundleID: String? = nil, vocabularyFixes: Int? = nil, translation: DictationTranslation? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
@@ -24,9 +26,21 @@ public struct Transcript: Codable, Identifiable, Equatable, Sendable {
         self.language = language
         self.appBundleID = appBundleID
         self.vocabularyFixes = vocabularyFixes
+        self.translation = translation
     }
 
     public var wordCount: Int { TranscriptPolisher.withoutListMarkers(text).split(whereSeparator: \.isWhitespace).count }
+}
+
+public struct DictationTranslation: Codable, Equatable, Sendable {
+    /// The prepared dictation supplied to the translator, without a spoken command.
+    public let sourceText: String
+    public let targetLanguage: String
+
+    public init(sourceText: String, targetLanguage: String) {
+        self.sourceText = sourceText
+        self.targetLanguage = targetLanguage
+    }
 }
 
 public struct VocabularyEntry: Codable, Identifiable, Equatable, Sendable {

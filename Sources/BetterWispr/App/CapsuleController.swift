@@ -4,13 +4,14 @@ import Observation
 import SwiftUI
 
 private final class RecordingPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
+    var acceptsLanguageNavigation = false
+    override var canBecomeKey: Bool { acceptsLanguageNavigation }
     override var canBecomeMain: Bool { false }
 }
 
 @MainActor @Observable
 final class CapsuleHover {
-    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, dictation }
+    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, dictation, translationLanguages }
 
     private(set) var isHovering = false
     private(set) var target: Target?
@@ -33,7 +34,7 @@ final class CapsuleHover {
         let height = max(32, surface.height)
         let activation = CGRect(x: surface.midX - width / 2 - 6, y: surface.maxY - height - 8,
                                 width: width + 12, height: height + 16)
-        let inside = activation.contains(point)
+        let inside = activation.contains(point) || regions[.translationLanguages]?.contains(point) == true
         let hit = [Target.microphone, .notetaker, .meetingNotes, .dictation].first { regions[$0]?.contains(point) == true }
         // Crossing the narrow gap between controls must not flash the tooltip off.
         set(isHovering: inside, target: hit ?? (inside && target.flatMap { regions[$0] } != nil ? target : nil))
@@ -117,11 +118,13 @@ extension AppModel {
 }
 
 @MainActor
-final class CapsuleController {
-    private let panel: NSPanel
+final class CapsuleController: NSObject, NSWindowDelegate {
+    private let panel: RecordingPanel
     private let model: AppModel
     private let hover = CapsuleHover()
     private let content: CapsuleHostingView
+    private weak var previousKeyWindow: NSWindow?
+    private var waitingToShowAfterKeyboardRelease = false
     private var pointerMonitors: [Any] = []
 
     init(model: AppModel) {
@@ -129,7 +132,10 @@ final class CapsuleController {
         content = CapsuleHostingView(model: model, hover: hover)
         panel = RecordingPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.delegate = self
         panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.isOpaque = false
@@ -157,7 +163,38 @@ final class CapsuleController {
     }
 
     func update() {
+        guard !waitingToShowAfterKeyboardRelease else { return }
+        let needsKeyboard = model.showsCapsule && model.phase == .recording && model.showsTranslationLanguages
+        if needsKeyboard, !panel.acceptsLanguageNavigation {
+            previousKeyWindow = NSApp.isActive ? NSApp.keyWindow : nil
+            panel.acceptsLanguageNavigation = true
+            panel.makeKey()
+        } else if !needsKeyboard, panel.acceptsLanguageNavigation {
+            releaseLanguageKeyboard()
+            return
+        }
         if model.showsCapsule { show() } else { panel.orderOut(nil) }
+    }
+
+    private func releaseLanguageKeyboard() {
+        waitingToShowAfterKeyboardRelease = true
+        let restoreKeyWindow = panel.isKeyWindow && NSApp.isActive
+        // Let AppKit order out the still-key panel before changing its eligibility.
+        panel.orderOut(nil)
+        panel.acceptsLanguageNavigation = false
+        if restoreKeyWindow, previousKeyWindow?.isVisible == true { previousKeyWindow?.makeKey() }
+        previousKeyWindow = nil
+        // Leave the panel out of the window list until AppKit has handed back keyboard focus.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.waitingToShowAfterKeyboardRelease else { return }
+            self.waitingToShowAfterKeyboardRelease = false
+            self.update()
+        }
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        guard !waitingToShowAfterKeyboardRelease, panel.acceptsLanguageNavigation else { return }
+        model.showsTranslationLanguages = false
     }
 
     private func observeMeetings() {
@@ -224,6 +261,8 @@ final class CapsuleController {
     }
 
     func close() {
+        waitingToShowAfterKeyboardRelease = false
+        panel.delegate = nil
         pointerMonitors.forEach(NSEvent.removeMonitor)
         pointerMonitors = []
         NotificationCenter.default.removeObserver(self)

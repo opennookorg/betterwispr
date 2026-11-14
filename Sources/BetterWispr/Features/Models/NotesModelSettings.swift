@@ -5,10 +5,14 @@ struct NotesModelPicker: View {
     @Bindable var model: AppModel
     var title = L10n.tr("Notes provider")
     var overrideSelection: WritableKeyPath<AppSettings, NotesModelSelection?>?
+    var defaultLabel: String?
 
     var body: some View {
         Picker(title, selection: Binding(get: { selection }, set: { select($0) })) {
-            if overrideSelection != nil { Text(L10n.tr("Same as notes · %@", String(model.settings.localizedNotesModelName))).tag(NotesModelSelection?.none) }
+            if overrideSelection != nil {
+                Text(defaultLabel ?? L10n.tr("Same as notes · %@", String(model.settings.localizedNotesModelName)))
+                    .tag(NotesModelSelection?.none)
+            }
             Text(L10n.tr("Apple Intelligence · On this Mac")).tag(NotesModelSelection?.some(.apple))
             if model.meetings.builtInModelInstalled || selection == .builtIn {
                 Text(model.meetings.builtInModelInstalled ? L10n.tr("Built-in · %@ · On this Mac", String(BuiltInModel.displayName)) : L10n.tr("Built-in · Not downloaded"))

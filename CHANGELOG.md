@@ -4,6 +4,12 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Added
+- Translate one dictation into a chosen language from the menu bar or the recording capsule. Recognition stays in the spoken language, including live segments, and translation runs once on the finished text. The capsule remembers the last target language and has a separate switch for translating the current dictation. Optional spoken translation commands are off by default.
+- Choose F5 as the dictation shortcut and optionally use the microphone key on a supported built-in Mac keyboard. BetterWispr restores Apple Dictation when you turn the option off or quit, remembers your choice after a normal quit, and recovers the original mapping after a forced quit.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added

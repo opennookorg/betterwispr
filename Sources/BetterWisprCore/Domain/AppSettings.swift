@@ -166,6 +166,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var dictationMode: DictationMode = .hold
     public var unloadModelWhenIdle: ModelIdleUnload = .never
     public var shortcut: DictationShortcut = .optionSpace
+    public var usesInternalMicrophoneKey = false
     /// Optional extra shortcut that cancels a dictation without pasting it; Escape always cancels.
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
@@ -201,6 +202,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Nil asks questions with the notes model.
     public var askSelection: NotesModelSelection?
     public var cleanupSelection: NotesModelSelection?
+    public var translationSelection: NotesModelSelection?
+    public var preferredTranslationLanguage = "en"
+    public var voiceTranslationCommands = false
     public var notesBuiltIn: Bool = false
     /// The newest onboarding the user finished or skipped; 0 shows it again.
     public var completedOnboardingVersion: Int = 0
@@ -244,6 +248,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         if notesConnectionID == id { notesSelection = .apple }
         if askSelection == .connection(id) { askSelection = nil }
         if cleanupSelection == .connection(id) { cleanupSelection = nil }
+        if translationSelection == .connection(id) { translationSelection = nil }
     }
 
     public init() {}
@@ -332,6 +337,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         dictationMode = (try? container.decodeIfPresent(DictationMode.self, forKey: .dictationMode)) ?? .hold
         unloadModelWhenIdle = try container.decodeIfPresent(ModelIdleUnload.self, forKey: .unloadModelWhenIdle) ?? .never
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
+        usesInternalMicrophoneKey = try container.decodeIfPresent(Bool.self, forKey: .usesInternalMicrophoneKey) ?? false
         cancelShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .cancelShortcut)
         selectedTextShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .selectedTextShortcut)
         formatShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .formatShortcut) ?? .fnControl
@@ -352,6 +358,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
         summaryLanguage = try? container.decodeIfPresent(String.self, forKey: .summaryLanguage)
         askSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .askSelection)
         cleanupSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .cleanupSelection)
+        translationSelection = try? container.decodeIfPresent(NotesModelSelection.self, forKey: .translationSelection)
+        if let language = try? container.decodeIfPresent(String.self, forKey: .preferredTranslationLanguage),
+           DictationTranslator.targetLanguages.contains(language) {
+            preferredTranslationLanguage = language
+        }
+        voiceTranslationCommands = (try? container.decodeIfPresent(Bool.self, forKey: .voiceTranslationCommands)) ?? false
         notesBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .notesBuiltIn) ?? false
         completedOnboardingVersion = try container.decodeIfPresent(Int.self, forKey: .completedOnboardingVersion) ?? 0
         onboardingStep = try container.decodeIfPresent(Int.self, forKey: .onboardingStep) ?? 0

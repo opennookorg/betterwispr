@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>en</key>
+    <array>
+        <string>translate to</string>
+        <string>translate into</string>
+    </array>
+    <key>es</key>
+    <array>
+        <string>traduce al</string>
+        <string>traduce a</string>
+        <string>traducir al</string>
+        <string>traducir a</string>
+    </array>
+    <key>fr</key>
+    <array>
+        <string>traduis en</string>
+        <string>traduire en</string>
+        <string>traduisez en</string>
+    </array>
+    <key>it</key>
+    <array>
+        <string>traduci in</string>
+        <string>tradurre in</string>
+    </array>
+</dict>
+</plist>

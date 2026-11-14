@@ -89,6 +89,17 @@ private struct MenuContents: View {
         }
         .disabled(model.phase == .preparing || model.phase == .transcribing)
         if model.isBusy { Button(L10n.tr("Cancel")) { model.cancelRecording() } }
+        Menu {
+            TranslationLanguageChoices(selection: model.nextTranslationLanguage, select: model.setNextTranslationLanguage)
+        } label: {
+            Text(model.nextTranslationLanguage.map {
+                L10n.tr("Translate next dictation to %@", TranslationLanguageChoices.name(for: $0))
+            } ?? L10n.tr("Translate next dictation"))
+        }
+        Toggle(L10n.tr("Voice translation commands"), isOn: Binding(
+            get: { model.settings.voiceTranslationCommands },
+            set: { model.setVoiceTranslationCommands($0) }
+        ))
         Button(model.meetings.capturingID == nil ? L10n.tr("Start Meeting Notes") : L10n.tr("Stop Meeting")) {
             guard model.meetings.capturingID == nil else { return model.meetings.stop() }
             model.startNotetaker()
@@ -126,9 +137,10 @@ private struct MenuContents: View {
     private var status: String {
         switch model.phase {
         case .recording: L10n.tr("Listening…")
-        case .transcribing: L10n.tr("Transcribing…")
+        case .transcribing: model.statusMessage.isEmpty ? L10n.tr("Transcribing…") : model.statusMessage
         case .preparing: L10n.tr("Preparing…")
         case .asking: L10n.tr("Waiting for your answer…")
+        case .translationFailed: L10n.tr("Couldn’t translate dictation")
         case .idle, .failed, .unpasted, .cancelled, .completed, .sending: L10n.tr("BetterWispr: Ready")
         }
     }
@@ -136,6 +148,36 @@ private struct MenuContents: View {
     private func openDashboard() {
         openWindow(id: "dashboard")
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+}
+
+struct TranslationLanguageChoices: View {
+    let selection: String?
+    let select: (String?) -> Void
+
+    var body: some View {
+        languageButton(L10n.tr("No translation"), code: nil)
+        Divider()
+        ForEach(Self.sortedLanguages, id: \.self) { code in
+            languageButton(Self.name(for: code), code: code)
+        }
+    }
+
+    static var sortedLanguages: [String] {
+        DictationTranslator.targetLanguages.sorted {
+            name(for: $0).localizedStandardCompare(name(for: $1)) == .orderedAscending
+        }
+    }
+
+    static func name(for code: String) -> String {
+        L10n.locale.localizedString(forIdentifier: code) ?? code
+    }
+
+    private func languageButton(_ title: String, code: String?) -> some View {
+        Button { select(code) } label: {
+            if selection == code { Label(title, systemImage: "checkmark") }
+            else { Text(verbatim: title) }
+        }
     }
 }
 
@@ -163,13 +205,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onPresentationChange = { [weak self] in self?.capsule?.update() }
         notetaker = NotetakerController(model: model)
         model.onShowNotetaker = { [weak self] in self?.notetaker?.show($0) }
-        model.registerShortcut()
+        model.startDictationShortcut()
         capsule?.update()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if !model.restoreMicrophoneKey(quitting: true) {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = L10n.tr("Couldn’t restore the microphone key")
+            alert.informativeText = L10n.tr("The microphone key may stay remapped after quitting. Keep BetterWispr open to retry in Settings.")
+            alert.addButton(withTitle: L10n.tr("Keep BetterWispr Open"))
+            alert.addButton(withTitle: L10n.tr("Quit Anyway"))
+            guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
+        }
         model.keepDictationForQuit()
         model.discardRecording()
         guard let pending = model.mediaPauser.pending else { return .terminateNow }

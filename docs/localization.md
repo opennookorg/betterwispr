@@ -69,3 +69,13 @@ rules, voice commands or writing tones. `StylePreview` shows illustrative French
 examples and keeps French input unchanged in its cleanup preview. Light and
 Medium cleanup currently edit English dictation only. Translating
 `StyleExamples.strings` does not extend cleanup to another spoken language.
+
+## Spoken translation commands
+
+The translation target comes from the shared language catalogue and is
+independent of the interface language and the speech engine. To add a spoken
+command language, add its locale and command prefixes to
+`Sources/BetterWisprCore/Localization/Resources/TranslationCommands.plist`.
+The parser combines these prefixes with that locale's language names.
+Add tests for an opening command followed by punctuation and body text, and
+for the same words used inside an ordinary sentence without quotes.

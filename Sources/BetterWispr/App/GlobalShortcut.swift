@@ -5,7 +5,18 @@ import IOKit.hidsystem
 import OSLog
 
 @MainActor
-final class GlobalShortcut {
+protocol DictationHotKey: AnyObject {
+    var isRegistered: Bool { get }
+    var wantsShift: Bool { get }
+    var onPress: (() -> Void)? { get set }
+    var onRelease: (() -> Void)? { get set }
+
+    func register(_ shortcut: DictationShortcut, withShift: Bool) throws
+    func unregister()
+}
+
+@MainActor
+final class GlobalShortcut: DictationHotKey {
     private let identifier: EventHotKeyID
     private var hotKeys: [EventHotKeyRef] = []
     private var handler: EventHandlerRef?

@@ -144,7 +144,7 @@ private struct DictationPanel: View {
         case .recording: L10n.tr("Listening…")
         case .preparing: L10n.tr("Getting ready…")
         case .transcribing: L10n.tr("Transcribing…")
-        case .idle, .failed, .unpasted, .cancelled, .completed, .sending, .asking: greeting
+        case .idle, .failed, .unpasted, .translationFailed, .cancelled, .completed, .sending, .asking: greeting
         }
     }
 

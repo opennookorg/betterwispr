@@ -44,6 +44,7 @@ struct HistoryView: View {
                             onDelete: { transcriptToDelete = transcript },
                             onEdit: { model.updateTranscript(transcript, text: $0) },
                             onRestore: { model.restoreOriginal(transcript) },
+                            onCopySource: { model.copyText($0) },
                             expanded: true
                         )
                     }
@@ -100,6 +101,7 @@ struct TranscriptRow: View {
     var onDelete: (() -> Void)?
     var onEdit: ((String) -> Void)?
     var onRestore: (() -> Void)?
+    var onCopySource: ((String) -> Void)?
     var expanded = false
     @State private var draft: String?
     @State private var showsOriginal = false
@@ -157,6 +159,18 @@ struct TranscriptRow: View {
                     .lineLimit(expanded ? nil : 3)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if expanded, let translation = transcript.translation {
+                let language = L10n.locale.localizedString(forLanguageCode: translation.targetLanguage) ?? translation.targetLanguage
+                HStack(spacing: 8) {
+                    Text(L10n.tr("Translated to %@", language))
+                        .foregroundStyle(.secondary)
+                    if let onCopySource {
+                        Button(L10n.tr("Copy source text")) { onCopySource(translation.sourceText) }
+                            .buttonStyle(.borderless)
+                    }
+                }
+                .font(.caption)
             }
             if expanded && transcript.text != transcript.rawText {
                 VStack(alignment: .leading, spacing: 6) {

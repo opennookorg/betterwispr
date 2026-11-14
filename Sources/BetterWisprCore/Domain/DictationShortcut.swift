@@ -31,6 +31,7 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
     public let key: String
 
     public static let optionSpace = DictationShortcut(validKeyCode: 49, modifiers: .option, key: "Space")
+    public static let f5 = DictationShortcut(validKeyCode: UInt32(kVK_F5), modifiers: [], key: "F5")
     /// Fn and Control held together, the second-mode shortcut other dictation apps use.
     public static let fnControl = DictationShortcut(validKeyCode: UInt32(kVK_Control), modifiers: .function, key: "Left Control")
     private static let functionKeyCodes = Set([kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,

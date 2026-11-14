@@ -341,7 +341,7 @@ struct SettingsView: View {
                 SettingsSection(L10n.tr("Permissions")) {
                     PermissionStatusRow(title: L10n.tr("Microphone"), caption: L10n.tr("Needed to hear your voice."), granted: model.microphoneGranted, action: model.requestMicrophone)
                     RowDivider()
-                    PermissionStatusRow(title: L10n.tr("Accessibility"), caption: L10n.tr("Needed for automatic paste, modifier-key shortcuts and cleaning up selected text."), granted: model.accessibilityGranted, action: model.requestAccessibility)
+                    PermissionStatusRow(title: L10n.tr("Accessibility"), caption: L10n.tr("Needed for automatic paste, modifier-key shortcuts and cleaning up selected text."), granted: model.accessibilityGranted, action: model.requestAccessibility, openSettings: model.openAccessibilitySettings)
                     RowDivider()
                     PermissionStatusRow(title: L10n.tr("Calendar"), caption: L10n.tr("Optional. Turns on Use Calendar for meeting notes."), granted: model.calendarGranted) { model.useCalendar(true) }
                 } footer: {
@@ -555,8 +555,26 @@ private struct ShortcutRecorder: View {
     }
 
     var body: some View {
+        Group {
+            shortcutRow
+            microphoneKeyOption
+        }
+        .animation(.ui, value: isCapturing)
+        .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
+        .onChange(of: model.capturingRecorder) { _, recorder in
+            if recorder != recorderID { stop() }
+        }
+        .onDisappear(perform: stop)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
+    }
+
+    private var shortcutRow: some View {
         SettingRow(title, caption: caption) {
             HStack(spacing: 6) {
+                if kind == .dictation, shortcut != .f5, model.capturingRecorder == nil {
+                    Button(L10n.tr("Use F5")) { model.changeShortcut(.f5) }
+                        .buttonStyle(.bordered)
+                }
                 if let defaultShortcut, shortcut != defaultShortcut, !isCapturing {
                     Button(L10n.tr("Reset to %@", String(defaultShortcut.spokenName)), systemImage: "arrow.counterclockwise") {
                         stop()
@@ -582,13 +600,22 @@ private struct ShortcutRecorder: View {
             }
             .disabled(model.isBusy)
         }
-        .animation(.ui, value: isCapturing)
-        .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
-        .onChange(of: model.capturingRecorder) { _, recorder in
-            if recorder != recorderID { stop() }
+    }
+
+    @ViewBuilder private var microphoneKeyOption: some View {
+        if kind == .dictation, shortcut == .f5 || model.microphoneKeyRecoveryNeeded {
+            SettingToggle(L10n.tr("Use the internal keyboard’s microphone key"),
+                          caption: L10n.tr("Press the microphone key without Fn. Turning this off or quitting BetterWispr restores its Apple action."),
+                          isOn: Binding(get: { model.microphoneKeyOptionEnabled }, set: model.setMicrophoneKeyRemapped))
+                .disabled(model.isBusy || model.capturingRecorder != nil || model.microphoneKeyRecoveryNeeded)
+            if model.microphoneKeyRecoveryNeeded {
+                Button(L10n.tr("Retry restoring the microphone key")) { model.retryMicrophoneKeyRecovery() }
+                    .disabled(model.isBusy || model.capturingRecorder != nil)
+            }
         }
-        .onDisappear(perform: stop)
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
+        if kind == .dictation, let error = model.microphoneKeyError {
+            Text(error).font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var clearHelp: String {
@@ -605,6 +632,7 @@ private struct ShortcutRecorder: View {
         }
         switch kind {
         case .dictation:
+            if shortcut == .f5 { return L10n.tr("If F5 starts Apple Dictation, press Fn–F5 or use standard function keys in macOS Keyboard settings.") }
             if shortcut?.keyCode == UInt32(kVK_Function) { return L10n.tr("Needs Accessibility. Set “Press 🌐 key to” to “Do Nothing” in Keyboard settings.") }
             return shortcut?.isModifierOnly == true ? L10n.tr("Needs Accessibility. Uses the left or right key you recorded.") : L10n.tr("Starts dictation from any app.")
         case .cancel: return L10n.tr("Also cancels a dictation from any app. Esc always does.")
@@ -828,18 +856,24 @@ struct PermissionStatusRow: View {
     let caption: String
     let granted: Bool
     let action: () -> Void
+    var openSettings: (() -> Void)? = nil
 
     var body: some View {
         SettingRow(title, caption: caption) {
-            if granted {
-                Label(L10n.tr("Allowed"), systemImage: "checkmark.circle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .symbolRenderingMode(.multicolor)
-                    .transition(.opacity)
-            } else {
-                Button(L10n.tr("Allow…"), action: action)
-                    .transition(.opacity)
+            HStack {
+                if granted {
+                    Label(L10n.tr("Allowed"), systemImage: "checkmark.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .symbolRenderingMode(.multicolor)
+                        .transition(.opacity)
+                } else {
+                    Button(L10n.tr("Allow…"), action: action)
+                        .transition(.opacity)
+                }
+                if let openSettings {
+                    Button(L10n.tr("Open Accessibility Settings"), action: openSettings)
+                }
             }
         }
     }
