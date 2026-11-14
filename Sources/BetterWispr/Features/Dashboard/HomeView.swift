@@ -77,7 +77,7 @@ struct HomeView: View {
                         .font(.headline)
                     if model.settings.saveHistory {
                         ShortcutSentence(
-                            format: model.settings.dictationMode == .hold
+                            format: model.settings.dictationMode != .toggle
                                 ? L10n.tr("Hold %@ in any app and your words will show up here.")
                                 : L10n.tr("Press %@ in any app and your words will show up here."),
                             shortcut: model.settings.shortcut)
@@ -132,14 +132,7 @@ private struct DictationPanel: View {
         .padding(24)
         .frame(minHeight: 120)
         .background {
-            ZStack {
-                Rectangle().fill(.cardFill)
-                RadialGradient(
-                    colors: [(recording ? Color.red : .accentColor).opacity(recording ? 0.22 : 0.12), .clear],
-                    center: .topLeading, startRadius: 0, endRadius: 420
-                )
-            }
-            .clipShape(.rect(cornerRadius: 16, style: .continuous))
+            RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.cardFill)
         }
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(recording ? Color.red.opacity(0.35) : .cardStroke))
         .animation(.ui, value: model.phase)
@@ -196,7 +189,7 @@ private struct DictationPanel: View {
                 .foregroundStyle(.secondary)
         } else {
             ShortcutSentence(
-                format: model.settings.dictationMode == .hold
+                format: model.settings.dictationMode != .toggle
                     ? L10n.tr("Hold %@ in any app and start talking.")
                     : L10n.tr("Press %@ in any app and start talking."),
                 shortcut: model.settings.shortcut, spacing: 5)

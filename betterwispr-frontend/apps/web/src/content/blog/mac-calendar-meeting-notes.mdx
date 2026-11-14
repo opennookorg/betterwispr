@@ -1,0 +1,40 @@
+export const meta = {
+  title: "See your Google and Outlook calendar on Mac and take meeting notes in one click",
+  description:
+    "BetterWispr 0.1.6 adds a Calendar page that reads the Google, Outlook, Exchange and iCloud calendars on your Mac, with Join and Take notes buttons on every meeting.",
+  date: "2026-11-13",
+};
+
+Your meetings live in your calendar, and your notes live in BetterWispr. Version 0.1.6 brings them together with a **Calendar** page in the sidebar.
+
+## Your calendars, read from your Mac
+
+Click **Connect Calendar** and allow access. BetterWispr shows the calendars already on your Mac, such as Google, Outlook or Exchange, Yahoo and iCloud, by Day, Week or Month.
+
+- Day and Week lay out the hours, with all-day events on top and a line at the current time.
+- Use ⌘← and ⌘→ to move, and ⌘T to come back to today.
+- The page updates when your calendars change.
+
+To add an account, click **Add Account…**. It opens Internet Accounts in System Settings, where you sign in with your email. For Outlook, choose Microsoft Exchange. BetterWispr never sees your password, only reads your calendars and never changes them.
+
+## The full event card
+
+Click an event to see its time, calendar, location and notes. Links in the notes are clickable. You also see the guest list, with who said yes, no or maybe, and who hasn't replied, plus a button to copy every guest's email.
+
+A meeting with a Zoom, Google Meet, Microsoft Teams or Webex link gets a **Join** button and a copy-link button.
+
+## Take notes with the event's details
+
+When a meeting starts within 15 minutes, or is already happening, its card shows **Take notes**. That starts a meeting note with the event's title and guests. The guests then help in three ways:
+
+- The speech model recognizes their names more often.
+- Your notes model sees who was invited.
+- You can [name each speaker](/blog/local-ai-meeting-notes-mac) after a guest with one click.
+
+With **Calendar for meeting notes** turned on in Settings, a note started during an event, or up to five minutes before it, picks up the title and guests by itself. Declined and cancelled events are skipped.
+
+## Why no sign-in
+
+BetterWispr reads calendars through macOS, not by connecting to Google or Microsoft. It needs no account or token of its own, works offline, and adds no third-party service. The event title and guest names go to your notes model with the transcript, and that model runs on your Mac unless you chose a cloud provider.
+
+[Download BetterWispr 0.1.6](https://github.com/opennookorg/betterwispr/releases/tag/v0.1.6) and open Calendar in the sidebar.

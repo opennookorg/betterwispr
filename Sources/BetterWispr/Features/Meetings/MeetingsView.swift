@@ -382,8 +382,8 @@ private extension Meeting {
 }
 
 extension AppModel {
-    func startMeeting() async {
-        let event = settings.useCalendar ? await calendarEvents.current(excluding: settings.excludedCalendarIDs) : nil
+    func startMeeting(for chosen: CalendarEvent? = nil) async {
+        let event = if let chosen { chosen } else if settings.useCalendar { await calendarEvents.current(excluding: settings.excludedCalendarIDs) } else { nil as CalendarEvent? }
         guard !isBusy, meetings.capturingID == nil else { return }
         let speechModel = selectedModel
         guard isModelInstalled(speechModel) else {
@@ -399,9 +399,9 @@ extension AppModel {
     }
 
     /// Starts a meeting and docks its card beside the call.
-    func startNotetaker() {
+    func startNotetaker(for event: CalendarEvent? = nil) {
         Task {
-            await startMeeting()
+            await startMeeting(for: event)
             if let id = meetings.capturingID { onShowNotetaker?(id) } else { onShowDashboard?() }
         }
     }

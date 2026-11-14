@@ -1,7 +1,17 @@
 import Foundation
 
 public enum DictationMode: String, Codable, CaseIterable, Sendable {
-    case hold, toggle
+    case hold, holdOnly, toggle
+
+    /// What letting go of the shortcut does after holding it `seconds`, while the microphone is `recording` or still starting.
+    public func release(afterHolding seconds: TimeInterval, recording: Bool) -> ShortcutRelease {
+        if seconds < 0.3 { return self == .holdOnly ? .abandon : .keepListening }
+        return recording ? .finish : .abandon
+    }
+}
+
+public enum ShortcutRelease: Sendable {
+    case keepListening, finish, abandon
 }
 
 public enum AppTheme: String, Codable, CaseIterable, Sendable {
@@ -32,6 +42,11 @@ public enum ModelIdleUnload: Int, Codable, CaseIterable, Sendable {
 /// Where the meeting-detected prompt appears on the screen showing the call.
 public enum MeetingPromptPosition: String, Codable, CaseIterable, Sendable {
     case top, bottom
+}
+
+/// Where the floating capsule rests along the bottom of the screen.
+public enum CapsulePosition: String, Codable, CaseIterable, Sendable {
+    case bottomCenter, bottomLeft, bottomRight
 }
 
 /// Seconds the meeting-detected prompt waits for an answer before it closes for that call.
@@ -98,7 +113,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var language: String = "auto"
     /// Nil keeps Chinese in the script the speech model wrote.
     public var chineseScript: ChineseScript?
-    /// Languages automatic detection chooses from with a Whisper model; empty allows every language.
+    /// Languages automatic detection chooses from with a Whisper model, or whose alphabet Parakeet keeps to; empty allows every language.
     public var dictationLanguages: Set<String> = []
     public var autoPaste: Bool = true
     /// Presses Return after pasting into a recognized Claude prompt; see `ClaudePrompt`.
@@ -116,6 +131,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Writes spoken numbers as digits, such as "forty-two" as "42", in every language.
     public var writesNumbersAsDigits: Bool = true
     public var showCapsule: Bool = true
+    public var capsulePosition: CapsulePosition = .bottomCenter
     /// Shows Parakeet's provisional words in the capsule while recording.
     public var showLiveText: Bool = true
     public var hideCapsuleWhileDictating: Bool = false
@@ -127,9 +143,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// macOS system sound names picked per cue; missing cues use `DictationSound.defaultSoundName`.
     public var sounds: [DictationSound: String] = [:]
     /// Pauses Music and Spotify while the microphone is open, then resumes only what it paused.
-    public var pauseMediaWhileDictating: Bool = false
+    public var pauseMediaWhileDictating: Bool = true
     /// Silences other apps while a dictation records, unless a known call app or a browser is using the microphone.
-    public var muteOtherAppsWhileDictating: Bool = false
+    public var muteOtherAppsWhileDictating: Bool = true
+    public static let mediaDefaultsVersion = 1
+    /// Workspaces saved before version 1 had pausing and muting off by default, so loading them turns both on once.
+    public var mediaDefaultsVersion: Int = AppSettings.mediaDefaultsVersion
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
     public var meetingPromptPosition: MeetingPromptPosition = .bottom
@@ -151,6 +170,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Optional extra shortcut that cancels a dictation without pasting it; Escape always cancels.
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
+    /// Shortcut that dictates and writes the text in the shape of the app it lands in.
+    public var formatShortcut: DictationShortcut = .fnControl
     public var learnCorrections: Bool = true
     /// Lets the Parakeet phrase booster rescore English dictation with vocabulary and screen names.
     public var usePhraseBooster: Bool = true
@@ -288,14 +309,21 @@ public struct AppSettings: Codable, Equatable, Sendable {
         appendTrailingSpace = try container.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? false
         writesNumbersAsDigits = try container.decodeIfPresent(Bool.self, forKey: .writesNumbersAsDigits) ?? true
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
+        capsulePosition = (try? container.decodeIfPresent(CapsulePosition.self, forKey: .capsulePosition)) ?? .bottomCenter
         showLiveText = try container.decodeIfPresent(Bool.self, forKey: .showLiveText) ?? true
         hideCapsuleWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .hideCapsuleWhileDictating) ?? false
         showNoSpeechNotice = try container.decodeIfPresent(Bool.self, forKey: .showNoSpeechNotice) ?? true
         soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         soundVolume = min(max(try container.decodeIfPresent(Float.self, forKey: .soundVolume) ?? 0.6, Self.soundVolumeRange.lowerBound), Self.soundVolumeRange.upperBound)
         sounds = try container.decodeIfPresent([DictationSound: String].self, forKey: .sounds) ?? [:]
-        pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? false
-        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? false
+        pauseMediaWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .pauseMediaWhileDictating) ?? true
+        muteOtherAppsWhileDictating = try container.decodeIfPresent(Bool.self, forKey: .muteOtherAppsWhileDictating) ?? true
+        mediaDefaultsVersion = try container.decodeIfPresent(Int.self, forKey: .mediaDefaultsVersion) ?? 0
+        if mediaDefaultsVersion < Self.mediaDefaultsVersion {
+            pauseMediaWhileDictating = true
+            muteOtherAppsWhileDictating = true
+            mediaDefaultsVersion = Self.mediaDefaultsVersion
+        }
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         meetingPromptPosition = (try? container.decodeIfPresent(MeetingPromptPosition.self, forKey: .meetingPromptPosition)) ?? .bottom
         meetingPromptTimeout = (try? container.decodeIfPresent(MeetingPromptTimeout.self, forKey: .meetingPromptTimeout)) ?? .thirtySeconds
@@ -306,12 +334,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         showInDock = try container.decodeIfPresent(Bool.self, forKey: .showInDock) ?? false
         silenceThreshold = try container.decode(Float.self, forKey: .silenceThreshold)
-        dictationMode = try container.decodeIfPresent(DictationMode.self, forKey: .dictationMode) ?? .hold
+        dictationMode = (try? container.decodeIfPresent(DictationMode.self, forKey: .dictationMode)) ?? .hold
         unloadModelWhenIdle = try container.decodeIfPresent(ModelIdleUnload.self, forKey: .unloadModelWhenIdle) ?? .never
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
         usesInternalMicrophoneKey = try container.decodeIfPresent(Bool.self, forKey: .usesInternalMicrophoneKey) ?? false
         cancelShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .cancelShortcut)
         selectedTextShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .selectedTextShortcut)
+        formatShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .formatShortcut) ?? .fnControl
         microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
         dismissedSpeakerDetectionOffer = try container.decodeIfPresent(Bool.self, forKey: .dismissedSpeakerDetectionOffer) ?? false
         separateRoomVoices = try container.decodeIfPresent(Bool.self, forKey: .separateRoomVoices) ?? false

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import Sparkle
 import BetterWisprCore
 
@@ -50,6 +51,7 @@ final class AppUpdater: NSObject {
 extension AppUpdater: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
+        Logger(subsystem: "org.betterwispr.app", category: "Updates").notice("Update ready to install on quit: version=\(item.versionString, privacy: .public)")
         relaunch = immediateInstallHandler
         pendingVersion = item.displayVersionString
         ToastWindow.shared.show(Toast(title: L10n.tr("Update ready"), message: L10n.tr("Restart BetterWispr to finish updating to %@.", String(item.displayVersionString)),

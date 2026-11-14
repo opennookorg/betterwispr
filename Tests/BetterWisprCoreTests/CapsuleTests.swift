@@ -525,6 +525,19 @@ func pendingSendStaysCancellableThroughTheFinalPromptCheck(delay: Duration) asyn
             == CGPoint(x: 2252, y: 624))
 }
 
+@Test @MainActor func capsuleRestsAtItsChosenBottomPositionButMeetingPromptsAtTheTopStayCentered() {
+    let size = CGSize(width: 440, height: 240)
+    let frame = CGRect(x: 1512, y: 0, width: 1920, height: 1080)
+    let visible = CGRect(x: 1512, y: 70, width: 1920, height: 985)
+    func origin(_ position: CapsulePosition, atTop: Bool = false) -> CGPoint {
+        CapsuleController.origin(atTop: atTop, position: position, size: size, frame: frame, visibleFrame: visible, safeTop: 0)
+    }
+    #expect(origin(.bottomCenter) == CGPoint(x: 2252, y: 82))
+    #expect(origin(.bottomLeft) == CGPoint(x: 1528, y: 82))
+    #expect(origin(.bottomRight) == CGPoint(x: 2976, y: 82))
+    #expect(CapsulePosition.allCases.map { origin($0, atTop: true) } == Array(repeating: CGPoint(x: 2252, y: 811), count: 3))
+}
+
 @Test @MainActor func meetingPromptFollowsTheScreenHoldingTheCallWindow() {
     let screens = [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: -200, width: 1920, height: 1080)]
     #expect(CapsuleController.screenIndex(showing: [CGRect(x: 1600, y: 300, width: 1200, height: 800)], in: screens) == 1)

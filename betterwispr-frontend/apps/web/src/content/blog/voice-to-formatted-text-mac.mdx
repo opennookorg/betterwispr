@@ -1,0 +1,47 @@
+export const meta = {
+  title: "Dictate and format: turn your voice into a formatted email or Slack message on Mac",
+  description:
+    "Hold fn and Control, say what you want, and BetterWispr writes it in the shape the app needs: an email with a greeting, a short Slack reply, or a plain AI prompt.",
+  date: "2026-11-13",
+};
+
+Plain dictation types what you said. That's fine for a quick note. An email, though, needs a greeting and paragraphs, a Slack reply should be short, and a prompt for ChatGPT should stay plain. BetterWispr 0.1.6 adds a second shortcut for that: **Dictate and format**.
+
+## How it works
+
+Hold **fn ⌃** (fn and Control together), speak, and let go. You can change the shortcut in Settings > Shortcut. BetterWispr transcribes your words with your local speech model as usual. Then it sends the English transcript to the cleanup provider you chose on the Style page, which shapes the text for the app you're typing in:
+
+- **Email** gets a greeting and paragraphs. A sign-off is added only when you say one or usually write one.
+- **Work chat** such as Slack or Teams stays short, with code and identifiers in backticks.
+- **Personal chat** stays relaxed.
+- **AI prompts** in ChatGPT, Claude or Cursor stay literal and plain.
+- **Documents** get paragraphs and lists.
+
+Web apps count too. Gmail, Outlook on the web, Proton Mail, Fastmail, Slack, Teams, Google Chat, WhatsApp Web, ChatGPT and Claude in a browser are each treated as their kind of app.
+
+## Say what you want written
+
+Start with a request, such as "write an email to Sam saying the launch moved to Thursday". The rest is written as that email, without the request words. The request can come after a few other words too, as in "okay so please write an email to Sam …". BetterWispr adds no facts you didn't say.
+
+If you correct a formatted dictation, BetterWispr keeps up to 8 of your edits per kind of app on your Mac while history is on, and uses a few of them as style examples next time. Settings shows how many are kept and can forget them.
+
+## Which provider it uses
+
+Dictate and format needs Claude Code, Codex, an API connection or Ollama as the cleanup provider. Ollama runs on your Mac. The others send the English dictation to that provider, and only after you choose one. If the provider isn't ready, or you spoke another language, you get the usual cleanup and a notice explains why. Your normal dictation shortcut doesn't change.
+
+## Cleanup that understands lists
+
+Medium cleanup also got smarter in 0.1.6. It turns English dictation into bullet lists or numbered steps based on what you meant, so you don't have to say "bullet" or "number one". Stories and comparisons stay as prose. "New line" and "new paragraph" still work.
+
+You can also **choose the cleanup provider** on the Style page, apart from your meeting notes model, for example a small Ollama model for dictation and a bigger one for notes. And an optional **clean up selected text** shortcut edits text you've already written, in any app, and pastes the result over your selection.
+
+## Small things that save typing
+
+- **Write numbers as digits** is on by default. "two cats" becomes "2 cats", and "PR four five six seven" becomes "PR 4567", in English and other languages written with spaces between words.
+- **Add a space after pasting** keeps back-to-back dictations from running together.
+- **Send keys** presses the key that submits in an app, such as Return, after a paste. See [hands-free prompts for Claude Code](/blog/dictate-prompts-claude-code).
+- **Writing modes** in Style set their own cleanup, tone and instructions for each app.
+
+## Try it
+
+BetterWispr is a free, open source alternative to Wispr Flow for Mac. [Download 0.1.6](https://github.com/opennookorg/betterwispr/releases/tag/v0.1.6), hold fn ⌃ in your email app, and say "write an email to …".

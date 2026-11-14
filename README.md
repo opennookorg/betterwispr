@@ -4,11 +4,11 @@
 
 # BetterWispr
 
-**Free, open-source voice dictation for macOS.** Hold **⌥ Space**, speak, release, and the text lands in whatever app you were typing in.
+**Free, open-source voice dictation for macOS.** Hold **⌥ Space**, speak, release, and the text lands in the app you're typing in.
 
-BetterWispr is a private, offline speech-to-text app and an open-source alternative to Wispr Flow. It transcribes on your Mac with Whisper, NVIDIA Parakeet or Apple's on-device speech recognition, so your voice never leaves your computer unless you explicitly select an API connection or Codex subscription transcription.
+Transcription runs on your Mac with Whisper, NVIDIA Parakeet, Cohere Transcribe or Apple speech. Your voice leaves your Mac only if you select an API connection or Codex subscription transcription.
 
-[Download the latest release](https://github.com/opennookorg/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
+[Download](https://github.com/opennookorg/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
 
 [![Buy me a coffee](https://shieldcn.dev/badge/Buy%20me%20a%20coffee-Support-FFDD00.svg?logo=buymeacoffee&variant=branded)](https://buymeacoffee.com/code_kartik)
 
@@ -16,77 +16,47 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 
 ## Features
 
-- **Dictate anywhere**: hold-to-talk or press-to-toggle, with a shortcut you choose.
-- **On-device models**: Apple speech, Parakeet v3 (25 European languages), Parakeet v2 (English) and Whisper large-v3 turbo.
-- **Vocabulary**: spelling hints and phrase replacements for names and jargon.
-- **Learns your corrections**: fix a misheard word once (in History, or right after it's pasted) and it's spelled right next time.
-- **Voice commands**: say "comma", "new line", "scratch that" or "sorry, remove that", and "at the rate KV" for "@KV".
-- **Meetings**: live transcript of you and the other side, plus on-device titles, summaries and action items with Apple Intelligence or a local Ollama model.
-- **Transcribe files and links**: drop in an audio or video file or paste a video link and get a timestamped transcript with the model you choose, to copy or export as text or Markdown. Links use yt-dlp, which BetterWispr installs only when you click Install.
-- **Connected apps**: let Claude, Cursor and other apps that support MCP list, search and read your meeting notes and transcripts. Off by default and read-only.
-- **Send to Claude**: optionally press Return after pasting, only into Claude Desktop or Claude Code in the VS Code panel, Terminal or iTerm2. Off by default.
-- **Send keys**: for any other app, add it under Settings > Send keys and record the key that submits there, such as Return, ⌘Return or Tab, and BetterWispr presses it after pasting. No rules by default. Terminal and iTerm2 aren't offered, since Send to Claude covers them.
-- **History**: raw and corrected transcripts, stored locally (can be turned off).
-- **Bring your own model**: optional Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.
-
-## Requirements
-
-- macOS 14 or later
-- Apple Silicon recommended
+- **Dictate anywhere** with hold-to-talk or toggle, on a shortcut you choose.
+- **Dictate and format** (**fn ⌃**) shapes English text for the app: an email, a Slack message, a plain AI prompt. Uses Claude Code, Codex, an API connection or Ollama.
+- **Clean up selected text** in any app with your cleanup provider.
+- **On-device models**: Parakeet (English, Japanese, 25 European languages), Whisper (about 100 languages), Cohere Transcribe (14 languages, macOS 15+) and Apple speech.
+- **Vocabulary and corrections**: fix a word once and it's spelled right next time.
+- **Voice commands** such as "comma", "new line" and "scratch that".
+- **Meeting notes** without a bot: live transcript, on-device speaker labels, summaries, and Ask with cited answers.
+- **Calendar**: see your Mac's calendars, join calls and take notes in one click. Read-only.
+- **Transcribe files and links** to timestamped text or Markdown.
+- **Send to Claude** and **Send keys** press Return (or your key) after pasting. Off by default.
+- **Connected apps** let MCP apps like Claude and Cursor read your meetings. Off by default, read-only.
+- **Bring your own model**: Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.
 
 ## Getting started
 
+Requires macOS 14 or later. Apple Silicon recommended.
+
 1. Download the DMG from [Releases](https://github.com/opennookorg/betterwispr/releases/latest) and drag BetterWispr to Applications.
-2. Open it and follow the welcome guide.
-3. Pick a model in **Models**. Apple on-device needs no download; Parakeet and Whisper download once, then work offline.
-4. Grant **Microphone** access, and **Accessibility** access so BetterWispr can paste for you.
-5. Click into a text field in any app, hold **⌥ Space**, speak, and release.
+2. Open it, follow the welcome guide and pick a model in **Models**.
+3. Grant **Microphone** and **Accessibility** access.
+4. Click into any text field, hold **⌥ Space**, speak and release.
 
-If paste can't safely reach the previous app, the text is copied to your
-clipboard instead, so you never lose a dictation. A dictation records until you
-release or press the shortcut again, up to about 24 hours 45 minutes at 48 kHz
-(a limit on audio frames, so half that at 96 kHz), then finishes by itself. A
-recording of ten minutes or longer asks before it is sent to an API connection
-or pasted automatically.
-
-## Bring your own model
-
-**Models → Bring your own model → Add connection.** Choose a provider, enter the
-model ID and API key, save, then click **Use**.
-
-| Provider | Default model | Notes |
-| --- | --- | --- |
-| Sarvam AI | `saaras:v4` | Long recordings are sent in 25-second chunks |
-| Smallest AI | `pulse` | Set an explicit spoken language in Settings |
-| OpenAI-compatible | any | Full URL, e.g. `http://localhost:8000/v1/audio/transcriptions`. HTTPS required except on localhost |
-
-When a connection is in use, your audio goes to that endpoint and its pricing
-and retention policies apply. Keys are stored in the macOS Keychain. Switch back
-to a built-in model to return to fully local transcription. BetterWispr never
-falls back to a cloud provider on its own.
+If paste can't safely reach the app, the text is copied to your clipboard instead.
 
 ## Privacy
 
-For optional subscription transcription, see [Codex subscription setup](docs/codex-subscription.md). BetterWispr uses your local Codex sign-in directly with an unofficial ChatGPT endpoint. Audio goes to ChatGPT only when you select this model and start transcription.
-
-- Settings, vocabulary and history live in `~/Library/Application Support/BetterWispr/workspace.json` (not encrypted).
-- Models live in the `Models` folder next to it.
-- With Remember named voices on, voice profiles of the speakers you name live in `Voices.json` next to it (not encrypted). Forget Voices in Models deletes them, and deleting a meeting deletes the profiles named in it.
-- Audio is written to temporary files and deleted after each recording. A dictation that fails to transcribe, or is still in progress when BetterWispr quits, is kept in the `Failed Dictations` folder next to it, readable only by your macOS user, unless Save dictation history is off. It is deleted once it is transcribed, after 7 days or a shorter Keep history age limit, when more than 20 are kept or they pass 1 GB (oldest first), or when you turn Save dictation history off. The folder is left out of backups, and History lists each one under Not transcribed. When the selected speech model is an API connection, its button names where the audio will be sent.
-- Built-in models only touch the network when you explicitly download one.
-- Claude Code as a notes, Ask or cleanup provider needs a Claude subscription sign-in. For meeting notes only, you can turn on Allow any Claude Code sign-in in Models, off by default. Meeting text then goes to the destination Claude Code reports, such as an API account, a company cloud account or a gateway, and is billed there. Models shows that destination, including a custom base URL in Claude Code's settings files, and nothing is sent until you confirm it or after it changes. Ask, Medium cleanup and correction review never use this switch.
-- Send to Claude is off by default. When it is on, BetterWispr reads the list of running processes on this Mac to find Claude Code, and asks Terminal and iTerm2 which tab is in front once you allow it. Nothing is stored or sent.
-- Connected apps is off by default. When you turn it on, apps you connect read your meetings through `BetterWispr --mcp` on this Mac and send what they read to their own AI provider.
+- Settings, vocabulary and history are stored locally in `~/Library/Application Support/BetterWispr/` (not encrypted). History can be turned off.
+- Built-in models use the network only when you download one. BetterWispr never falls back to a cloud provider on its own.
+- API keys are stored in the macOS Keychain. With an API connection, your audio goes to that provider.
+- Codex subscription transcription uses an unofficial ChatGPT endpoint. See [setup](docs/codex-subscription.md).
+- Audio is deleted after each recording. A failed dictation is kept for up to 7 days so you can retry it from History.
 
 ## Troubleshooting
 
-- **Paste stopped working after an update or rebuild**: remove and re-add BetterWispr in System Settings → Privacy & Security → Accessibility.
-- **Apple on-device model unavailable**: your language or OS speech assets may not support it. Install Parakeet or Whisper instead.
+- **Paste stopped working after an update**: remove and re-add BetterWispr in System Settings → Privacy & Security → Accessibility.
+- **Apple on-device model unavailable**: install Parakeet or Whisper instead.
 - **First transcription is slow**: large models take time to load the first time.
 
 ## Contributing
 
-Build instructions, project layout and guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Star history
 
@@ -96,4 +66,4 @@ Build instructions, project layout and guidelines are in [CONTRIBUTING.md](CONTR
 
 ## License
 
-[Apache-2.0](LICENSE). Third-party code and model weights keep their own terms;
+[Apache-2.0](LICENSE). Third-party code and model weights keep their own terms.

@@ -19,6 +19,7 @@ struct CapsuleView: View {
     }
     private var meetingPrompt: DetectedMeeting? { model.meetingPrompt }
     private var atTop: Bool { model.showsCapsuleAtTop }
+    private var position: CapsulePosition { atTop ? .bottomCenter : model.settings.capsulePosition }
     private var showsCard: Bool {
         switch model.phase {
         case .cancelled, .completed, .unpasted, .failed, .sending, .asking, .translationFailed: true
@@ -33,7 +34,7 @@ struct CapsuleView: View {
     private var swap: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: atTop ? .top : .bottom)) }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: position.stackAlignment, spacing: 6) {
             if atTop {
                 surface
                 Spacer(minLength: 0)
@@ -51,7 +52,8 @@ struct CapsuleView: View {
             }
         }
         .padding(atTop ? .top : .bottom, atTop ? 8 : 16)
-        .frame(width: 440, height: 240)
+        .padding(.horizontal, 12)
+        .frame(width: 440, height: 240, alignment: atTop ? .top : position.alignment)
         .coordinateSpace(name: "capsule")
         .onPreferenceChange(CapsuleRegions.self) { hover.update(regions: $0) }
         .environment(\.colorScheme, .dark)
@@ -472,6 +474,12 @@ struct CapsuleView: View {
             .capsuleRegion(.microphone)
             meetingButton
         }
+        .contextMenu {
+            Picker(L10n.tr("Capsule position"), selection: Binding(get: { model.settings.capsulePosition }, set: { model.settings.capsulePosition = $0; model.saveSettings() })) {
+                ForEach(CapsulePosition.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            Button(L10n.tr("Hide capsule"), action: model.hideIdleCapsule)
+        }
     }
 
     /// Confirmed words stay bright and the provisional tail is dimmed; only the newest two lines show.
@@ -699,7 +707,7 @@ struct CapsuleView: View {
 
     private var meetingButton: some View {
         HStack(spacing: 0) {
-            Button(action: model.startNotetaker) {
+            Button { model.startNotetaker() } label: {
                 Image(systemName: "record.circle")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)

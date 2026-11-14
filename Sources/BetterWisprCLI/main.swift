@@ -22,8 +22,8 @@ func run() async throws {
           --download-yt-dlp
           --download-builtin-model
           --transcribe-file PATH [--model MODEL_ID] [--language en] [--languages en,es] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"]
-            --languages limits a Whisper model's automatic detection to the listed languages, as Dictation languages does.
-          --live-file PATH [--model MODEL_ID] [--language en]
+            --languages limits a Whisper model's automatic detection to the listed languages, and a Parakeet model's to their alphabet, as Dictation languages does.
+          --live-file PATH [--model MODEL_ID] [--language en] [--languages en,pt]
             Feeds the file through the Parakeet live preview in real time, printing each confirmed | provisional
             update with its pass latency, then the batch transcription of the same file.
           --meeting PATH [--model MODEL_ID] [--language en] [--vocabulary "Term,Other term"] [--notes OUT.md] [--notes-model builtin|OLLAMA_MODEL]
@@ -35,7 +35,14 @@ func run() async throws {
             Transcribes an audio or video file, or a web link fetched with yt-dlp, as the Transcribe page does:
             chunks cut at the quietest moment 30 to 59.5 seconds apart, meeting cleanup and vocabulary, one JSON
             segment per line. Speaker detection labels voices when it is installed.
-          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
+          --live-speakers PATH [--window SECONDS] [--my-voice SAMPLE]
+            Plays the file through the meeting chunker as call audio and prints one JSON line per chunk with the
+            provisional speaker first shown during a call, the one shown when the call ends, the seconds each
+            pass took and the speaker the pass after the meeting gives. With --my-voice, the file is microphone
+            audio instead, and the voice nearest the one in SAMPLE stays Me, printed as speaker 0. SAMPLE needs
+            at least 20 seconds of that voice.
+          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--screen-terms "Term,Other term"] [--cleanup light|medium] [--format email|work|personal|aiPrompts|documents] [--notes-model builtin|OLLAMA_MODEL]
+            --format runs Medium cleanup as Dictate and format does for that kind of app.
             Each manifest line is {"id", "language", "audio", "reference"}. Prints one JSON line per clip
             with the hypothesis and recognition seconds. Without --language, each clip uses its own language.
           --latency MANIFEST.jsonl [--model PARAKEET_MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--cleanup light|medium] [--notes-model builtin|OLLAMA_MODEL]
@@ -70,6 +77,15 @@ func run() async throws {
         print("Installed speaker detection at \(SpeakerDetection.directory.path).")
         return
     }
+    if arguments.first == "--live-speakers", arguments.count >= 2, arguments.count % 2 == 0 {
+        let options = Dictionary(stride(from: 2, to: arguments.count, by: 2).map { (arguments[$0], arguments[$0 + 1]) }) { $1 }
+        guard Set(options.keys).isSubset(of: ["--window", "--my-voice"]), let window = TimeInterval(options["--window"] ?? "300") else {
+            throw CLIError.usage("--live-speakers takes --window SECONDS and --my-voice SAMPLE.")
+        }
+        let sample = options["--my-voice"].map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        try await liveSpeakers(URL(fileURLWithPath: (arguments[1] as NSString).expandingTildeInPath), window: window, sample: sample)
+        return
+    }
     if arguments == ["--download-yt-dlp"] {
         try await YTDLP.install()
         print("Installed yt-dlp at \(YTDLP.installed.path).")
@@ -85,7 +101,7 @@ func run() async throws {
     var index = 0
     while index < arguments.count {
         let option = arguments[index]
-        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--latency", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--notes-model"].contains(option),
+        guard ["--download-model", "--transcribe-file", "--live-file", "--bench", "--latency", "--meeting", "--media", "--notes", "--model", "--language", "--languages", "--vocabulary", "--screen-terms", "--cleanup", "--format", "--notes-model"].contains(option),
               index + 1 < arguments.count, !arguments[index + 1].hasPrefix("--"), options[option] == nil else {
             throw CLIError.usage("Invalid or repeated argument: \(option). Run --help for usage.")
         }
@@ -113,9 +129,13 @@ func run() async throws {
     case .apple: throw CLIError.usage("Apple speech requires permissions granted through the macOS app. Select a Parakeet or Whisper model in the CLI.")
     case .whisperKit: provider = WhisperKitProvider()
     case .parakeet: provider = ParakeetProvider()
+    case .cohere: provider = CohereProvider()
     case .api: throw CLIError.usage("Configure API connections in the macOS app. The CLI uses local models only.")
     case .codex: provider = CodexSpeechProvider()
     }
+    let detectionLanguages = Set(options["--languages"]?.split(separator: ",").map(String.init) ?? [])
+    (provider as? WhisperKitProvider)?.detectionLanguages = detectionLanguages
+    (provider as? ParakeetProvider)?.detectionLanguages = detectionLanguages
     let clock = ContinuousClock()
     let started = clock.now
     if options["--download-model"] != nil {
@@ -130,11 +150,17 @@ func run() async throws {
         guard let cleanup = CleanupLevel(rawValue: options["--cleanup"] ?? "none") else {
             throw CLIError.usage("--cleanup must be light or medium.")
         }
+        let format = try options["--format"].map { name in
+            guard let category = AppCategory(rawValue: name), category != .other else {
+                throw CLIError.usage("--format must be email, work, personal, aiPrompts or documents.")
+            }
+            return DictationFormat(category: category)
+        }
         var settings = AppSettings()
         settings.cleanup = cleanup
         settings.notesSelection = notesSelection
         try await bench(manifest: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), provider: provider,
-                        language: options["--language"], vocabulary: vocabulary, screenTerms: screenTerms, settings: settings)
+                        language: options["--language"], vocabulary: vocabulary, screenTerms: screenTerms, settings: settings, format: format)
     } else if let path = options["--latency"] {
         guard let parakeet = provider as? ParakeetProvider else { throw CLIError.usage("--latency needs a Parakeet model.") }
         var settings = AppSettings()
@@ -158,7 +184,6 @@ func run() async throws {
     } else if let path = options["--transcribe-file"] {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let language = options["--language"].flatMap { $0 == "auto" ? nil : $0 }
-        (provider as? WhisperKitProvider)?.detectionLanguages = Set(options["--languages"]?.split(separator: ",").map(String.init) ?? [])
         let transcript = try await provider.transcribe(audioURL: url, language: language, vocabulary: vocabulary, screenTerms: screenTerms)
         print(transcript)
         FileHandle.standardError.write(Data("Completed in \(started.duration(to: clock.now)).\n".utf8))
@@ -222,6 +247,48 @@ func meeting(_ url: URL, provider: any SpeechProvider, language: String?, vocabu
     try await write(notes: notes, for: segments, language: language, settings: settings)
 }
 
+/// Labels call audio chunk by chunk as a meeting does while it records, then with the pass that runs after it, without transcribing.
+@MainActor
+func liveSpeakers(_ url: URL, window: TimeInterval, sample: URL?) async throws {
+    guard SpeakerDetection.isInstalled() else { throw CLIError.usage("Install speaker detection first with --download-speaker-detection.") }
+    var myVoice: [Float]?
+    if let sample {
+        myVoice = try await SpeakerDetection.voice(inRecording: sample)
+        if myVoice == nil { throw CLIError.usage("The sample needs at least 20 seconds of one voice.") }
+    }
+    let chunks = try MeetingRecorder.chunks(of: url, speaker: sample == nil ? .them : .me)
+    defer { for chunk in chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    let voices = try SpeakerRecording()
+    defer { voices.discard() }
+    let labeller = LiveSpeakerLabeller(window: window)
+    var segments: [MeetingSegment] = []
+    var seconds: [UUID: Double] = [:]
+    var first: [UUID: Int] = [:]
+    var live: [UUID: Int] = [:]
+    for chunk in chunks where chunk.hasSpeech {
+        let segment = MeetingSegment(speaker: chunk.speaker, start: chunk.start, duration: chunk.duration, text: "", rawText: "")
+        let started = Date()
+        if sample == nil { await labeller.add(chunk.url, for: segment.id) }
+        let numbers = await labeller.speakers() ?? [:]
+        seconds[segment.id] = Date().timeIntervalSince(started)
+        first[segment.id] = numbers[segment.id]
+        live.merge(numbers) { $1 }
+        segments.append(segment)
+        try await voices.append(chunk.url, for: segment.id)
+    }
+    segments = segments.map { segment in
+        var segment = segment
+        segment.participant = live[segment.id]
+        return segment
+    }
+    let final = try await SpeakerDetection.label(segments, voices: voices, myVoice: myVoice) { _, _, _ in nil }.segments
+    for segment in final {
+        let fields: [String: Any] = ["start": segment.start, "duration": segment.duration, "first": first[segment.id] ?? 0, "live": live[segment.id] ?? 0,
+                                     "final": segment.participant ?? 0, "seconds": seconds[segment.id] ?? 0]
+        print(String(decoding: try JSONSerialization.data(withJSONObject: fields, options: .sortedKeys), as: UTF8.self))
+    }
+}
+
 /// Transcribes a media file, or a link's audio fetched with yt-dlp, and prints one JSON segment per line.
 @MainActor
 func media(_ source: String, provider: any SpeechProvider, language: String?, vocabulary: [VocabularyEntry]) async throws {
@@ -265,7 +332,7 @@ func write(notes: URL, for segments: [MeetingSegment], language: String?, settin
 
 /// Transcribes every manifest clip with the prepared provider, one JSON line per clip on stdout.
 @MainActor
-func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocabulary: [String], screenTerms: [String], settings: AppSettings) async throws {
+func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocabulary: [String], screenTerms: [String], settings: AppSettings, format: DictationFormat? = nil) async throws {
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
     encoder.outputFormatting = .withoutEscapingSlashes
@@ -282,7 +349,7 @@ func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocab
             var cleaned = TranscriptCleaner.clean(hypothesis, language: spoken)
             if settings.cleanup == .medium, TranscriptCleaner.isEnglish(cleaned, language: spoken) {
                 let commanded = VoiceCommands.apply(cleaned)
-                cleaned = await TranscriptPolisher.polish(commanded, settings: settings, vocabulary: vocabulary, context: nil) ?? commanded
+                cleaned = await TranscriptPolisher.polish(commanded, settings: settings, vocabulary: vocabulary, context: nil, format: format) ?? commanded
             }
             result.cleaned = cleaned
             result.cleanupSeconds = seconds(cleaning.duration(to: clock.now))
@@ -301,7 +368,8 @@ func live(_ url: URL, provider: ParakeetProvider, language: String?) async throw
     transcriber.onUpdate = { [weak transcriber] transcript in
         let elapsed = String(format: "%5.1f", seconds(started.duration(to: clock.now)))
         let pass = String(format: "%.2f", seconds(transcriber?.lastPass ?? .zero))
-        print("\(elapsed) s  pass \(pass) s  \(transcript.confirmed) | \(transcript.hypothesis)")
+        let shown = transcript.writingNumbersAsDigits(language: language)
+        print("\(elapsed) s  pass \(pass) s  \(shown.confirmed) | \(shown.hypothesis)")
     }
     transcriber.beginBuffering()
     transcriber.start { try await provider.liveTranscribe($0, language: language) }
@@ -311,7 +379,8 @@ func live(_ url: URL, provider: ParakeetProvider, language: String?) async throw
         try await Task.sleep(for: .milliseconds(100))
     }
     await transcriber.stop()
-    print("live:  \(transcriber.transcript.confirmed) | \(transcriber.transcript.hypothesis)")
+    let shown = transcriber.transcript.writingNumbersAsDigits(language: language)
+    print("live:  \(shown.confirmed) | \(shown.hypothesis)")
     print("batch: \(try await provider.transcribe(audioURL: url, language: language, vocabulary: []))")
 }
 

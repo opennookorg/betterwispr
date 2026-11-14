@@ -10,6 +10,14 @@ public enum NotesAvailability: Equatable, Sendable {
 
 public enum NotesModelSelection: Hashable, Sendable, Codable {
     case apple, builtIn, ollama(String), connection(UUID), cli(NotesCLI)
+
+    /// Dictate and format needs Claude Code, Codex, an API connection or Ollama; the small on-device models write weak layouts.
+    public var formats: Bool {
+        switch self {
+        case .apple, .builtIn: false
+        case .ollama, .connection, .cli: true
+        }
+    }
 }
 
 public struct GeneratedMeetingNotes: Sendable {

@@ -104,22 +104,25 @@ struct StyleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 8, style: .continuous))
                     .padding([.horizontal, .bottom], 16)
-                    if model.settings.cleanup == .medium || model.settings.selectedTextShortcut != nil {
-                        RowDivider()
-                        VStack(alignment: .leading, spacing: 8) {
-                            NotesModelPicker(model: model, title: L10n.tr("Cleanup provider"), overrideSelection: \.cleanupSelection)
-                            if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings.cleanupSettings) {
-                                Label(model.settings.cleanup == .medium ? L10n.tr("%@ Until then, Medium dictations get Light cleanup.", String(reason)) : reason,
-                                      systemImage: "exclamationmark.triangle")
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                            }
+                    RowDivider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        NotesModelPicker(model: model, title: L10n.tr("Cleanup provider"), overrideSelection: \.cleanupSelection)
+                        if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings.cleanupSettings) {
+                            Label(model.settings.cleanup == .medium ? L10n.tr("%@ Until then, Medium dictations get Light cleanup.", String(reason)) : reason,
+                                  systemImage: "exclamationmark.triangle")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 11)
-                        .transition(.opacity)
+                        if !model.settings.cleanupSettings.notesSelection.formats {
+                            Label(L10n.tr("Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style."),
+                                  systemImage: "exclamationmark.triangle")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
                     RowDivider()
                     SettingToggle(L10n.tr("Use screen context"), caption: Self.screenContextCaption, isOn: setting(\.useScreenContext).animation(reveal))
                     if model.settings.useScreenContext {
@@ -209,7 +212,7 @@ struct StyleView: View {
     private var cleanupFooter: String {
         let original = L10n.tr("Your original words are never lost. In History, open Original transcription and choose Use Original.")
         guard model.settings.cleanup == .medium else {
-            return model.settings.selectedTextShortcut == nil ? original : L10n.tr("Clean up selected text sends your selection to the cleanup provider. %@", String(original))
+            return L10n.tr("Dictate and format sends your English dictation to the cleanup provider. %@", String(original))
         }
         let provider = model.settings.cleanupSettings
         let destination = switch provider.notesSelection {

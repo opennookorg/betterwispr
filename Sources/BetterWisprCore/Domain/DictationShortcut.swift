@@ -9,7 +9,7 @@ public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     public static let shift = ShortcutModifiers(rawValue: 1 << 9)
     public static let option = ShortcutModifiers(rawValue: 1 << 11)
     public static let control = ShortcutModifiers(rawValue: 1 << 12)
-    /// Only ever held by a standalone Fn shortcut; Carbon hot keys can't use it.
+    /// Only held by Fn alone or Fn with another modifier key; Carbon hot keys can't use it.
     public static let function = ShortcutModifiers(rawValue: 1 << 17)
 
     fileprivate static let names: [(modifier: ShortcutModifiers, symbol: String, spoken: String)] = [
@@ -32,14 +32,16 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
 
     public static let optionSpace = DictationShortcut(validKeyCode: 49, modifiers: .option, key: "Space")
     public static let f5 = DictationShortcut(validKeyCode: UInt32(kVK_F5), modifiers: [], key: "F5")
+    /// Fn and Control held together, the second-mode shortcut other dictation apps use.
+    public static let fnControl = DictationShortcut(validKeyCode: UInt32(kVK_Control), modifiers: .function, key: "Left Control")
     private static let functionKeyCodes = Set([kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
                                                kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19,
                                                kVK_F20].map(UInt32.init))
 
     public init?(keyCode: UInt32, modifiers: ShortcutModifiers, key: String) {
         guard !key.isEmpty else { return nil }
-        if Self.modifier(for: keyCode) != nil {
-            guard modifiers.isEmpty else { return nil }
+        if let own = Self.modifier(for: keyCode) {
+            guard modifiers.isEmpty || (modifiers == .function && own != .function) else { return nil }
         } else {
             guard Self.functionKeyCodes.contains(keyCode) || !modifiers.isDisjoint(with: [.control, .option, .command]) else { return nil }
         }
@@ -57,7 +59,8 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
         }
     }
 
-    public var isModifierOnly: Bool { modifiers.isEmpty && Self.modifier(for: keyCode) != nil }
+    /// Whether the shortcut is only modifier keys, such as Fn alone or Fn with Control, so it needs a modifier listener.
+    public var isModifierOnly: Bool { Self.modifier(for: keyCode) != nil }
 
     /// Whether Shift is part of the shortcut, so it can't also mean "paste without pressing Return".
     public var usesShift: Bool { modifiers.union(Self.modifier(for: keyCode) ?? []).contains(.shift) }
@@ -112,7 +115,11 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
     }
 
     private var localizedKey: String { Self.localizedKeyName(keyCode: keyCode, fallback: key) }
+    private var chordKey: (symbol: String, spoken: String)? {
+        guard !modifiers.isEmpty, let own = Self.modifier(for: keyCode)?.activeNames.first else { return nil }
+        return (own.symbol, L10n.tr(own.spoken))
+    }
 
-    public var displayName: String { modifiers.isEmpty ? localizedKey : modifiers.symbols + " " + localizedKey }
-    public var spokenName: String { (modifiers.activeNames.map { L10n.tr($0.spoken) } + [localizedKey]).joined(separator: " ") }
+    public var displayName: String { modifiers.isEmpty ? localizedKey : modifiers.symbols + " " + (chordKey?.symbol ?? localizedKey) }
+    public var spokenName: String { (modifiers.activeNames.map { L10n.tr($0.spoken) } + [chordKey?.spoken ?? localizedKey]).joined(separator: " ") }
 }

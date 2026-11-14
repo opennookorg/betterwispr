@@ -96,6 +96,8 @@ final class DictationRecording {
     let target: NSRunningApplication?
     let targetElement: AXUIElement?
     let mode: WritingMode?
+    /// Set for Dictate and format: the kind of app the text lands in and the user's examples there.
+    let format: DictationFormat?
     let context: Task<DictationContext, Never>?
     /// Shift was held when the dictation started or finished, or no rule and no recognized prompt matched, so the send is skipped.
     let holdsBackReturn: Bool
@@ -109,8 +111,8 @@ final class DictationRecording {
     var stoppedAt = ContinuousClock.now
 
     init(audio: RecordedAudio, model: SpeechModel, settings: AppSettings, vocabulary: [VocabularyEntry],
-         target: NSRunningApplication?, targetElement: AXUIElement? = nil, mode: WritingMode? = nil, context: Task<DictationContext, Never>? = nil,
-         holdsBackReturn: Bool = false, continuesIn: pid_t? = nil) {
+         target: NSRunningApplication?, targetElement: AXUIElement? = nil, mode: WritingMode? = nil, format: DictationFormat? = nil,
+         context: Task<DictationContext, Never>? = nil, holdsBackReturn: Bool = false, continuesIn: pid_t? = nil) {
         self.audio = audio
         self.model = model
         self.settings = settings
@@ -118,6 +120,7 @@ final class DictationRecording {
         self.target = target
         self.targetElement = targetElement
         self.mode = mode
+        self.format = format
         self.context = context
         self.holdsBackReturn = holdsBackReturn
         self.continuesIn = continuesIn
@@ -253,6 +256,7 @@ final class AppModel {
     var accessibilityGranted = AXIsProcessTrusted()
     var calendarGranted = CalendarEvents.isAuthorized
     var calendarAccounts: [CalendarAccount] = []
+    var shownCalendarEvents: [CalendarEvent] = []
     @ObservationIgnored let calendarEvents = CalendarEvents()
     var microphones: [AudioInputDevice] = []
     var automaticMicrophone: AudioInputDevice?
@@ -280,6 +284,10 @@ final class AppModel {
     @ObservationIgnored private let cancelShortcut = GlobalShortcut(id: 2)
     @ObservationIgnored private let customCancelShortcut = GlobalShortcut(id: 3)
     @ObservationIgnored private let selectedTextShortcut = GlobalShortcut(id: 4)
+    @ObservationIgnored private let formatShortcut = GlobalShortcut(id: 5)
+    @ObservationIgnored private var styleExampleStore: StyleExampleStore?
+    /// The user's edits of formatted dictations; nil while the saved examples can't be read, so they are left untouched.
+    private(set) var styleExamples: StyleExamples?
     @ObservationIgnored private var selectedTextCleanup: Task<Void, Never>?
     @ObservationIgnored private var microphoneObserver: AudioInputObserver?
     @ObservationIgnored private var shortcutWarning: String?
@@ -299,6 +307,9 @@ final class AppModel {
     @ObservationIgnored private var targetApplication: NSRunningApplication?
     @ObservationIgnored private var targetElement: AXUIElement?
     @ObservationIgnored private var writingMode: WritingMode?
+    /// This dictation started from the Dictate and format shortcut.
+    @ObservationIgnored private var formatsDictation = false
+    @ObservationIgnored private var targetURL: String?
     @ObservationIgnored private var holdsBackReturn = false
     @ObservationIgnored private var pendingReturn: Task<Void, Never>?
     @ObservationIgnored private var pendingReturnApp: pid_t?
@@ -333,17 +344,17 @@ final class AppModel {
         return microphones + [saved]
     }
 
-    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser = MediaPauser(),
+    init(store: LocalStore = LocalStore(), startsServices: Bool = true, mediaPauser: MediaPauser? = nil,
          microphoneKeyRemap: MicrophoneKeyRemap? = nil,
          globalShortcut: any DictationHotKey = GlobalShortcut(),
-         makeReplacementShortcut: @escaping () -> any DictationHotKey = { GlobalShortcut(id: 5) },
+         makeReplacementShortcut: @escaping () -> any DictationHotKey = { GlobalShortcut(id: 6) },
          translateDictation: @escaping (String, String, AppSettings) async throws -> String = DictationTranslator.translate) {
         self.store = store
         self.globalShortcut = globalShortcut
         self.makeReplacementShortcut = makeReplacementShortcut
         self.microphoneKeyRemap = microphoneKeyRemap ?? MicrophoneKeyRemap(directory: store.directory)
         failedDictationStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
-        self.mediaPauser = mediaPauser
+        self.mediaPauser = mediaPauser ?? (startsServices ? MediaPauser() : MediaPauser(players: NoMediaPlayers(), otherApps: nil))
         self.startsServices = startsServices
         self.translateDictation = translateDictation
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
@@ -358,10 +369,16 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = L10n.tr("Could not read your saved workspace. It has been left untouched: %@", String(error.localizedDescription))
         }
+        let examplesStore = StyleExampleStore(url: store.directory.appendingPathComponent("style-examples.json"))
+        if let examples = try? examplesStore.load() {
+            styleExamples = examples
+            styleExampleStore = examplesStore
+        }
         meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         if storageIsReadable, !settings.saveHistory { deleteKeptAudio() } else { pruneFailedDictations() }
         guard startsServices else { return }
-        mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        self.mediaPauser.onMuteFailure = { ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t mute other apps"), $0)) }
+        if settings.pauseMediaWhileDictating { Task { await AppleEventMediaPlayers.requestPermission() } }
         AudioRecorder.removeLeftovers()
         Task { [weak self] in
             while !Task.isCancelled {
@@ -403,6 +420,8 @@ final class AppModel {
         cancelShortcut.onPress = { [weak self] in self?.escapePressed() }
         customCancelShortcut.onPress = { [weak self] in self?.cancelOrHoldBack() }
         selectedTextShortcut.onPress = { [weak self] in self?.cleanUpSelectedText() }
+        formatShortcut.onPress = { [weak self] in self?.shortcutPressed(formatting: true) }
+        formatShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
         onBusyChange = { [weak self] busy in self?.armCancelShortcut(busy) }
         warmUpSelectedModel()
         let warmUpAfterWake: @Sendable (Notification) -> Void = { [weak self] _ in
@@ -419,29 +438,34 @@ final class AppModel {
         _ = DistributedNotificationCenter.default().addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main, using: warmUpAfterWake)
     }
 
-    func shortcutPressed() {
+    func shortcutPressed(formatting: Bool = false) {
         guard shortcutPressedAt == nil || !isBusy else { return }
-        guard settings.dictationMode == .hold, !isBusy else { toggleRecording(); return }
+        guard settings.dictationMode != .toggle, !isBusy else { toggleRecording(formatting: formatting); return }
         shortcutPressedAt = Date()
-        startRecording(held: true)
+        startRecording(held: true, formatting: formatting)
     }
+
+    /// The shortcut that started this dictation, for the hints that say how to finish it.
+    private var activeShortcut: DictationShortcut { formatsDictation ? settings.formatShortcut : settings.shortcut }
 
     func shortcutReleased() {
         guard let pressedAt = shortcutPressedAt else { return }
         shortcutPressedAt = nil
         guard phase == .preparing || phase == .recording else { return }
-        if Date().timeIntervalSince(pressedAt) < 0.3 {
+        switch settings.dictationMode.release(afterHolding: Date().timeIntervalSince(pressedAt), recording: phase == .recording) {
+        case .keepListening:
             isHeldSession = false
             if phase == .recording { statusMessage = listeningStatus }
+        case .finish: finishRecording()
+        case .abandon: abandon(.releasedEarly(activeShortcut))
         }
-        else if phase == .preparing { abandon(.releasedEarly(settings.shortcut)) }
-        else { finishRecording() }
     }
 
     func registerShortcut() {
         let retriesMicrophoneKeyShortcut = microphoneKeyShortcutRetryPending
         microphoneKeyShortcutRetryPending = false
         if let shortcut = settings.selectedTextShortcut { try? selectedTextShortcut.register(shortcut) }
+        try? formatShortcut.register(settings.formatShortcut)
         do {
             try globalShortcut.register(settings.shortcut, withShift: wantsShiftShortcut(for: settings.shortcut))
             if statusMessage == shortcutWarning { statusMessage = "" }
@@ -456,6 +480,7 @@ final class AppModel {
     func suspendShortcut() {
         globalShortcut.unregister()
         selectedTextShortcut.unregister()
+        formatShortcut.unregister()
     }
 
     /// Makes one recorder the only one capturing; any other recorder stops when it sees this change.
@@ -474,7 +499,7 @@ final class AppModel {
 
     private func armCancelShortcut(_ busy: Bool) {
         if busy {
-            var escapeModifiers = settings.shortcut.cancelModifiers
+            var escapeModifiers = activeShortcut.cancelModifiers
             if let custom = settings.cancelShortcut {
                 do {
                     try customCancelShortcut.register(custom)
@@ -495,7 +520,7 @@ final class AppModel {
     func changeShortcut(_ shortcut: DictationShortcut) {
         guard !isBusy else { return }
         if microphoneKeyRecoveryNeeded, shortcut == settings.shortcut { return }
-        if shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut {
+        if shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut || shortcut == settings.formatShortcut {
             registerShortcut()
             ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), ShortcutError.alreadyAssigned(shortcut)))
             return
@@ -568,7 +593,8 @@ final class AppModel {
             current.settings.usesInternalMicrophoneKey = enabled
             if let replacementShortcut {
                 guard replacementShortcut != previous.cancelShortcut,
-                      replacementShortcut != previous.selectedTextShortcut else {
+                      replacementShortcut != previous.selectedTextShortcut,
+                      replacementShortcut != previous.formatShortcut else {
                     throw ShortcutError.alreadyAssigned(replacementShortcut)
                 }
                 current.settings.shortcut = replacementShortcut
@@ -667,7 +693,7 @@ final class AppModel {
         if let shortcut {
             do {
                 if shortcut.isModifierOnly { throw ShortcutError.needsKey }
-                if shortcut == settings.shortcut || shortcut == settings.selectedTextShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
+                if shortcut == settings.shortcut || shortcut == settings.selectedTextShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
                 try customCancelShortcut.register(shortcut)
                 customCancelShortcut.unregister()
             } catch {
@@ -696,7 +722,7 @@ final class AppModel {
     }
 
     private var listeningStatus: String {
-        let shortcut = settings.shortcut.displayName
+        let shortcut = activeShortcut.displayName
         let finish = sendKeystroke != nil ? L10n.tr("send") : L10n.tr("finish")
         return isHeldSession ? L10n.tr("Listening. Release %@ to %@.", String(shortcut), String(finish)) : L10n.tr("Listening. Press %@ or click ✓ to %@.", String(shortcut), String(finish))
     }
@@ -711,7 +737,7 @@ final class AppModel {
     }
 
     /// Shift held while starting or finishing a dictation pastes it without sending.
-    private var shiftHeld: Bool { !settings.shortcut.usesShift && NSEvent.modifierFlags.contains(.shift) }
+    private var shiftHeld: Bool { !activeShortcut.usesShift && NSEvent.modifierFlags.contains(.shift) }
 
     /// Waits for the paste and any takeover by a new dictation, then posts the key the target still asks for, if any.
     func pressSendKey(in app: NSRunningApplication, after delay: Duration, using paste: FocusedAppIntegration,
@@ -766,7 +792,7 @@ final class AppModel {
             do {
                 if shortcut.isModifierOnly { throw ShortcutError.needsKey }
                 if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
-                if shortcut == settings.shortcut || shortcut == settings.cancelShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
+                if shortcut == settings.shortcut || shortcut == settings.cancelShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
                 try selectedTextShortcut.register(shortcut)
             } catch {
                 registerShortcut()
@@ -778,6 +804,40 @@ final class AppModel {
         }
         settings.selectedTextShortcut = shortcut
         saveSettings()
+    }
+
+    func changeFormatShortcut(_ shortcut: DictationShortcut) {
+        guard !isBusy else { return }
+        do {
+            if shortcut.isModifierOnly, shortcut.modifiers.isEmpty { throw ShortcutError.needsKey }
+            if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
+            if [settings.shortcut, settings.cancelShortcut, settings.selectedTextShortcut].contains(shortcut) { throw ShortcutError.alreadyAssigned(shortcut) }
+            try formatShortcut.register(shortcut)
+        } catch {
+            registerShortcut()
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
+            return
+        }
+        settings.formatShortcut = shortcut
+        saveSettings()
+    }
+
+    /// Keeps the user's edit of a formatted dictation as a style example, only while dictation history is saved.
+    private func rememberStyle(_ edited: String, replacing original: String, for category: AppCategory) {
+        guard settings.saveHistory, let store = styleExampleStore, var examples = styleExamples else { return }
+        examples.record(edited, for: category, replacing: original)
+        guard (try? store.save(examples)) != nil else { return }
+        styleExamples = examples
+    }
+
+    func forgetStyleExamples() {
+        guard let store = styleExampleStore else { return }
+        do {
+            try store.save(StyleExamples())
+            styleExamples = StyleExamples()
+        } catch {
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t forget your writing examples"), error))
+        }
     }
 
     func cleanUpSelectedText() {
@@ -863,11 +923,15 @@ final class AppModel {
     }
 
     func toggleRecording() {
-        if phase == .recording { finishRecording(); return }
-        startRecording(held: false)
+        toggleRecording(formatting: false)
     }
 
-    private func startRecording(held: Bool) {
+    private func toggleRecording(formatting: Bool) {
+        if phase == .recording { finishRecording(); return }
+        startRecording(held: false, formatting: formatting)
+    }
+
+    private func startRecording(held: Bool, formatting: Bool = false) {
         guard !isBusy else { return }
         if case .asking(.translate) = phase { return }
         answerQuestion(false)
@@ -881,6 +945,11 @@ final class AppModel {
             fail(DictationFailure(title: L10n.tr("Download a model first."), message: L10n.tr("Download %@ in Models before recording.", String(selectedModel.localizedName))))
             return
         }
+        guard !formatting || settings.cleanupSettings.notesSelection.formats else {
+            selectedPage = .style
+            fail(Self.formatProviderMissing)
+            return
+        }
         if let cleanup = selectedTextCleanup {
             cleanup.cancel()
             selectedTextCleanup = nil
@@ -890,7 +959,9 @@ final class AppModel {
         if let app = targetApplication { SendAfterPaste.prepare(app, settings: settings) }
         targetElement = FocusedAppIntegration.focusedElement(in: targetApplication)
         let modes = settings.modes
-        let website = modes.needsWebsite ? targetApplication.flatMap(WebsiteReader.read) : nil
+        formatsDictation = formatting
+        targetURL = nil
+        let website = modes.needsWebsite || formatting ? targetApplication.flatMap(WebsiteReader.read) : nil
         writingMode = modes.match(app: targetApplication?.bundleIdentifier)?.mode
         holdsBackReturn = shiftHeld
         sendKeystroke = nil
@@ -916,9 +987,11 @@ final class AppModel {
         let model = selectedModel
         let live = model.engine == .parakeet ? LiveTranscriber() : nil
         if settings.showLiveText && !settings.hideCapsuleWhileDictating {
+            let language = settings.language == "auto" ? nil : settings.language
+            let digits = settings.writesNumbersAsDigits
             live?.onUpdate = { [weak self] transcript in
                 guard let self, self.generation == token else { return }
-                self.liveTranscript = transcript
+                self.liveTranscript = digits ? transcript.writingNumbersAsDigits(language: language) : transcript
             }
         }
         pieceEdits?.tasks.values.forEach { $0.cancel() }
@@ -945,6 +1018,7 @@ final class AppModel {
                 let url = await website?.value
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
+                self.targetURL = url
                 if let url, let app = self.targetApplication {
                     self.writingMode = modes.match(url: url, app: app.bundleIdentifier)?.mode
                     self.dictationContext = self.captureContext(for: self.settings.applying(self.writingMode))
@@ -986,8 +1060,8 @@ final class AppModel {
         remindedHour = hour
         guard startsServices, let limit = recorder.maximumDuration else { return }
         let finish = isHeldSession
-            ? L10n.tr("Release %@ to finish.", settings.shortcut.displayName)
-            : L10n.tr("Press %@ to finish.", settings.shortcut.displayName)
+            ? L10n.tr("Release %@ to finish.", activeShortcut.displayName)
+            : L10n.tr("Press %@ to finish.", activeShortcut.displayName)
         ToastWindow.shared.show(Toast(title: L10n.tr("Still recording"), message: hour == 1 ? L10n.tr("1h so far. %@ It stops by itself at about %@h.", finish, String(Int(limit / 3600))) : L10n.tr("%@h so far. %@ It stops by itself at about %@h.", String(hour), finish, String(Int(limit / 3600))), systemImage: "waveform"))
     }
 
@@ -1011,6 +1085,7 @@ final class AppModel {
             let hints = VocabularyProcessor.hints(self.vocabulary)
             let spellsScreenNames = self.spellsScreenNames(with: model, settings: self.settings)
             parakeet.usesPhraseBooster = self.settings.usePhraseBooster
+            parakeet.detectionLanguages = self.settings.dictationLanguages
             live.onSegment = { [weak self] in self?.editAhead($0, token: token) }
             live.start(pass: { try await parakeet.liveTranscribe($0, language: language) }, segment: { [weak self] samples in
                 let context = self?.dictationContext
@@ -1031,7 +1106,7 @@ final class AppModel {
 
     /// Starts Medium cleanup of a piece recognized while recording, so stopping only waits for the edit of the last piece.
     private func editAhead(_ recognized: String, token: UUID) {
-        guard generation == token, phase == .recording else { return }
+        guard generation == token, phase == .recording, !formatsDictation else { return }
         let language = settings.language == "auto" ? nil : settings.language
         let editSettings = settings.applying(writingMode).cleanupSettings
         guard editSettings.cleanup == .medium, MeetingNotesGenerator.availability(settings: editSettings) == .available else { return }
@@ -1066,6 +1141,7 @@ final class AppModel {
         let target = targetApplication
         let targetElement = targetElement
         let mode = writingMode
+        let format = dictationFormat
         let translationLanguage = recordingTranslationLanguage.take()
         let suppressesVoiceTranslation = suppressesVoiceTranslation
         let shiftHoldsBack = holdsBackReturn || shiftHeld || translationLanguage != nil
@@ -1114,7 +1190,7 @@ final class AppModel {
                     self.updateSendKeystroke(holdingBack: holdsBackReturn)
                 }
                 let recording = DictationRecording(audio: audio, model: model, settings: settings,
-                                                   vocabulary: entries, target: target, targetElement: targetElement, mode: mode, context: context,
+                                                   vocabulary: entries, target: target, targetElement: targetElement, mode: mode, format: format, context: context,
                                                    holdsBackReturn: holdsBackReturn, continuesIn: continuesIn)
                 recording.streamed = streamed
                 recording.translationLanguage = translationLanguage
@@ -1177,6 +1253,7 @@ final class AppModel {
                 guard self.generation == token, let provider = self.provider else { return }
                 (provider as? WhisperKitProvider)?.detectionLanguages = recording.settings.dictationLanguages
                 (provider as? ParakeetProvider)?.usesPhraseBooster = recording.settings.usePhraseBooster
+                (provider as? ParakeetProvider)?.detectionLanguages = recording.settings.dictationLanguages
                 let recognitionStarted = ContinuousClock.now
                 var pieces: [String] = []
                 var recognitionFixes = 0
@@ -1220,7 +1297,25 @@ final class AppModel {
                 var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text, digits: digits) : heard.text
                 if digits { spoken = LocalizedSpokenNumbers.apply(spoken, language: language) }
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
-                if english, let email = EmailDictation.compose(spoken) {
+                let format = recording.format.flatMap { self.formatIfPossible(self.requested($0, by: spoken), english: english, settings: writingSettings) }
+                var styledFormat: DictationFormat?
+                if let format {
+                    self.statusMessage = L10n.tr("Formatting with %@…", String(writingSettings.localizedNotesModelName))
+                    let editContext = sharesContext ? await context?.value(within: .seconds(1)) : nil
+                    let formatted = await TranscriptPolisher.polish(spoken, settings: writingSettings, vocabulary: hints, context: editContext,
+                                                                    instructions: mode?.instructions ?? "", format: format)
+                    try Task.checkCancellation()
+                    guard self.generation == token else { return }
+                    if formatted == nil, format.category == .email, let email = EmailDictation.compose(spoken) {
+                        spoken = email
+                    } else if formatted == nil {
+                        ToastWindow.shared.show(Toast(title: L10n.tr("Pasted without formatting"), message: L10n.tr("%@ didn’t return a usable edit, so the cleaned dictation was used.", String(writingSettings.localizedNotesModelName)), systemImage: "text.badge.xmark"))
+                    } else {
+                        styledFormat = format
+                    }
+                    spoken = StyleFormatter.apply(tone, to: formatted ?? spoken)
+                    Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Formatting completed: category=\(format.category.rawValue, privacy: .public) accepted=\(formatted != nil)")
+                } else if english, let email = EmailDictation.compose(spoken) {
                     spoken = email
                 } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = L10n.tr("Editing with %@…", String(writingSettings.localizedNotesModelName))
@@ -1303,9 +1398,15 @@ final class AppModel {
                     switch result {
                     case .pasted:
                         self.phase = .idle
+                        let styleFormat = styledFormat
+                        let learnsStyle = styleFormat?.rules != nil && writingSettings.saveHistory
                         let watchCorrections = { [weak self] in
-                            guard translationLanguage == nil, writingSettings.learnCorrections, let app = recording.target else { return }
-                            self?.correctionWatcher.watch(output, in: app) { [weak self] in self?.learn(from: $0, to: $1) }
+                            guard translationLanguage == nil, writingSettings.learnCorrections || learnsStyle,
+                                  let app = recording.target else { return }
+                            self?.correctionWatcher.watch(output, in: app) { [weak self] original, edited in
+                                if writingSettings.learnCorrections { self?.learn(from: original, to: edited) }
+                                if learnsStyle, let styleFormat { self?.rememberStyle(edited, replacing: original, for: styleFormat.category) }
+                            }
                         }
                         if let returnDelay, let app = recording.target {
                             self.pressSendKey(in: app, after: returnDelay, using: paste, otherwise: watchCorrections)
@@ -1433,6 +1534,41 @@ final class AppModel {
         }
     }
 
+    /// The format when it can run; otherwise tells the user why this dictation gets the usual cleanup.
+    private func formatIfPossible(_ format: DictationFormat, english: Bool, settings: AppSettings) -> DictationFormat? {
+        guard settings.notesSelection.formats else {
+            ToastWindow.shared.show(Toast(title: Self.formatProviderMissing.title, message: Self.formatProviderMissing.message, systemImage: "exclamationmark.triangle", isError: true,
+                                          action: Toast.Action(title: L10n.tr("Open Style")) { [weak self] in
+                                              self?.selectedPage = .style
+                                              self?.onShowDashboard?()
+                                          }))
+            return nil
+        }
+        let reason: String
+        if format.rules == nil {
+            reason = L10n.tr("Dictate and format has no layout for this app yet. This dictation got the usual cleanup.")
+        } else if !english {
+            reason = L10n.tr("Dictate and format works in English. This dictation got the usual cleanup.")
+        } else if case .unavailable(let why) = MeetingNotesGenerator.availability(settings: settings) {
+            reason = L10n.tr("%@ Until then, Dictate and format gives the usual cleanup.", String(why))
+        } else {
+            return format
+        }
+        ToastWindow.shared.show(Toast(title: L10n.tr("Not formatted"), message: reason, systemImage: "exclamationmark.triangle"))
+        return nil
+    }
+
+    static var formatProviderMissing: DictationFailure {
+        DictationFailure(title: L10n.tr("Connect a provider to format."),
+                         message: L10n.tr("Dictate and format needs Claude Code, Codex, an API connection or Ollama. Choose one as the cleanup provider in Style."))
+    }
+
+    /// An email format when the dictation asks for an email in an app without its own email, chat or prompt layout.
+    private func requested(_ format: DictationFormat, by spoken: String) -> DictationFormat {
+        guard [.other, .documents].contains(format.category), EmailDictation.isRequest(spoken) else { return format }
+        return DictationFormat(category: .email, examples: styleExamples?.recent(for: .email) ?? [])
+    }
+
     func cancelRecording() {
         guard isBusy else { return }
         Logger(subsystem: "org.betterwispr.app", category: "Dictation").notice("Dictation cancelled: recording=\(self.phase == .recording)")
@@ -1455,10 +1591,18 @@ final class AppModel {
         playFeedback(.cancelled)
     }
 
+    /// The format for a Dictate and format session, from the target app or its web page, with the user's newest examples there.
+    private var dictationFormat: DictationFormat? {
+        guard formatsDictation else { return nil }
+        let category = AppCategory(bundleID: targetApplication?.bundleIdentifier, url: targetURL)
+        return DictationFormat(category: category, examples: styleExamples?.recent(for: category) ?? [])
+    }
+
     private func sessionRecording(_ audio: RecordedAudio) -> DictationRecording {
         let recording = DictationRecording(audio: audio, model: selectedModel, settings: settings, vocabulary: vocabulary,
-                           target: targetApplication, targetElement: targetElement, mode: writingMode, context: dictationContext.take(),
-                           holdsBackReturn: holdsBackReturn || targetKeystroke == nil, continuesIn: continuesIn)
+                                           target: targetApplication, targetElement: targetElement, mode: writingMode,
+                                           format: dictationFormat, context: dictationContext.take(),
+                                           holdsBackReturn: holdsBackReturn || targetKeystroke == nil, continuesIn: continuesIn)
         recording.translationLanguage = recordingTranslationLanguage
         recording.suppressesVoiceTranslation = suppressesVoiceTranslation
         return recording
@@ -1959,7 +2103,7 @@ final class AppModel {
     }
 
     private func refreshModels() {
-        installedModelIDs = Set(models.filter { WhisperKitProvider.isInstalled($0) || ParakeetProvider.isInstalled($0) }.map(\.id))
+        installedModelIDs = Set(models.filter { WhisperKitProvider.isInstalled($0) || ParakeetProvider.isInstalled($0) || CohereProvider.isInstalled($0) }.map(\.id))
         phraseBoosterInstalled = ParakeetProvider.isPhraseBoosterInstalled()
         speakerDetectionInstalled = SpeakerDetection.isInstalled()
         meetings.builtInModelInstalled = BuiltInModel.isInstalled()
@@ -2168,7 +2312,7 @@ final class AppModel {
 
     private func wantsShiftShortcut(for shortcut: DictationShortcut) -> Bool {
         guard settings.sendsAfterPaste, !shortcut.isModifierOnly, !shortcut.usesShift else { return false }
-        return ![settings.cancelShortcut, settings.selectedTextShortcut].compactMap { $0 }.contains {
+        return ![settings.cancelShortcut, settings.selectedTextShortcut, settings.formatShortcut].compactMap { $0 }.contains {
             $0.keyCode == shortcut.keyCode && $0.modifiers == shortcut.modifiers.union(.shift)
         }
     }
@@ -2195,7 +2339,9 @@ final class AppModel {
         if previous.saveHistory, !settings.saveHistory { deleteKeptAudio() }
         if previous.unloadModelWhenIdle != settings.unloadModelWhenIdle { scheduleIdleUnload() }
         if previous.selectedTextShortcut != settings.selectedTextShortcut { selectedTextShortcut.unregister() }
+        if previous.formatShortcut != settings.formatShortcut { formatShortcut.unregister() }
         if previous.selectedTextShortcut != settings.selectedTextShortcut
+            || previous.formatShortcut != settings.formatShortcut
             || wantsShiftShortcut(for: settings.shortcut) != globalShortcut.wantsShift {
             registerShortcut()
         }
@@ -2315,12 +2461,28 @@ final class AppModel {
         }
     }
 
+    /// Opens Internet Accounts in System Settings, where Google, Outlook, Exchange, Yahoo and iCloud calendars are added to this Mac.
+    func addCalendarAccount() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
+    }
+
+    /// Re-reads the events in `interval` from the calendars meeting notes use, for the Calendar page.
+    func refreshCalendarEvents(in interval: DateInterval) async {
+        calendarGranted = CalendarEvents.isAuthorized
+        guard settings.useCalendar, calendarGranted else { shownCalendarEvents = []; return }
+        let accounts = await calendarEvents.accounts()
+        let events = await calendarEvents.events(excluding: settings.excludedCalendarIDs, in: interval)
+        guard !Task.isCancelled else { return }
+        calendarAccounts = accounts
+        shownCalendarEvents = events
+    }
+
     func refreshPermissions() {
         refreshCalendars()
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         let previouslyGranted = accessibilityGranted
         accessibilityGranted = AXIsProcessTrusted()
-        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly, !isBusy { registerShortcut() }
+        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly || settings.formatShortcut.isModifierOnly, !isBusy { registerShortcut() }
     }
 
     private func refreshCalendars() {

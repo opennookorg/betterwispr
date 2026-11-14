@@ -130,6 +130,52 @@ import Testing
     #expect(transitions == [true, false])
 }
 
+@Test @MainActor func fnControlDeliversPressAndReleaseInEitherOrderOnlyWithNothingElseHeld() throws {
+    let listener = GlobalShortcut()
+    let shortcut = DictationShortcut.fnControl
+    #expect(shortcut.isModifierOnly && shortcut.displayName == "fn ⌃" && shortcut.spokenName == "Fn Control")
+    #expect(DictationShortcut(keyCode: UInt32(kVK_Control), modifiers: .function, key: "Left Control") == shortcut)
+    #expect(DictationShortcut(keyCode: UInt32(kVK_Control), modifiers: .option, key: "Left Control") == nil)
+    #expect(DictationShortcut(keyCode: UInt32(kVK_Function), modifiers: .function, key: "Fn") == nil)
+    var transitions: [Bool] = []
+    listener.onPress = { transitions.append(true) }
+    listener.onRelease = { transitions.append(false) }
+    let control = NSEvent.ModifierFlags(rawValue: UInt(NX_DEVICELCTLKEYMASK)).union(.control)
+
+    func send(_ keyCode: Int, _ flags: NSEvent.ModifierFlags) throws {
+        let event = try #require(NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: flags,
+                                                timestamp: 0, windowNumber: 0, context: nil, characters: "",
+                                                charactersIgnoringModifiers: "", isARepeat: false, keyCode: UInt16(keyCode)))
+        listener.handleModifierEvent(event, shortcut: shortcut)
+    }
+
+    try send(kVK_Control, control)
+    try send(kVK_Control, [])
+    try send(kVK_Function, .function)
+    try send(kVK_Control, control.union([.function, .command]))
+    try send(kVK_Control, [])
+    try send(kVK_Function, [])
+    #expect(transitions.isEmpty)
+
+    try send(kVK_Function, .function)
+    try send(kVK_Control, control.union(.function))
+    try send(kVK_Function, control)
+    try send(kVK_Control, [])
+    try send(kVK_Control, control)
+    try send(kVK_Function, control.union(.function))
+    try send(kVK_Control, .function)
+    try send(kVK_Function, [])
+    #expect(transitions == [true, false, true, false])
+}
+
+@Test func savedSettingsWithoutAFormatShortcutGetFnControl() throws {
+    let saved = try JSONEncoder().encode(AppSettings())
+    var object = try #require(try JSONSerialization.jsonObject(with: saved) as? [String: Any])
+    object.removeValue(forKey: "formatShortcut")
+    let settings = try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(settings.formatShortcut == .fnControl)
+}
+
 @Test @MainActor func cancelShortcutRefusesTheDictationShortcutAndAModifierAloneThenSavesAKeyAndClears() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

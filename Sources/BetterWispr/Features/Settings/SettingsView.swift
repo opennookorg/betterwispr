@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var permissionCheck = 0
     @State private var terminals: [ScriptableTerminal] = []
     @State private var pendingRetention: HistoryRetention?
+    @State private var choosesDictationLanguages = false
 
     private static let voiceCommands = [
         ("“comma”, “question mark”, “full stop”", ", ? ."),
@@ -17,6 +18,14 @@ struct SettingsView: View {
         ("“at the rate KV”, “at sign KV”", "@KV"),
         ("“write an email to Sam saying …, best regards, Kartik”", L10n.tr("Hi Sam, body and sign-off")),
     ]
+
+    private var styleExamplesCaption: String {
+        guard let examples = model.styleExamples else { return L10n.tr("Your saved writing examples couldn’t be read, so they’re left untouched and no new ones are kept.") }
+        let learned = examples.count == 1 ? L10n.tr("1 example learned.") : L10n.tr("%d examples learned.", examples.count)
+        return learned + " " + (model.settings.saveHistory
+            ? L10n.tr("When you edit text from Dictate and format, your version is kept on this Mac and guides later formatting in that kind of app.")
+            : L10n.tr("New examples are kept only while Save dictation history is on."))
+    }
 
     var body: some View {
         ScrollView {
@@ -42,11 +51,12 @@ struct SettingsView: View {
                     RowDivider()
                     ShortcutRecorder(model: model, kind: .selectedText)
                     RowDivider()
-                    SettingRow(L10n.tr("Behavior"), caption: model.settings.dictationMode == .hold
-                        ? L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
-                        : L10n.tr("Press once to speak. Press again or click ✓ to finish.")) {
+                    ShortcutRecorder(model: model, kind: .format)
+                    RowDivider()
+                    SettingRow(L10n.tr("Behavior"), caption: behaviorCaption) {
                         Picker(L10n.tr("Behavior"), selection: setting(\.dictationMode)) {
                             Text(L10n.tr("Hold or tap")).tag(DictationMode.hold)
+                            Text(L10n.tr("Hold only")).tag(DictationMode.holdOnly)
                             Text(L10n.tr("Press to toggle")).tag(DictationMode.toggle)
                         }
                         .pickerStyle(.segmented)
@@ -66,24 +76,35 @@ struct SettingsView: View {
                     RowDivider()
                     SettingRow(L10n.tr("Spoken language"), caption: L10n.tr("A fixed language gives more consistent results.")) {
                         Picker(L10n.tr("Spoken language"), selection: setting(\.language)) {
-                            Text(model.selectedModel.engine == .apple ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
+                            Text([.apple, .cohere].contains(model.selectedModel.engine) ? L10n.tr("System language") : L10n.tr("Detect automatically")).tag("auto")
                             ForEach(languageChoices, id: \.code) { Text($0.name).tag($0.code) }
                         }
                         .labelsHidden()
                         .fixedSize()
                     }
-                    if model.selectedModel.engine == .whisperKit && model.settings.language == "auto" {
+                    if [.whisperKit, .parakeet].contains(model.selectedModel.engine) && model.settings.language == "auto" {
                         RowDivider()
                         SettingRow(L10n.tr("Dictation languages"), caption: L10n.tr("Automatic detection chooses only among these.")) {
-                            Menu(dictationLanguagesLabel) {
-                                Toggle(L10n.tr("All languages"), isOn: Binding(
-                                    get: { dictationLanguageNames.isEmpty },
-                                    set: { if $0 { setting(\.dictationLanguages).wrappedValue = [] } }
-                                ))
-                                Divider()
-                                ForEach(languageChoices, id: \.code) { Toggle($0.name, isOn: dictates($0.code)) }
-                            }
-                            .fixedSize()
+                            Button(dictationLanguagesLabel) { choosesDictationLanguages = true }
+                                .fixedSize()
+                                .accessibilityLabel(L10n.tr("Dictation languages"))
+                                .accessibilityValue(dictationLanguagesLabel)
+                                .popover(isPresented: $choosesDictationLanguages, arrowEdge: .bottom) {
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Toggle(L10n.tr("All languages"), isOn: Binding(
+                                                get: { dictationLanguageNames.isEmpty },
+                                                set: { if $0 { setting(\.dictationLanguages).wrappedValue = [] } }
+                                            ))
+                                            Divider()
+                                            ForEach(languageChoices, id: \.code) { Toggle($0.name, isOn: dictates($0.code)) }
+                                        }
+                                        .toggleStyle(.checkbox)
+                                        .padding(12)
+                                    }
+                                    .frame(width: 220)
+                                    .frame(maxHeight: 360)
+                                }
                         }
                     }
                     if showsChineseScript {
@@ -131,7 +152,7 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(L10n.tr("After you speak")) {
-                    SettingToggle(L10n.tr("Write numbers as digits"), caption: L10n.tr("“Two tickets for PR forty-two” becomes “2 tickets for PR 42”, in any language. Turn off to keep numbers as spoken words."), isOn: setting(\.writesNumbersAsDigits))
+                    SettingToggle(L10n.tr("Write numbers as digits"), caption: L10n.tr("“Two PRs for the ticket sixty-seven” becomes “2 PRs for the ticket 67”, in any language. Turn off to keep numbers as spoken words."), isOn: setting(\.writesNumbersAsDigits))
                     RowDivider()
                     SettingToggle(L10n.tr("Paste into the active app"), caption: L10n.tr("Needs Accessibility. Otherwise, text is copied."), isOn: setting(\.autoPaste))
                     RowDivider()
@@ -209,13 +230,21 @@ struct SettingsView: View {
                         }
                     }
                     RowDivider()
-                    SettingToggle(L10n.tr("Pause music while dictating"), caption: L10n.tr("Pauses Music and Spotify while you speak, then resumes them. Browsers and other players keep playing. macOS asks for permission for each of these apps that is open when you turn this on."), isOn: pauseMediaWhileDictating)
+                    SettingToggle(L10n.tr("Pause music while dictating"), caption: L10n.tr("Pauses Music and Spotify while you speak, then resumes them. On by default. macOS asks for permission for each of these apps that is open when BetterWispr starts or when you turn this on."), isOn: pauseMediaWhileDictating)
                     if #available(macOS 14.2, *) {
                         RowDivider()
-                        SettingToggle(L10n.tr("Mute other apps while dictating"), caption: L10n.tr("Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. macOS asks to use system audio when you turn this on. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested."), isOn: muteOtherAppsWhileDictating)
+                        SettingToggle(L10n.tr("Mute other apps while dictating"), caption: L10n.tr("Silences other apps, such as a video in your browser, while you speak. Videos keep playing silently, and your volume and mute settings don’t change. Nothing is muted if meeting notes are recording, or if a browser or a known call app such as Zoom, Teams or FaceTime is using the microphone when you start. Any other call goes silent while you speak. On by default. macOS asks to use system audio the first time it mutes. Whether other apps come back on their own if BetterWispr crashes during a dictation hasn’t been tested."), isOn: muteOtherAppsWhileDictating)
                     }
                     RowDivider()
                     SettingToggle(L10n.tr("Floating recording capsule"), caption: L10n.tr("A small voice control at the bottom of your screen."), isOn: setting(\.showCapsule))
+                    RowDivider()
+                    SettingRow(L10n.tr("Capsule position"), caption: L10n.tr("Where the capsule sits along the bottom of the screen. You can also right-click the capsule to move or hide it.")) {
+                        Picker(L10n.tr("Capsule position"), selection: setting(\.capsulePosition)) {
+                            ForEach(CapsulePosition.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                     RowDivider()
                     SettingToggle(L10n.tr("Hide capsule while dictating"), caption: L10n.tr("Keeps the capsule out of sight while you speak and while text is transcribed. Errors, Undo and the warning before a long dictation stops still appear. The menu bar icon turns into a microphone while you speak."), isOn: setting(\.hideCapsuleWhileDictating))
                     RowDivider()
@@ -270,6 +299,11 @@ struct SettingsView: View {
                             .fixedSize()
                         }
                     }
+                    RowDivider()
+                    SettingRow(L10n.tr("Writing examples"), caption: styleExamplesCaption) {
+                        Button(L10n.tr("Forget"), role: .destructive) { model.forgetStyleExamples() }
+                            .disabled(model.styleExamples?.count ?? 0 == 0)
+                    }
                 }
 
                 SettingsSection(L10n.tr("Calendar")) {
@@ -292,6 +326,10 @@ struct SettingsView: View {
                                 if calendar.id != account.calendars.first?.id { RowDivider() }
                                 SettingToggle(calendar.title, isOn: includes(calendar))
                             }
+                        }
+                        RowDivider()
+                        SettingRow(L10n.tr("Add a calendar account"), caption: L10n.tr("Opens Internet Accounts in System Settings, where you sign in to Google, Outlook, Exchange, Yahoo or iCloud. The calendars appear here once this Mac syncs them. For Outlook, choose Microsoft Exchange.")) {
+                            Button(L10n.tr("Add Account…"), action: model.addCalendarAccount)
                         }
                     }
                 } footer: {
@@ -329,7 +367,6 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
-            .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
         }
         .toggleStyle(.switch)
@@ -457,6 +494,14 @@ struct SettingsView: View {
         )
     }
 
+    private var behaviorCaption: String {
+        switch model.settings.dictationMode {
+        case .hold: L10n.tr("Hold to speak and release to finish. Or tap once to dictate hands-free, then press again or click ✓ to finish.")
+        case .holdOnly: L10n.tr("Dictation runs only while you hold the shortcut. Release to finish. A quick tap never starts hands-free dictation.")
+        case .toggle: L10n.tr("Press once to speak. Press again or click ✓ to finish.")
+        }
+    }
+
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {
         Binding(
             get: { model.settings[keyPath: keyPath] },
@@ -473,7 +518,7 @@ struct SettingsView: View {
 }
 
 private struct ShortcutRecorder: View {
-    enum Kind { case dictation, cancel, selectedText }
+    enum Kind { case dictation, cancel, selectedText, format }
 
     let model: AppModel
     let kind: Kind
@@ -489,6 +534,7 @@ private struct ShortcutRecorder: View {
         case .dictation: model.settings.shortcut
         case .cancel: model.settings.cancelShortcut
         case .selectedText: model.settings.selectedTextShortcut
+        case .format: model.settings.formatShortcut
         }
     }
     private var title: String {
@@ -496,9 +542,17 @@ private struct ShortcutRecorder: View {
         case .dictation: L10n.tr("Keyboard shortcut")
         case .cancel: L10n.tr("Cancel shortcut")
         case .selectedText: L10n.tr("Clean up selected text")
+        case .format: L10n.tr("Dictate and format")
         }
     }
     private var placeholder: String { kind == .dictation ? "" : L10n.tr("Set Shortcut…") }
+    private var defaultShortcut: DictationShortcut? {
+        switch kind {
+        case .dictation: .optionSpace
+        case .format: .fnControl
+        case .cancel, .selectedText: nil
+        }
+    }
 
     var body: some View {
         Group {
@@ -521,22 +575,22 @@ private struct ShortcutRecorder: View {
                     Button(L10n.tr("Use F5")) { model.changeShortcut(.f5) }
                         .buttonStyle(.bordered)
                 }
-                if kind == .dictation, shortcut != .optionSpace, !isCapturing {
-                    Button(L10n.tr("Reset to %@", String(DictationShortcut.optionSpace.spokenName)), systemImage: "arrow.counterclockwise") {
+                if let defaultShortcut, shortcut != defaultShortcut, !isCapturing {
+                    Button(L10n.tr("Reset to %@", String(defaultShortcut.spokenName)), systemImage: "arrow.counterclockwise") {
                         stop()
-                        model.changeShortcut(.optionSpace)
+                        change(defaultShortcut)
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help(L10n.tr("Reset to %@", String(DictationShortcut.optionSpace.displayName)))
+                    .help(L10n.tr("Reset to %@", String(defaultShortcut.displayName)))
                     .transition(.opacity)
-                } else if kind != .dictation, shortcut != nil, !isCapturing {
+                } else if defaultShortcut == nil, shortcut != nil, !isCapturing {
                     Button(L10n.tr("Clear"), systemImage: "xmark.circle") { change(nil) }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help(kind == .cancel ? L10n.tr("Remove the cancel shortcut") : L10n.tr("Remove the clean up shortcut"))
+                    .help(clearHelp)
                     .transition(.opacity)
                 }
                 recordButton
@@ -564,6 +618,13 @@ private struct ShortcutRecorder: View {
         }
     }
 
+    private var clearHelp: String {
+        switch kind {
+        case .cancel: L10n.tr("Remove the cancel shortcut")
+        default: L10n.tr("Remove the clean up shortcut")
+        }
+    }
+
     private var caption: String? {
         if isCapturing {
             return feedback ?? (kind == .dictation ? L10n.tr("Press and release ⌃, ⌥, ⇧, ⌘ or Fn alone, use a key combination, or press an F-key. Esc cancels.")
@@ -576,6 +637,10 @@ private struct ShortcutRecorder: View {
             return shortcut?.isModifierOnly == true ? L10n.tr("Needs Accessibility. Uses the left or right key you recorded.") : L10n.tr("Starts dictation from any app.")
         case .cancel: return L10n.tr("Also cancels a dictation from any app. Esc always does.")
         case .selectedText: return L10n.tr("Edits the text you select in any app with your cleanup provider from Style. English only.")
+        case .format:
+            let shapes = L10n.tr("Dictates, then shapes the text for the app you’re in, such as an email or a chat message, with your cleanup provider from Style. English only.")
+            guard shortcut?.isModifierOnly == true else { return shapes }
+            return L10n.tr("%@ Hold both keys while you speak. Needs Accessibility.", String(shapes))
         }
     }
 
@@ -614,6 +679,7 @@ private struct ShortcutRecorder: View {
         case .dictation: if let shortcut { model.changeShortcut(shortcut) }
         case .cancel: model.changeCancelShortcut(shortcut)
         case .selectedText: model.changeSelectedTextShortcut(shortcut)
+        case .format: if let shortcut { model.changeFormatShortcut(shortcut) }
         }
     }
 

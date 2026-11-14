@@ -19,7 +19,7 @@ cancellable task. Redirects, cookies, cached responses, and stored URL credentia
 are disabled. Preparation checks only the bounded local Codex sign-in file.
 Transcription reads credentials again before audio conversion and never refreshes
 or persists them. Errors exclude service bodies and credentials.
-Only Parakeet and Whisper permit synthetic warm-up. Processing-location metadata
+Only Parakeet, Whisper and Cohere permit synthetic warm-up. Processing-location metadata
 supplies the UI audio disclosure. The `codex` selection uses the existing
 selected-model string without a schema change. See [setup](codex-subscription.md).
 
@@ -188,15 +188,18 @@ the policy immediately and persist through the existing workspace store.
    the model selected at that moment and never fall back to another one; when
    that model is off this Mac the button names where the audio goes.
 
-With "Pause music while dictating" on, `MediaPauser` sends Apple Events to pause
+With "Pause music while dictating" on (the default), `MediaPauser` sends Apple Events to pause
 Music and Spotify when the phase enters preparing, only if they report playing.
 When the phase leaves recording for any other phase it resumes only the apps it
 paused that still report paused. Operations run one at a time, address the
 running process so a closed app is never launched, and never prompt during
-dictation; consent is asked once when the setting turns on. Quitting waits for
+dictation; consent is asked when the setting turns on and at launch while it is
+on, for each of those apps that is running and hasn't been asked yet. A model built
+without services, as in tests, gets an inert pauser that never touches real players
+or system audio. Quitting waits for
 the resume through `terminateLater`. Meeting capture does not pause media.
 
-"Mute other apps while dictating" (`AppSettings.muteOtherAppsWhileDictating`, off
+"Mute other apps while dictating" (`AppSettings.muteOtherAppsWhileDictating`, on
 by default, shown on macOS 14.2 and later) is a separate setting. Browsers and
 other players can't be asked whether they play without private MediaRemote APIs,
 which macOS 15.4 closed to other apps, and a play/pause media key could start
@@ -238,8 +241,9 @@ microphone, and a call that starts during the dictation all go silent until the
 recording stops. `MeetingDetector.meeting` isn't used because it only holds the
 prompt on offer, which clears on dismissal and expiry.
 
-Turning the setting on starts an unmuted system audio tap once, so macOS asks for
-System Audio Recording then rather than during a dictation.
+Since the setting is on by default, macOS asks for System Audio Recording the first
+time a dictation mutes, and until it is allowed nothing goes silent. Turning the
+setting back on starts an unmuted system audio tap once, so macOS asks then instead.
 
 If BetterWispr crashes or is force quit while muting, it can't remove the tap, and
 Apple doesn't document that Core Audio does. `.mutedWhenTapped` is chosen because

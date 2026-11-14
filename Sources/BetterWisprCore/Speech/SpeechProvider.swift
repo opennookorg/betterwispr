@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import WhisperKit
 
 public enum SpeechEngine: String, Codable, Sendable {
-    case apple, whisperKit, parakeet, api, codex
+    case apple, whisperKit, parakeet, cohere, api, codex
 }
 
 public enum SpeechProcessingLocation: Sendable {
@@ -33,7 +33,7 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
 
     public var processingLocation: SpeechProcessingLocation {
         switch engine {
-        case .apple, .whisperKit, .parakeet: .onDevice
+        case .apple, .whisperKit, .parakeet, .cohere: .onDevice
         case .api: .configuredEndpoint
         case .codex: .chatGPT
         }
@@ -56,14 +56,14 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
 
     public var requiresModelDownload: Bool {
         switch engine {
-        case .whisperKit, .parakeet: true
+        case .whisperKit, .parakeet, .cohere: true
         case .apple, .api, .codex: false
         }
     }
 
     public var supportsSyntheticWarmUp: Bool {
         switch engine {
-        case .whisperKit, .parakeet: true
+        case .whisperKit, .parakeet, .cohere: true
         case .apple, .api, .codex: false
         }
     }
@@ -127,7 +127,13 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
               sizeLabel: "~650 MB", engine: .whisperKit, modelName: "openai_whisper-large-v3-v20240930_turbo_632MB", tokenizerName: "openai/whisper-large-v3", languages: whisperLargeV3Languages),
         .init(id: "whisper-small", name: "Whisper Small", detail: "A lighter multilingual Whisper model with a smaller download.",
               sizeLabel: "~490 MB", engine: .whisperKit, modelName: "openai_whisper-small", tokenizerName: "openai/whisper-small", languages: whisperLanguagesBeforeLargeV3)
-    ]
+    ] + (CohereProvider.runsOnThisMac ? [cohereTranscribe] : [])
+
+    static let cohereTranscribe = SpeechModel(
+        id: "cohere-transcribe", name: "Cohere Transcribe",
+        detail: "Cohere's model for 14 languages, with punctuation. It can't detect the language, so choose the spoken language in Settings.",
+        sizeLabel: "~2.2 GB", engine: .cohere, modelName: "cohere-transcribe-03-2026",
+        languages: ["en", "fr", "de", "es", "it", "pt", "nl", "pl", "el", "ar", "ja", "zh", "vi", "ko"])
 }
 
 @MainActor
@@ -159,6 +165,7 @@ extension SpeechModel {
         case .apple: AppleSpeechProvider()
         case .whisperKit: WhisperKitProvider()
         case .parakeet: ParakeetProvider()
+        case .cohere: CohereProvider()
         case .api: APISpeechProvider()
         case .codex: CodexSpeechProvider()
         }

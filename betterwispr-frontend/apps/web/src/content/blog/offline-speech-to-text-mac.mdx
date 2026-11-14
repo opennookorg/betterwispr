@@ -1,0 +1,44 @@
+export const meta = {
+  title: "Offline speech to text on Mac: Cohere Transcribe, Parakeet and Whisper in BetterWispr",
+  description:
+    "How to pick a local speech model in BetterWispr 0.1.6: Cohere Transcribe for 14 languages, Parakeet for speed, Whisper for about 100 languages, plus file and YouTube transcription.",
+  date: "2026-11-13",
+};
+
+BetterWispr turns speech into text on your Mac. You install a speech model once, and after that, dictation works without the internet. Version 0.1.6 adds a new model, better language controls and a page for transcribing files and links. This post helps you choose.
+
+## The models
+
+- **Parakeet** (NVIDIA) is fast and very good in English. Parakeet TDT v3 and Parakeet Ultra cover 25 European languages. Setup recommends Parakeet Ultra.
+- **Cohere Transcribe** is new in 0.1.6. It covers English, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Greek, Arabic, Japanese, Chinese, Vietnamese and Korean, with punctuation. It's a 2.2 GB download that runs on the Neural Engine and needs macOS 15 or later. It can't detect the spoken language, so set Spoken language in Settings. The first transcription after it loads can take about a minute while macOS prepares it.
+- **Whisper** covers about 100 languages, and Spoken language now lists all of them when a Whisper model is selected.
+- **Apple on-device speech** is listed only when it supports your language on this Mac.
+
+Each model in Models now names the languages it supports, so you can check before you download.
+
+## Tell it which languages you speak
+
+If you switch between languages, open **Dictation languages** under Settings > Microphone and language, with Spoken language set to Detect automatically, and check the ones you speak.
+
+- With **Whisper**, detection picks the most likely of your languages instead of any language Whisper knows.
+- With **Parakeet** TDT v3 and Ultra, when all your languages use one alphabet, Parakeet never writes letters from another. English and Portuguese no longer turn into Cyrillic words.
+
+**Chinese script** lets you choose Simplified or Traditional characters, and macOS converts them on your Mac.
+
+## Save memory
+
+**Unload speech model when idle** frees the model's memory after 5 minutes, 15 minutes or an hour without dictation. The next dictation loads it again, so it takes a moment longer. By default the model stays loaded.
+
+## Long dictation
+
+Dictation used to stop at two minutes without warning. In 0.1.6 it keeps recording until you finish, with a short reminder every hour. If a dictation fails to transcribe, or you quit in the middle of one, BetterWispr keeps the recording so you can try again from History.
+
+## Transcribe files and YouTube links
+
+The new **Transcribe** page takes MP3, M4A, AAC, WAV, AIFF, CAF, FLAC, MP4, MOV and M4V files, or a link such as a YouTube video. It transcribes on your Mac with the model you pick. Links download through yt-dlp, which installs only when you click Install yt-dlp. Transcripts keep timestamps, label speakers when Speaker detection is installed, and export as plain text or Markdown.
+
+## Cloud is optional
+
+All of this runs on your Mac. API connections and Codex · Subscription are there if you want them, but BetterWispr uses one only when you select it. It never falls back to the cloud when a local model fails. See [where your voice goes](/blog/where-your-voice-goes) for the details.
+
+[Download BetterWispr 0.1.6](https://github.com/opennookorg/betterwispr/releases/tag/v0.1.6). It's free and open source.

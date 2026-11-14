@@ -272,3 +272,32 @@ func forgettingAVoiceRemovesOtherMeetingsSuggestionsAndPreventsSavingItAgain(del
     try store.forget()
     #expect(try store.load().isEmpty)
 }
+
+@Test func myVoiceIsStoredBesideRememberedVoicesAndForgottenWithThem() throws {
+    let store = temporaryStore()
+    defer { try? FileManager.default.removeItem(at: store.url.deletingLastPathComponent()) }
+    let meeting = UUID()
+    #expect(try store.myVoice() == nil)
+
+    try store.setMyVoice([0.5, 0.25])
+    try store.replaceVoices(from: meeting, with: [known("Ana", [1, 0], meeting: meeting)])
+    #expect(try store.myVoice() == [0.5, 0.25])
+    #expect(try store.load() == [known("Ana", [1, 0], meeting: meeting)])
+    #expect(try FileManager.default.attributesOfItem(atPath: store.url.path)[.posixPermissions] as? Int == 0o600)
+
+    try store.setMyVoice(nil)
+    #expect(try store.myVoice() == nil)
+    #expect(try store.load() == [known("Ana", [1, 0], meeting: meeting)])
+
+    try Data(#"{"version":1,"voices":[]}"#.utf8).write(to: store.url)
+    #expect(try store.myVoice() == nil)
+
+    try store.setMyVoice([1, 0])
+    try store.forget()
+    #expect(try store.myVoice() == nil)
+
+    let unreadable = Data("not voices".utf8)
+    try unreadable.write(to: store.url)
+    #expect(throws: (any Error).self) { try store.setMyVoice([1, 0]) }
+    #expect(try Data(contentsOf: store.url) == unreadable)
+}
