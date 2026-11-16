@@ -48,6 +48,10 @@
 "%@, waiting for keys" = "%@, waiting for keys";
 "%@h so far. %@ It stops by itself at about %@h." = "%@h so far. %@ It stops by itself at about %@h.";
 "%@× typing speed" = "%@× typing speed";
+"%ld dictations and the audio of failed ones will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone." = "%ld dictations and the audio of failed ones will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.";
+"%ld dictations were removed from this Mac." = "%ld dictations were removed from this Mac.";
+"1 dictation and the audio of failed ones will be deleted from this Mac. This can’t be undone." = "1 dictation and the audio of failed ones will be deleted from this Mac. This can’t be undone.";
+"1 dictation was removed from this Mac." = "1 dictation was removed from this Mac.";
 "1h so far. %@ It stops by itself at about %@h." = "1h so far. %@ It stops by itself at about %@h.";
 "1 other app" = "1 other app";
 "1.28 GB" = "1.28 GB";
@@ -210,6 +214,8 @@
 "Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API." = "Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API.";
 "Chosen in Settings" = "Chosen in Settings";
 "Claude Desktop and Cursor" = "Claude Desktop and Cursor";
+"Clean now" = "Clean now";
+"Clean now…" = "Clean now…";
 "Clean up selected text" = "Clean up selected text";
 "Cleaned up" = "Cleaned up";
 "Cleaning up…" = "Cleaning up…";
@@ -263,6 +269,7 @@
 "Couldn’t access the API key in macOS Keychain (%@). Unlock your login keychain and try again." = "Couldn’t access the API key in macOS Keychain (%@). Unlock your login keychain and try again.";
 "Couldn’t change history retention" = "Couldn’t change history retention";
 "Couldn’t clean up" = "Couldn’t clean up";
+"Couldn’t clean up history" = "Couldn’t clean up history";
 "Couldn’t complete action" = "Couldn’t complete action";
 "Couldn’t continue recording." = "Couldn’t continue recording.";
 "Couldn’t copy" = "Couldn’t copy";
@@ -301,7 +308,9 @@
 "Decisions" = "Decisions";
 "Delete" = "Delete";
 "Delete Mode" = "Delete Mode";
+"Delete all dictations?" = "Delete all dictations?";
 "Delete dictation" = "Delete dictation";
+"Delete every saved dictation right away" = "Delete every saved dictation right away";
 "Delete meeting…" = "Delete meeting…";
 "Delete older dictations?" = "Delete older dictations?";
 "Delete recording" = "Delete recording";
@@ -419,6 +428,7 @@
 "Hide capsule while dictating" = "Hide capsule while dictating";
 "Hindi" = "Hindi";
 "History" = "History";
+"History cleaned" = "History cleaned";
 "History could not be saved: %@" = "History could not be saved: %@";
 "History exported." = "History exported.";
 "History is off" = "History is off";

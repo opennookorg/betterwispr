@@ -5,6 +5,7 @@ struct HistoryView: View {
     @Bindable var model: AppModel
     @State private var query = ""
     @State private var transcriptToDelete: Transcript?
+    @State private var pendingCleanAll = false
 
     private var filteredHistory: [Transcript] {
         query.isEmpty ? model.history : model.history.filter { $0.text.localizedStandardContains(query) }
@@ -56,6 +57,14 @@ struct HistoryView: View {
             }
         }
         .listStyle(.inset)
+        .toolbar {
+            ToolbarItem {
+                Button(L10n.tr("Clean now…"), role: .destructive) { pendingCleanAll = true }
+                    .disabled(model.history.isEmpty && model.failedDictations.isEmpty)
+                    .help(L10n.tr("Delete every saved dictation right away"))
+                    .accessibilityLabel(L10n.tr("Clean now"))
+            }
+        }
         .overlay {
             if filteredHistory.isEmpty {
                 if query.isEmpty, !model.failedDictations.isEmpty {
@@ -83,6 +92,14 @@ struct HistoryView: View {
             }
         } message: {
             Text(L10n.tr("This removes the saved text from this Mac. It cannot be undone."))
+        }
+        .alert(L10n.tr("Delete all dictations?"), isPresented: $pendingCleanAll) {
+            Button(L10n.tr("Clean now"), role: .destructive) { model.deleteAllHistory() }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
+        } message: {
+            let count = model.history.count
+            Text(count == 1 ? L10n.tr("1 dictation and the audio of failed ones will be deleted from this Mac. This can’t be undone.")
+                            : L10n.tr("%ld dictations and the audio of failed ones will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.", count))
         }
     }
 

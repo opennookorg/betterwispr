@@ -48,6 +48,10 @@
 "%@, waiting for keys" = "%@, en attente des touches";
 "%@h so far. %@ It stops by itself at about %@h." = "%@ h écoulées. %@ L’enregistrement s’arrête automatiquement après environ %@ h.";
 "%@× typing speed" = "%@× la vitesse de saisie";
+"%ld dictations and the audio of failed ones will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone." = "%ld dictées et l’audio des dictées en échec seront supprimées de ce Mac. Les totaux d’utilisation et Analyses rétréciront, car ils comptent les dictées enregistrées. C’est irréversible.";
+"%ld dictations were removed from this Mac." = "%ld dictées ont été supprimées de ce Mac.";
+"1 dictation and the audio of failed ones will be deleted from this Mac. This can’t be undone." = "1 dictée et l’audio des dictées en échec seront supprimés de ce Mac. C’est irréversible.";
+"1 dictation was removed from this Mac." = "1 dictée a été supprimée de ce Mac.";
 "1h so far. %@ It stops by itself at about %@h." = "1 heure écoulée. %@ L’enregistrement s’arrête automatiquement après environ %@ h.";
 "1 other app" = "1 autre app";
 "1.28 GB" = "1,28 Go";
@@ -210,6 +214,8 @@
 "Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API." = "Choisir Utiliser envoie l’audio des dictées et des réunions à ce point d’accès. Les frais et règles de conservation du fournisseur s’appliquent. Les clés API sont conservées dans le Trousseau macOS ; les remplacements du vocabulaire restent sur votre Mac. Les modèles open source nécessitent un serveur doté d’une API de transcription compatible.";
 "Chosen in Settings" = "Choisi dans les Réglages";
 "Claude Desktop and Cursor" = "Claude Desktop et Cursor";
+"Clean now" = "Nettoyer";
+"Clean now…" = "Nettoyer maintenant…";
 "Clean up selected text" = "Nettoyer le texte sélectionné";
 "Cleaned up" = "Nettoyé";
 "Cleaning up…" = "Nettoyage…";
@@ -263,6 +269,7 @@
 "Couldn’t access the API key in macOS Keychain (%@). Unlock your login keychain and try again." = "Impossible d’accéder à la clé API dans le Trousseau macOS (%@). Déverrouillez votre trousseau de session et réessayez.";
 "Couldn’t change history retention" = "Impossible de modifier la durée de conservation de l’historique";
 "Couldn’t clean up" = "Impossible de nettoyer";
+"Couldn’t clean up history" = "Impossible de nettoyer l’historique";
 "Couldn’t complete action" = "Impossible de terminer l’action";
 "Couldn’t continue recording." = "Impossible de poursuivre l’enregistrement.";
 "Couldn’t copy" = "Impossible de copier";
@@ -301,7 +308,9 @@
 "Decisions" = "Décisions";
 "Delete" = "Supprimer";
 "Delete Mode" = "Supprimer le mode";
+"Delete all dictations?" = "Supprimer toutes les dictées ?";
 "Delete dictation" = "Supprimer la dictée";
+"Delete every saved dictation right away" = "Supprimer immédiatement toutes les dictées enregistrées";
 "Delete meeting…" = "Supprimer la réunion…";
 "Delete older dictations?" = "Supprimer les anciennes dictées ?";
 "Delete recording" = "Supprimer l’enregistrement";
@@ -419,6 +428,7 @@
 "Hide capsule while dictating" = "Masquer la capsule pendant la dictée";
 "Hindi" = "Hindi";
 "History" = "Historique";
+"History cleaned" = "Historique nettoyé";
 "History could not be saved: %@" = "Impossible d’enregistrer l’historique : %@";
 "History exported." = "Historique exporté.";
 "History is off" = "Historique désactivé";
