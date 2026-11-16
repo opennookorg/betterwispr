@@ -17,7 +17,7 @@ enum OnboardingStep: Int, CaseIterable {
     var subtitle: String {
         switch self {
         case .welcome: L10n.tr("Speak in any app and your words appear where your cursor is.")
-        case .permissions: L10n.tr("BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you.")
+        case .permissions: L10n.tr("BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you and hear double-tap fn.")
         case .model: L10n.tr("Choose a speech model. Downloaded models run offline.")
         case .practice: L10n.tr("Say a sentence and watch it turn into text.")
         }
@@ -57,7 +57,7 @@ struct OnboardingView: View {
     private var speechChoices: [SpeechModel] {
         Self.speechChoices(from: model.models, appleSpeechAvailable: appleSpeechAvailable)
     }
-    private var shortcut: String { model.settings.shortcut.displayName }
+    private var shortcut: String { model.settings.primaryShortcut.displayName }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -125,7 +125,7 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label(model.settings.dictationMode != .toggle
+            Label(model.settings.primaryShortcutIsHeld
                 ? L10n.tr("Hold %@ to start dictating", shortcut)
                 : L10n.tr("Press %@ to start dictating", shortcut), systemImage: "keyboard")
             Label(L10n.tr("Built-in models keep your audio on this Mac"), systemImage: "lock.fill")
@@ -139,7 +139,7 @@ struct OnboardingView: View {
     private var permissions: some View {
         Form {
             PermissionRow(title: L10n.tr("Microphone"), detail: L10n.tr("Required to dictate."), granted: model.microphoneGranted, action: model.requestMicrophone)
-            PermissionRow(title: L10n.tr("Paste into apps"), detail: L10n.tr("Optional. Without it, text is copied to your clipboard."), granted: model.accessibilityGranted, action: model.requestAccessibility)
+            PermissionRow(title: L10n.tr("Paste into apps"), detail: L10n.tr("Optional. Without it, text is copied to your clipboard, and double-tap fn can't dictate hands-free."), granted: model.accessibilityGranted, action: model.requestAccessibility)
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
@@ -283,7 +283,7 @@ struct OnboardingView: View {
     private var practiceText: String {
         if !model.partialTranscript.isEmpty { return model.partialTranscript }
         if model.isBusy { return model.statusMessage }
-        if model.settings.dictationMode != .toggle { return L10n.tr("Hold %@, say something, then let go.", String(shortcut)) }
+        if model.settings.primaryShortcutIsHeld { return L10n.tr("Hold %@, say something, then let go.", String(shortcut)) }
         return L10n.tr("Press %@, say something, then press it again.", String(shortcut))
     }
 

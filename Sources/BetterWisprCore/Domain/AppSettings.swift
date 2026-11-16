@@ -163,9 +163,17 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var launchAtLogin: Bool = false
     public var showInDock: Bool = false
     public var silenceThreshold: Float = 0.002
-    public var dictationMode: DictationMode = .hold
     public var unloadModelWhenIdle: ModelIdleUnload = .never
+    /// Triggers that dictate while held and finish when released. Hold the trigger to speak; let go to finish.
+    public var pushToTalkTriggers: [DictationTrigger] = [.keyboard(.optionSpace)]
+    /// Triggers that start hands-free dictation with a press and finish it with the next press. The fixed double-tap
+    /// function-key trigger is always on and is not stored here.
+    public var handsFreeTriggers: [DictationTrigger] = []
+    /// The single dictation shortcut workspaces saved before triggers had, kept in sync so older app versions can
+    /// still read a workspace this version saves. The app itself starts dictation through the trigger lists.
     public var shortcut: DictationShortcut = .optionSpace
+    /// The dictation mode saved the same way; see `shortcut`.
+    public var dictationMode: DictationMode = .hold
     /// Optional extra shortcut that cancels a dictation without pasting it; Escape always cancels.
     public var cancelShortcut: DictationShortcut?
     public var selectedTextShortcut: DictationShortcut?
@@ -226,6 +234,35 @@ public struct AppSettings: Codable, Equatable, Sendable {
             case .cli(let cli): notesCLI = cli
             }
         }
+    }
+
+    /// The keyboard shortcut hint texts show: the first push-to-talk keyboard trigger, else the first hands-free one.
+    public var primaryShortcut: DictationShortcut {
+        let keyboards = dictationKeyboardShortcuts
+        return keyboards.first ?? .optionSpace
+    }
+
+    /// Whether hints should say Hold instead of Press for the primary shortcut.
+    public var primaryShortcutIsHeld: Bool {
+        pushToTalkTriggers.contains {
+            if case .keyboard = $0 { return true }
+            return false
+        }
+    }
+
+    /// Every keyboard shortcut configured for dictation, push to talk first.
+    public var dictationKeyboardShortcuts: [DictationShortcut] {
+        (pushToTalkTriggers + handsFreeTriggers).compactMap {
+            if case .keyboard(let shortcut) = $0 { return shortcut }
+            return nil
+        }
+    }
+
+    /// Refreshes the legacy single-shortcut fields from the trigger lists, so older app versions still read this
+    /// workspace: a hands-free-only setup reads as toggle, everything else as hold.
+    public mutating func syncLegacyShortcut() {
+        shortcut = primaryShortcut
+        dictationMode = pushToTalkTriggers.isEmpty && !handsFreeTriggers.isEmpty ? .toggle : .hold
     }
 
     public var askSettings: AppSettings {
@@ -329,9 +366,20 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         showInDock = try container.decodeIfPresent(Bool.self, forKey: .showInDock) ?? false
         silenceThreshold = try container.decode(Float.self, forKey: .silenceThreshold)
-        dictationMode = (try? container.decodeIfPresent(DictationMode.self, forKey: .dictationMode)) ?? .hold
         unloadModelWhenIdle = try container.decodeIfPresent(ModelIdleUnload.self, forKey: .unloadModelWhenIdle) ?? .never
+        dictationMode = (try? container.decodeIfPresent(DictationMode.self, forKey: .dictationMode)) ?? .hold
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
+        // Workspaces saved before dictation triggers kept one shortcut and a dictation mode: a toggle shortcut becomes
+        // hands-free, everything else becomes push to talk.
+        if let pushToTalk = try container.decodeIfPresent([DictationTrigger].self, forKey: .pushToTalkTriggers) {
+            pushToTalkTriggers = pushToTalk
+        } else if dictationMode == .toggle {
+            pushToTalkTriggers = []
+            handsFreeTriggers = [.keyboard(shortcut)]
+        } else {
+            pushToTalkTriggers = [.keyboard(shortcut)]
+        }
+        handsFreeTriggers = try container.decodeIfPresent([DictationTrigger].self, forKey: .handsFreeTriggers) ?? handsFreeTriggers
         cancelShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .cancelShortcut)
         selectedTextShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .selectedTextShortcut)
         formatShortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .formatShortcut) ?? .fnControl

@@ -9,7 +9,7 @@ public enum SendAfterPaste {
     public static func rule(for bundleID: String?, settings: AppSettings) -> AppSendRule? {
         guard let bundleID, allowsRule(for: bundleID) else { return nil }
         return settings.sendRules.first {
-            $0.isEnabled && $0.bundleID == bundleID && refusal(of: $0.keystroke, shortcut: settings.shortcut) == nil
+            $0.isEnabled && $0.bundleID == bundleID && refusal(of: $0.keystroke, settings: settings) == nil
         }
     }
 
@@ -27,6 +27,12 @@ public enum SendAfterPaste {
         let quitsOrCloses = [kVK_ANSI_Q, kVK_ANSI_W].contains(keyCode) || ["Q", "W"].contains(keystroke.key.uppercased())
         if keystroke.modifiers.contains(.command), quitsOrCloses { return L10n.tr("%@ could quit the app or close its window.", name) }
         return clashes(keystroke, with: shortcut) ? L10n.tr("%@ clashes with your dictation shortcut, %@.", name, shortcut.displayName) : nil
+    }
+
+    /// The same check against every keyboard shortcut dictation can start with.
+    @MainActor
+    public static func refusal(of keystroke: SendKeystroke, settings: AppSettings) -> String? {
+        settings.dictationKeyboardShortcuts.lazy.compactMap { refusal(of: keystroke, shortcut: $0) }.first
     }
 
     /// The hot key also listens with Shift while sending is on, and a posted modifier always comes from its left-hand key.

@@ -151,7 +151,7 @@ struct CapsuleView: View {
         HStack(spacing: 4) {
             Text(tooltipTitle(for: target))
             if target == .microphone {
-                Text(model.settings.shortcut.displayName).fontWeight(.semibold)
+                Text(model.settings.primaryShortcut.displayName).fontWeight(.semibold)
             }
             if target == .dictation {
                 Text(L10n.tr("Esc to cancel")).foregroundStyle(.secondary)
@@ -175,7 +175,7 @@ struct CapsuleView: View {
         case .meetingNotes: L10n.tr("Open meeting notes")
         case .dictation:
             switch model.phase {
-            case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.settings.shortcut.displayName)) : L10n.tr("Finish dictation")
+            case .recording: model.isHeldSession ? L10n.tr("Release %@ to finish", String(model.activeTriggerName)) : L10n.tr("Finish dictation")
             case .transcribing: L10n.tr("Transcribing…")
             default: L10n.tr("Starting microphone…")
             }
@@ -300,7 +300,7 @@ struct CapsuleView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.tr("Sending…"))
                     .font(.system(size: 14, weight: .medium))
-                Text(L10n.tr("%@ to add more", String(model.settings.shortcut.displayName)))
+                Text(L10n.tr("%@ to add more", String(model.activeTriggerName)))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
             }

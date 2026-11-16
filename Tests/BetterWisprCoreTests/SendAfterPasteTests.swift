@@ -145,7 +145,7 @@ import Testing
     let commandReturn = try #require(SendKeystroke(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))
     settings.sendRules = [AppSendRule(bundleID: harness, keystroke: commandReturn)]
     #expect(SendAfterPaste.rule(for: harness, settings: settings)?.keystroke == commandReturn)
-    settings.shortcut = try #require(DictationShortcut(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))
+    settings.pushToTalkTriggers = [try #require(DictationShortcut(keyCode: UInt32(kVK_Return), modifiers: [.command], key: "Return"))].map(DictationTrigger.keyboard)
     #expect(SendAfterPaste.rule(for: harness, settings: settings) == nil)
 }
 

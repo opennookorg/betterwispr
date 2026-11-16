@@ -193,8 +193,8 @@ import Testing
     #expect(model.settings.cancelShortcut == nil)
     model.changeCancelShortcut(f19)
     #expect(model.settings.cancelShortcut == f19)
-    model.changeShortcut(f19)
-    #expect(model.settings.shortcut == .optionSpace)
+    model.applyDictationTriggers(pushToTalk: [.keyboard(f19)], handsFree: [])
+    #expect(model.settings.primaryShortcut == .optionSpace)
     model.changeCancelShortcut(nil)
     #expect(model.settings.cancelShortcut == nil)
 }
@@ -230,10 +230,10 @@ import Testing
     #expect(throws: ShortcutError.self) { try other.register(f18) }
     occupied.unregister()
     model.suspendShortcut()
-    model.changeShortcut(f18)
+    model.applyDictationTriggers(pushToTalk: [.keyboard(f18)], handsFree: [])
     model.suspendShortcut()
     model.changeCancelShortcut(f18)
-    #expect(model.settings.shortcut == .optionSpace)
+    #expect(model.settings.primaryShortcut == .optionSpace)
     #expect(model.settings.cancelShortcut == f17)
 
     model.registerShortcut()
@@ -291,9 +291,9 @@ import Testing
     let shiftF18 = try #require(DictationShortcut(keyCode: UInt32(kVK_F18), modifiers: [.shift], key: "F18"))
     let cancel = GlobalShortcut(id: 11)
     defer { cancel.unregister(); model.suspendShortcut() }
-    model.settings.shortcut = f18
     model.settings.cancelShortcut = shiftF18
     model.settings.sendToClaude = true
+    model.applyDictationTriggers(pushToTalk: [.keyboard(f18)], handsFree: [])
     model.registerShortcut()
     try cancel.register(shiftF18)
     #expect(throws: ShortcutError.self) { try cancel.register(f18) }
@@ -306,7 +306,7 @@ import Testing
     let f16 = try #require(DictationShortcut(keyCode: UInt32(kVK_F16), modifiers: [], key: "F16"))
     let other = GlobalShortcut(id: 11)
     defer { other.unregister(); model.suspendShortcut() }
-    model.changeShortcut(f16)
+    model.applyDictationTriggers(pushToTalk: [.keyboard(f16)], handsFree: [])
     #expect(throws: ShortcutError.self) { try other.register(f16) }
 
     let first = UUID()

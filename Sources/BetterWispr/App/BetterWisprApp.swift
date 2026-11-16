@@ -85,7 +85,7 @@ private struct MenuContents: View {
         Text(status)
         Button { model.toggleRecording() } label: {
             Text(model.phase == .recording ? L10n.tr("Finish Dictation") : L10n.tr("Start Dictation"))
-            Text(model.settings.shortcut.displayName)
+            Text(model.settings.primaryShortcut.displayName)
         }
         .disabled(model.phase == .preparing || model.phase == .transcribing)
         if model.isBusy { Button(L10n.tr("Cancel")) { model.cancelRecording() } }

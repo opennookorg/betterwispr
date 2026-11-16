@@ -4,6 +4,13 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Added
+- Dictation shortcuts, a new dialog in Settings > Shortcut that replaces the single keyboard shortcut and the Behavior picker with two groups. Push to talk lists shortcuts that dictate while you hold them and finish when you let go, starting with Option Space as before; hands-free mode lists shortcuts that start dictation with a press and finish it with the next press. A trigger can be a key combination, a modifier key alone, an F-key or a side mouse button. The dialog adds with +, removes with the trash, records over a trigger with the pencil, and resets to the default. A trigger another feature already uses, or one used twice, is refused, and the dialog says so. Side mouse buttons still click the app they land in, because BetterWispr only listens.
+- Double-tap fn, always on and not removable, so there is always a way to dictate hands-free. Holding the function key still means push to talk when it is listed there; a tap starts hands-free dictation and a double-tap finishes one, so one key can hold and toggle. While macOS is set to show emojis, switch input sources or start its own dictation on a press of the 🌐 key, BetterWispr takes the key's presses away with an event tap before macOS acts and puts a held press back when a chord develops, so double-tap fn dictates instead of opening emojis and fn ⌫ or the F-keys still work. Nothing asks you to change Keyboard settings.
+- Workspaces saved before this change keep working: a shortcut set to Press to toggle becomes a hands-free trigger, any other shortcut becomes push to talk, and the saved shortcut and mode are kept in the workspace for older app versions to read.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added

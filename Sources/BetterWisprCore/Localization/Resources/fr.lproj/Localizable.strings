@@ -5,6 +5,10 @@
 " You can try this same recording again." = " Vous pouvez réessayer avec ce même enregistrement.";
 " Your earlier dictation was pasted but not sent." = " Votre dictée précédente a été collée sans être envoyée.";
 " · Download in Models" = " · Télécharger dans Modèles";
+"BetterWispr needs your microphone to hear you. Accessibility lets it paste text for you and hear double-tap fn." = "BetterWispr a besoin de votre microphone pour vous entendre. L’accessibilité lui permet de coller du texte pour vous et d’entendre le double appui sur fn.";
+"Optional. Without it, text is copied to your clipboard, and double-tap fn can't dictate hands-free." = "Facultatif. Sans elle, le texte est copié dans le presse-papiers, et le double appui sur fn ne peut pas dicter en mains libres.";
+"Allow BetterWispr to use Accessibility" = "Autoriser BetterWispr à utiliser l’accessibilité";
+"A trigger that is only a modifier key, such as ⌥, needs Accessibility." = "Un déclencheur qui n’est qu’une touche de modification, comme ⌥, nécessite l’accessibilité.";
 "## Summary\n\n%@" = "## Résumé\n\n%@";
 "%@ %@ Other languages, very short dictations and edits that fail, take too long or rewrite too much get Light cleanup. %@" = "%@ %@ Les autres langues, les dictées très courtes et les modifications qui échouent, prennent trop de temps ou réécrivent trop le texte reçoivent un nettoyage Léger. %@";
 "%@ (default)" = "%@ (par défaut)";
@@ -18,6 +22,7 @@
 "%@ cleanup" = "nettoyage %@";
 "%@ couldn’t be read and was left untouched, so new questions about all meetings won’t be saved." = "Impossible de lire %@. Le fichier est conservé sans modification ; les nouvelles questions sur toutes les réunions ne seront donc pas enregistrées.";
 "%@ didn’t return a usable edit." = "%@ n’a pas fourni de modification exploitable.";
+"%@ is already used for dictation." = "%@ est déjà utilisé pour la dictée.";
 "%@ is already BetterWispr’s other shortcut." = "%@ est déjà l’autre raccourci de BetterWispr.";
 "%@ is for typing, so it can’t be a shortcut. Hold ⌃, ⌥ or ⌘ with it." = "%@ sert à saisir du texte et ne peut donc pas être un raccourci. Maintenez ⌃, ⌥ ou ⌘ avec cette touche.";
 "%@ is installed. Choose Use in Models to switch to it.%@" = "%@ est installé. Choisissez Utiliser dans Modèles pour l’activer.%@";
@@ -59,6 +64,7 @@
 "@code_kartik on X" = "@code_kartik sur X";
 "A few seconds from %@ couldn’t be transcribed. %@" = "Quelques secondes de %@ n’ont pas pu être transcrites. %@";
 "A fixed language gives more consistent results." = "Une langue fixe donne des résultats plus réguliers.";
+"A key combination, a modifier alone or a side mouse button. Esc cancels." = "Une combinaison de touches, une touche de modification seule ou un bouton latéral de la souris. Esc annule.";
 "A lighter multilingual Whisper model with a smaller download." = "Un modèle Whisper multilingue plus léger, avec un téléchargement moins volumineux.";
 "A meeting note started during an event takes its title and the people invited." = "Une note de réunion commencée pendant un événement reprend son titre et ses invités.";
 "A mode changes cleanup and tone in the apps and websites it lists, or when you start or end a dictation with its trigger word. A trigger word wins over a website, and a website wins over an app. Websites are detected through Accessibility in supported browsers, and the address is used only on this Mac." = "Un mode change le nettoyage et le ton dans les apps et sites web de sa liste, ou quand vous commencez ou terminez une dictée par son mot déclencheur. Un mot déclencheur prime sur un site web, qui prime sur une app. Les sites sont détectés par l’accessibilité dans les navigateurs compatibles ; leur adresse est utilisée uniquement sur ce Mac.";
@@ -86,6 +92,7 @@
 "Add Word" = "Ajouter un mot";
 "Add a Word" = "Ajouter un mot";
 "Add a name that often gets misspelled, a technical term or a phrase you use every day." = "Ajoutez un nom souvent mal orthographié, un terme technique ou une expression du quotidien.";
+"Add a shortcut" = "Ajouter un raccourci";
 "Add a space after pasting" = "Ajouter une espace après le collage";
 "Add an app, website or trigger word to use this mode." = "Ajoutez une app, un site web ou un mot déclencheur pour utiliser ce mode.";
 "Add connection…" = "Ajouter une connexion…";
@@ -188,6 +195,7 @@
 "Caps and punctuation, exactly as cleaned up." = "Majuscules et ponctuation conservées après le nettoyage.";
 "Caps, fewer commas and no final period." = "Majuscules, moins de virgules et aucun point final.";
 "Casual" = "Décontracté";
+"Change %@" = "Modifier %@";
 "Change who said this" = "Changer la personne qui a parlé";
 "Changelog" = "Historique des versions";
 "Chat completions URL" = "URL de Chat Completions";
@@ -207,6 +215,7 @@
 "Choose a notes connection in Models." = "Choisissez une connexion de notes dans Modèles.";
 "Choose a speech model. Downloaded models run offline." = "Choisissez un modèle de reconnaissance vocale. Les modèles téléchargés fonctionnent hors ligne.";
 "Choose a supported language or Auto before transcription." = "Choisissez une langue prise en charge ou Auto avant la transcription.";
+"Choose your shortcuts for starting dictation." = "Choisissez vos raccourcis pour lancer la dictée.";
 "Choosing Use sends dictation and meeting audio to that endpoint. Provider charges and retention policies apply. API keys are kept in macOS Keychain; vocabulary replacements stay on your Mac. Open-source models need a server with a compatible transcription API." = "Choisir Utiliser envoie l’audio des dictées et des réunions à ce point d’accès. Les frais et règles de conservation du fournisseur s’appliquent. Les clés API sont conservées dans le Trousseau macOS ; les remplacements du vocabulaire restent sur votre Mac. Les modèles open source nécessitent un serveur doté d’une API de transcription compatible.";
 "Chosen in Settings" = "Choisi dans les Réglages";
 "Claude Desktop and Cursor" = "Claude Desktop et Cursor";
@@ -232,6 +241,7 @@
 "Combine the full transcript and your current thoughts using %@" = "Combiner la transcription complète et vos notes actuelles avec %@";
 "Command" = "Commande";
 "Configure and test notes models…" = "Configurer et tester les modèles de notes…";
+"Configure…" = "Configurer…";
 "Connected apps" = "Apps connectées";
 "Connection saved, but its previous Keychain entry could not be removed: %@" = "Connexion enregistrée, mais impossible de supprimer son ancienne entrée du Trousseau : %@";
 "Continue" = "Continuer";
@@ -320,10 +330,12 @@
 "Development" = "Développement";
 "Dictate" = "Dicter";
 "Dictate a few times and your pace, time saved and top apps appear here." = "Dictez quelques fois pour voir ici votre rythme, le temps gagné et vos apps les plus utilisées.";
+"Dictate hands-free by pressing this hotkey to start and stop." = "Dictée mains libres en appuyant sur ce raccourci pour démarrer et arrêter.";
 "Dictate today to keep it going." = "Dictez aujourd’hui pour poursuivre la série.";
 "Dictate today to start a streak." = "Dictez aujourd’hui pour commencer une série.";
 "Dictation for your Mac. Press %@ in any app, speak, and your words appear where you’re typing. Speech runs on this Mac by default. Choosing an API connection or Codex subscription transcription sends audio to that provider." = "La dictée sur votre Mac. Appuyez sur %@ dans n’importe quelle app, parlez et vos mots apparaissent à l’endroit où vous écrivez. Par défaut, la reconnaissance vocale s’exécute sur ce Mac. Choisir une connexion API ou la transcription avec l’abonnement Codex envoie l’audio à ce fournisseur.";
 "Dictation languages" = "Langues de dictée";
+"Dictation shortcuts" = "Raccourcis de dictée";
 "Dictation sounds" = "Sons de dictée";
 "Dictation text" = "Texte de la dictée";
 "Dictations" = "Dictées";
@@ -337,6 +349,10 @@
 "Done" = "Terminé";
 "Don’t send" = "Ne pas envoyer";
 "Don’t show again" = "Ne plus afficher";
+"Double-tap fn" = "Double appui sur fn";
+"Double-tap fn is always on. BetterWispr takes lone taps of the 🌐 key away from macOS, so emojis and its dictation don't appear." = "Le double appui sur fn est toujours actif. BetterWispr retire à macOS les appuis isolés de la touche 🌐, pour que les emojis et sa dictée n’apparaissent pas.";
+"Double-tap fn is always on." = "Le double appui sur fn est toujours actif.";
+"Double-tap fn needs Accessibility to hear the function key alone." = "Le double appui sur fn nécessite l’accessibilité pour entendre la touche fn seule.";
 "Download" = "Télécharger";
 "Download %@" = "Télécharger %@";
 "Download %@ in Models before recording." = "Téléchargez %@ dans Modèles avant d’enregistrer.";
@@ -412,6 +428,7 @@
 "Good afternoon" = "Bon après-midi";
 "Good evening" = "Bonsoir";
 "Good morning" = "Bonjour";
+"Hands-free mode" = "Mode mains libres";
 "Have BetterWispr ready when your Mac starts." = "BetterWispr sera prêt au démarrage de votre Mac.";
 "Help fund BetterWispr’s development." = "Contribuez au financement du développement de BetterWispr.";
 "Helps Parakeet spell the words in this list. About 100 MB. New Parakeet downloads include it." = "Aide Parakeet à orthographier les mots de cette liste. Environ 100 Mo. Inclus dans les nouveaux téléchargements de Parakeet.";
@@ -426,6 +443,7 @@
 "History is off. Copy these words before starting another dictation." = "L’historique est désactivé. Copiez ce texte avant de commencer une autre dictée.";
 "Hold %@ in any app and start talking." = "Maintenez %@ dans n’importe quelle app et commencez à parler.";
 "Hold %@ in any app and your words will show up here." = "Maintenez %@ dans n’importe quelle app pour voir votre texte apparaître ici.";
+"Hold %@ to speak, release to finish." = "Maintenez %@ pour parler, relâchez pour terminer.";
 "Hold %@ to start dictating" = "Maintenez %@ pour commencer à dicter.";
 "Hold %@, say something, then let go." = "Maintenez %@, dites quelque chose, puis relâchez.";
 "Hold or tap" = "Maintenir ou appuyer";
@@ -527,6 +545,7 @@
 "Mostly evenings" = "Surtout le soir";
 "Mostly late at night" = "Surtout tard dans la nuit";
 "Mostly mornings" = "Surtout le matin";
+"Mouse %ld" = "Souris %ld";
 "Move closer to your microphone and try again." = "Rapprochez-vous du microphone et réessayez.";
 "Mute other apps while dictating" = "Couper le son des autres apps pendant la dictée";
 "My notes model" = "Mon modèle de notes";
@@ -653,6 +672,7 @@
 "Press %@ in any app and start talking." = "Appuyez sur %@ dans n’importe quelle app et commencez à parler.";
 "Press %@ in any app and your words will show up here." = "Appuyez sur %@ dans n’importe quelle app pour voir votre texte apparaître ici.";
 "Press %@ to finish." = "Appuyez sur %@ pour terminer.";
+"Press %@ to start and stop hands-free." = "Appuyez sur %@ pour démarrer et arrêter la dictée mains libres.";
 "Press %@ to start dictating" = "Appuyez sur %@ pour commencer à dicter.";
 "Press %@, say something, then press it again." = "Appuyez sur %@, dites quelque chose, puis appuyez de nouveau.";
 "Press Return after pasting into Claude Desktop, or into Claude Code in the VS Code panel, Terminal or iTerm2. Elsewhere, text is only pasted. Hold Shift to paste only. Return also answers a Claude Code question, such as a permission prompt." = "Appuie sur Retour après avoir collé dans Claude Desktop ou Claude Code, dans le panneau VS Code, Terminal ou iTerm2. Ailleurs, le texte est seulement collé. Maintenez Maj pour coller uniquement. Retour répond aussi aux questions de Claude Code, comme une demande d’autorisation.";
@@ -663,6 +683,7 @@
 "Previews Parakeet’s recognition in the capsule while you record. The pasted text is still the full recognition." = "Affiche un aperçu de la reconnaissance de Parakeet dans la capsule pendant l’enregistrement. Le texte collé provient toujours de la reconnaissance complète.";
 "Provider" = "Fournisseur";
 "Pulse Pro requires English. Choose English in Settings or use the pulse model." = "Pulse Pro nécessite l’anglais. Choisissez Anglais dans les Réglages ou utilisez le modèle pulse.";
+"Push to talk" = "Appui pour parler";
 "Questions about all meetings couldn’t be saved. %@" = "Impossible d’enregistrer les questions sur toutes les réunions. %@";
 "Quiet voice" = "Voix discrète";
 "Quit BetterWispr" = "Quitter BetterWispr";
@@ -695,6 +716,7 @@
 "Report a bug or suggest a feature." = "Signalez un problème ou proposez une fonctionnalité.";
 "Required to dictate." = "Nécessaire pour dicter.";
 "Reset to %@" = "Rétablir %@";
+"Reset to default" = "Réinitialiser";
 "Restart" = "Redémarrer";
 "Restart BetterWispr to finish updating to %@." = "Redémarrez BetterWispr pour terminer la mise à jour vers %@.";
 "Results vary by model." = "Les résultats varient selon le modèle.";

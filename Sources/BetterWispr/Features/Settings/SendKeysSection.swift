@@ -52,7 +52,7 @@ struct SendKeysSection: View {
         guard SendAfterPaste.allowsRule(for: rule.bundleID) else {
             return L10n.tr("Nothing is pressed here, because a key could run a shell command. Send to Claude covers Claude Code here.")
         }
-        if let refused = SendAfterPaste.refusal(of: rule.keystroke, shortcut: model.settings.shortcut) {
+        if let refused = SendAfterPaste.refusal(of: rule.keystroke, settings: model.settings) {
             return L10n.tr("%@ Nothing is pressed until you record another key.", refused)
         }
         let key = L10n.tr("Presses %@ after pasting.", rule.keystroke.displayName)
@@ -144,7 +144,7 @@ private struct SendKeystrokeRecorder: View {
         guard let keystroke = SendKeystroke(keyCode: UInt32(event.keyCode), modifiers: modifiers, key: key) else {
             return NSSound.beep()
         }
-        if let reason = SendAfterPaste.refusal(of: keystroke, shortcut: model.settings.shortcut) {
+        if let reason = SendAfterPaste.refusal(of: keystroke, settings: model.settings) {
             refusal = reason
             return NSSound.beep()
         }
