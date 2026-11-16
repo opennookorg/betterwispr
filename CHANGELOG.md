@@ -4,6 +4,11 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Added
+- Clean now, a button beside the Keep history picker in Settings and on the History page. It deletes every saved dictation and the audio of failed ones from this Mac right away, after asking, and says how many went in a toast. Usage totals and Insights shrink with them, since they count saved dictations. Learned writing examples, meetings and transcribed files are untouched.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added

@@ -1774,6 +1774,26 @@ final class AppModel {
         }
     }
 
+    /// Deletes every saved dictation and the audio of failed ones right away. Usage totals and Insights shrink with
+    /// them, because they count saved dictations; nothing else, such as learned writing examples, is touched.
+    func deleteAllHistory() {
+        let previous = history
+        history = []
+        do {
+            try persist()
+        } catch {
+            history = previous
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t clean up history"), error))
+            return
+        }
+        failedDictationStore.removeAll()
+        failedDictations = failedDictationStore.list()
+        let count = previous.count
+        ToastWindow.shared.show(Toast(title: L10n.tr("History cleaned"),
+                                      message: count == 1 ? L10n.tr("1 dictation was removed from this Mac.") : L10n.tr("%ld dictations were removed from this Mac.", count),
+                                      systemImage: "trash"))
+    }
+
     func updateTranscript(_ transcript: Transcript, text: String) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text != transcript.text, let index = history.firstIndex(where: { $0.id == transcript.id }) else { return }

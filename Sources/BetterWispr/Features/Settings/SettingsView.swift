@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var permissionCheck = 0
     @State private var terminals: [ScriptableTerminal] = []
     @State private var pendingRetention: HistoryRetention?
+    @State private var pendingCleanAll = false
     @State private var choosesDictationLanguages = false
 
     private static let voiceCommands = [
@@ -283,20 +284,25 @@ struct SettingsView: View {
                     if model.settings.saveHistory {
                         RowDivider()
                         SettingRow(L10n.tr("Keep history"), caption: L10n.tr("Older dictations are deleted from this Mac when BetterWispr opens and after each dictation. Usage totals and Insights count only the dictations kept. Audio kept from failed dictations follows the same age limit.")) {
-                            Picker(L10n.tr("Keep history"), selection: Binding(
-                                get: { model.settings.historyRetention },
-                                set: { retention in
-                                    if model.historyRemoved(by: retention) > 0 { pendingRetention = retention } else { model.setHistoryRetention(retention) }
+                            HStack(spacing: 8) {
+                                Picker(L10n.tr("Keep history"), selection: Binding(
+                                    get: { model.settings.historyRetention },
+                                    set: { retention in
+                                        if model.historyRemoved(by: retention) > 0 { pendingRetention = retention } else { model.setHistoryRetention(retention) }
+                                    }
+                                )) {
+                                    Text(L10n.tr("Forever")).tag(HistoryRetention.forever)
+                                    Text(L10n.tr("Latest 100")).tag(HistoryRetention.latest100)
+                                    Text(L10n.tr("3 days")).tag(HistoryRetention.threeDays)
+                                    Text(L10n.tr("2 weeks")).tag(HistoryRetention.twoWeeks)
+                                    Text(L10n.tr("3 months")).tag(HistoryRetention.threeMonths)
                                 }
-                            )) {
-                                Text(L10n.tr("Forever")).tag(HistoryRetention.forever)
-                                Text(L10n.tr("Latest 100")).tag(HistoryRetention.latest100)
-                                Text(L10n.tr("3 days")).tag(HistoryRetention.threeDays)
-                                Text(L10n.tr("2 weeks")).tag(HistoryRetention.twoWeeks)
-                                Text(L10n.tr("3 months")).tag(HistoryRetention.threeMonths)
+                                .labelsHidden()
+                                .fixedSize()
+                                Button(L10n.tr("Clean now…"), role: .destructive) { pendingCleanAll = true }
+                                    .disabled(model.history.isEmpty && model.failedDictations.isEmpty)
+                                    .help(L10n.tr("Delete every saved dictation right away"))
                             }
-                            .labelsHidden()
-                            .fixedSize()
                         }
                     }
                     RowDivider()
@@ -382,6 +388,14 @@ struct SettingsView: View {
         } message: { retention in
             let count = model.historyRemoved(by: retention)
             Text(L10n.tr("%ld dictations will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.", count))
+        }
+        .alert(L10n.tr("Delete all dictations?"), isPresented: $pendingCleanAll) {
+            Button(L10n.tr("Clean now"), role: .destructive) { model.deleteAllHistory() }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
+        } message: {
+            let count = model.history.count
+            Text(count == 1 ? L10n.tr("1 dictation and the audio of failed ones will be deleted from this Mac. This can’t be undone.")
+                            : L10n.tr("%ld dictations and the audio of failed ones will be deleted from this Mac. Usage totals and Insights will shrink, because they count saved dictations. This can’t be undone.", count))
         }
     }
 

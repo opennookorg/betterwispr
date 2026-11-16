@@ -279,3 +279,40 @@ private func modelWith(_ history: [Transcript], retention: HistoryRetention, sav
     #expect(Toast(pruned: 7, by: .latest100).title == "Deleted 7 dictations beyond the latest 100")
     #expect(!Toast(pruned: 1, by: .threeDays).isError)
 }
+
+@Test @MainActor func cleaningHistoryDeletesEverythingAndSaves() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let store = LocalStore(directory: folder)
+    let model = AppModel(store: store, startsServices: false)
+    model.history = [dictation("one"), dictation("two")]
+    let failedStore = FailedDictationStore(directory: store.directory.appendingPathComponent("Failed Dictations", isDirectory: true))
+    let audio = folder.appendingPathComponent("recording.wav")
+    try Data([0]).write(to: audio)
+    _ = try failedStore.keep(audio)
+    model.deleteAllHistory()
+    #expect(model.history.isEmpty)
+    #expect(model.failedDictations.isEmpty)
+    #expect(try store.load().history.isEmpty)
+    #expect(failedStore.list().isEmpty)
+}
+
+@Test @MainActor func aFailedCleanKeepsEverything() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let store = LocalStore(directory: folder)
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+        try? FileManager.default.removeItem(at: folder)
+    }
+    let kept = dictation("kept")
+    var state = SavedState()
+    state.history = [kept]
+    try store.save(state)
+    let model = AppModel(store: store, startsServices: false)
+    model.history = [kept]
+    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+    model.deleteAllHistory()
+    #expect(model.history == [kept])
+    #expect(try store.load().history == [kept])
+}
