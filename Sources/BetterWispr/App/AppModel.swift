@@ -3,6 +3,7 @@ import AVFoundation
 @preconcurrency import ApplicationServices
 import BetterWisprCore
 import Carbon.HIToolbox
+import IOKit.hidsystem
 import Observation
 import OSLog
 import ServiceManagement
@@ -69,8 +70,8 @@ struct DictationFailure: Equatable {
         return "exclamationmark.triangle"
     }
 
-    static func releasedEarly(_ shortcut: DictationShortcut) -> DictationFailure {
-        DictationFailure(title: L10n.tr("Keep holding %@.", String(shortcut.displayName)), message: L10n.tr("Wait for the bars to move, then speak and release."))
+    static func releasedEarly(_ trigger: String) -> DictationFailure {
+        DictationFailure(title: L10n.tr("Keep holding %@.", String(trigger)), message: L10n.tr("Wait for the bars to move, then speak and release."))
     }
     static let noSpeech = DictationFailure(title: L10n.tr("No speech heard."), message: L10n.tr("Move closer to your microphone and try again."))
     static let pasteBlocked = DictationFailure(title: L10n.tr("Copied, not pasted."), message: L10n.tr("Allow Accessibility so text lands at your cursor. Press ⌘V for now."), needsAccessibility: true)
@@ -235,7 +236,20 @@ final class AppModel {
     @ObservationIgnored private let recorder = AudioRecorder()
     @ObservationIgnored private let startsServices: Bool
     @ObservationIgnored private let correctionWatcher = CorrectionWatcher()
-    @ObservationIgnored private let globalShortcut = GlobalShortcut()
+    /// One listener per configured keyboard trigger, so several dictation shortcuts can work at once.
+    @ObservationIgnored var pushToTalkShortcuts: [(trigger: DictationTrigger, shortcut: GlobalShortcut)] = []
+    @ObservationIgnored var handsFreeShortcuts: [(trigger: DictationTrigger, shortcut: GlobalShortcut)] = []
+    /// The function key alone, which holds push to talk when configured and always feeds the double-tap trigger.
+    @ObservationIgnored let functionTapShortcut = GlobalShortcut(id: 20)
+    @ObservationIgnored private let functionKeyTap = FunctionKeyTap()
+    @ObservationIgnored private let mouseMonitor = MouseButtonMonitor()
+    @ObservationIgnored private var doubleTap = DoubleTapTracker()
+    /// Kept apart from `shortcutPressedAt` because another trigger may be holding a dictation while fn taps.
+    @ObservationIgnored private var functionPressStarted: Date?
+    @ObservationIgnored private var doubleTapRecordingWasActive = false
+    private(set) var activeTrigger: DictationTrigger?
+    private(set) var functionKeySystemAction = FunctionKeySystemAction.current()
+    private(set) var inputMonitoringGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     @ObservationIgnored private let cancelShortcut = GlobalShortcut(id: 2)
     @ObservationIgnored private let customCancelShortcut = GlobalShortcut(id: 3)
     @ObservationIgnored private let selectedTextShortcut = GlobalShortcut(id: 4)
@@ -357,13 +371,11 @@ final class AppModel {
         refreshMicrophones()
         microphoneObserver = AudioInputObserver { [weak self] in self?.refreshMicrophones() }
         meetingDetector.isEnabled = settings.detectMeetings
-        globalShortcut.onPress = { [weak self] in self?.shortcutPressed() }
-        globalShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
         cancelShortcut.onPress = { [weak self] in self?.cancelOrHoldBack() }
         customCancelShortcut.onPress = { [weak self] in self?.cancelOrHoldBack() }
         selectedTextShortcut.onPress = { [weak self] in self?.cleanUpSelectedText() }
-        formatShortcut.onPress = { [weak self] in self?.shortcutPressed(formatting: true) }
-        formatShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
+        formatShortcut.onPress = { [weak self] in self?.pushToTalkPressed(formatting: true) }
+        formatShortcut.onRelease = { [weak self] in self?.pushToTalkReleased(nil) }
         onBusyChange = { [weak self] busy in self?.armCancelShortcut(busy) }
         warmUpSelectedModel()
         let warmUpAfterWake: @Sendable (Notification) -> Void = { [weak self] _ in
@@ -380,43 +392,160 @@ final class AppModel {
         _ = DistributedNotificationCenter.default().addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main, using: warmUpAfterWake)
     }
 
-    func shortcutPressed(formatting: Bool = false) {
-        guard shortcutPressedAt == nil || !isBusy else { return }
-        guard settings.dictationMode != .toggle, !isBusy else { toggleRecording(formatting: formatting); return }
+    /// A dictation trigger went down: hands-free triggers toggle, the function key feeds double-tap, the rest hold.
+    func triggerPressed(_ trigger: DictationTrigger, formatting: Bool = false) {
+        if trigger.isFunctionTap { functionPressed() }
+        else if settings.handsFreeTriggers.contains(trigger) {
+            activeTrigger = formatting ? nil : trigger
+            toggleRecording(formatting: formatting)
+        }
+        else { pushToTalkPressed(formatting: formatting, trigger: trigger) }
+    }
+
+    func triggerReleased(_ trigger: DictationTrigger) {
+        if trigger.isFunctionTap { functionReleased() }
+        else { pushToTalkReleased(trigger) }
+    }
+
+    private func pushToTalkPressed(formatting: Bool, trigger: DictationTrigger? = nil) {
+        guard shortcutPressedAt == nil, !isBusy else { return }
         shortcutPressedAt = Date()
+        activeTrigger = formatting ? nil : trigger
         startRecording(held: true, formatting: formatting)
     }
 
     /// The shortcut that started this dictation, for the hints that say how to finish it.
-    private var activeShortcut: DictationShortcut { formatsDictation ? settings.formatShortcut : settings.shortcut }
+    private var activeShortcut: DictationShortcut { formatsDictation ? settings.formatShortcut : settings.primaryShortcut }
 
-    func shortcutReleased() {
+    var activeTriggerName: String {
+        if formatsDictation { return settings.formatShortcut.displayName }
+        return activeTrigger?.displayName ?? settings.primaryShortcut.displayName
+    }
+
+    private func pushToTalkReleased(_ trigger: DictationTrigger?) {
         guard let pressedAt = shortcutPressedAt else { return }
         shortcutPressedAt = nil
         guard phase == .preparing || phase == .recording else { return }
-        switch settings.dictationMode.release(afterHolding: Date().timeIntervalSince(pressedAt), recording: phase == .recording) {
+        switch DictationMode.holdOnly.release(afterHolding: Date().timeIntervalSince(pressedAt), recording: phase == .recording) {
         case .keepListening:
             isHeldSession = false
             if phase == .recording { statusMessage = listeningStatus }
         case .finish: finishRecording()
-        case .abandon: abandon(.releasedEarly(activeShortcut))
+        case .abandon: abandon(.releasedEarly(activeTriggerName))
+        }
+    }
+
+    /// The function key went down: it may hold push to talk, or begin the double-tap trigger.
+    private func functionPressed() {
+        doubleTapRecordingWasActive = isBusy
+        doubleTap.press(Date())
+        guard settings.pushToTalkTriggers.contains(where: \.isFunctionTap), !isBusy else { return }
+        functionPressStarted = Date()
+        activeTrigger = .keyboard(.functionTap)
+        startRecording(held: true)
+    }
+
+    /// The function key came up: a tap keeps listening hands-free, a double-tap toggles it, a held press finishes.
+    private func functionReleased() {
+        switch doubleTap.release(Date()) {
+        case .firstTap:
+            guard functionPressStarted != nil else { return }
+            functionPressStarted = nil
+            guard phase == .preparing || phase == .recording else { return }
+            isHeldSession = false
+            if phase == .recording { statusMessage = listeningStatus }
+        case .secondTap:
+            functionPressStarted = nil
+            if phase == .preparing || phase == .recording {
+                if doubleTapRecordingWasActive { finishRecording() }
+            } else {
+                toggleRecording()
+            }
+        case .longPress:
+            guard functionPressStarted != nil else { return }
+            functionPressStarted = nil
+            guard phase == .preparing || phase == .recording else { return }
+            finishRecording()
         }
     }
 
     func registerShortcut() {
         if let shortcut = settings.selectedTextShortcut { try? selectedTextShortcut.register(shortcut) }
         try? formatShortcut.register(settings.formatShortcut)
-        do {
-            try globalShortcut.register(settings.shortcut, withShift: wantsShiftShortcut(for: settings.shortcut))
-            if statusMessage == shortcutWarning { statusMessage = "" }
-        } catch {
-            statusMessage = L10n.tr("%@ Use the menu bar or Record button to dictate, or choose another shortcut in Settings.", String(error.localizedDescription))
+        registerDictationTriggers()
+    }
+
+    private func registerDictationTriggers() {
+        (pushToTalkShortcuts + handsFreeShortcuts).forEach { $0.shortcut.unregister() }
+        pushToTalkShortcuts = []
+        handsFreeShortcuts = []
+        mouseMonitor.stop()
+        functionTapShortcut.unregister()
+        // The function key is always wired, whether or not it is a listed trigger.
+        functionTapShortcut.onPress = { [weak self] in self?.functionPressed() }
+        functionTapShortcut.onRelease = { [weak self] in self?.functionReleased() }
+        var id: UInt32 = 21  // 20 belongs to the fixed function-key listener
+        var failed: [(shortcut: DictationShortcut, error: any Error)] = []
+        func registerKeyboard(_ shortcut: DictationShortcut, handsFree: Bool) {
+            let instance = GlobalShortcut(id: id)
+            id += 1
+            instance.onPress = { [weak self] in self?.triggerPressed(.keyboard(shortcut)) }
+            instance.onRelease = { [weak self] in self?.triggerReleased(.keyboard(shortcut)) }
+            // Shift is only useful for push-to-talk, the one mode that can send after pasting.
+            do { try instance.register(shortcut, withShift: !handsFree && wantsShiftShortcut(for: shortcut)) } catch {
+                failed.append((shortcut, error))
+                return
+            }
+            if handsFree { handsFreeShortcuts.append((.keyboard(shortcut), instance)) } else { pushToTalkShortcuts.append((.keyboard(shortcut), instance)) }
+        }
+        for case .keyboard(let shortcut) in settings.pushToTalkTriggers where shortcut != .functionTap {
+            registerKeyboard(shortcut, handsFree: false)
+        }
+        for case .keyboard(let shortcut) in settings.handsFreeTriggers where shortcut != .functionTap {
+            registerKeyboard(shortcut, handsFree: true)
+        }
+        // While macOS claims fn, the event tap hears it; otherwise the modifier monitor does.
+        let functionKeyWanted = settings.pushToTalkTriggers.contains(where: \.isFunctionTap)
+        if AXIsProcessTrusted() {
+            if FunctionKeySystemAction.current().interceptsTaps {
+                functionKeyTap.onPress = { [weak self] in self?.functionPressed() }
+                functionKeyTap.onRelease = { [weak self] in self?.functionReleased() }
+                functionKeyTap.start()
+            } else {
+                functionKeyTap.stop()
+            }
+            if functionKeyTap.isRunning {
+                functionTapShortcut.unregister()
+            } else {
+                do { try functionTapShortcut.register(.functionTap) } catch {
+                    if functionKeyWanted { failed.append((.functionTap, error)) }
+                }
+            }
+        } else {
+            functionKeyTap.stop()
+            if functionKeyWanted { failed.append((.functionTap, ShortcutError.accessibilityRequired)) }
+        }
+        if let first = failed.first {
+            statusMessage = L10n.tr("%@ Use the menu bar or Record button to dictate, or choose another shortcut in Settings.", String(first.error.localizedDescription))
             shortcutWarning = statusMessage
+        } else if statusMessage == shortcutWarning {
+            statusMessage = ""
+        }
+        if (settings.pushToTalkTriggers + settings.handsFreeTriggers).contains(where: {
+            if case .mouse = $0 { return true }
+            return false
+        }) {
+            mouseMonitor.onPress = { [weak self] button in self?.triggerPressed(.mouse(button: button)) }
+            mouseMonitor.onRelease = { [weak self] button in self?.triggerReleased(.mouse(button: button)) }
+            mouseMonitor.start()
         }
     }
 
     func suspendShortcut() {
-        globalShortcut.unregister()
+        (pushToTalkShortcuts + handsFreeShortcuts).forEach { $0.shortcut.unregister() }
+        functionTapShortcut.unregister()
+        functionKeyTap.stop()
+        mouseMonitor.stop()
         selectedTextShortcut.unregister()
         formatShortcut.unregister()
     }
@@ -444,23 +573,47 @@ final class AppModel {
         }
     }
 
-    func changeShortcut(_ shortcut: DictationShortcut) {
+    /// Applies new push-to-talk and hands-free triggers, rejecting duplicates and shortcuts other features already use.
+    /// Triggers another app owns warn through the usual status message while the rest still work.
+    func applyDictationTriggers(pushToTalk: [DictationTrigger], handsFree: [DictationTrigger]) {
         guard !isBusy else { return }
-        if shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut || shortcut == settings.formatShortcut {
-            registerShortcut()
-            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), ShortcutError.alreadyAssigned(shortcut)))
-            return
-        }
+        let previous = (settings.pushToTalkTriggers, settings.handsFreeTriggers)
+        settings.pushToTalkTriggers = pushToTalk
+        settings.handsFreeTriggers = handsFree
+        settings.syncLegacyShortcut()
         do {
-            try globalShortcut.register(shortcut, withShift: wantsShiftShortcut(for: shortcut))
+            try validateDictationTriggers()
+            registerDictationTriggers()
         } catch {
-            registerShortcut()
-            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use %@", String(shortcut.displayName)), error))
+            (settings.pushToTalkTriggers, settings.handsFreeTriggers) = previous
+            settings.syncLegacyShortcut()
+            registerDictationTriggers()
+            ToastWindow.shared.show(Toast(failure: L10n.tr("Couldn’t use the shortcut"), error))
             return
         }
         if statusMessage == shortcutWarning { statusMessage = "" }
-        settings.shortcut = shortcut
         saveSettings()
+    }
+
+    /// Puts the dictation triggers back the way a fresh install has them: Option Space for push to talk and no
+    /// hands-free triggers beyond the fixed double-tap of the function key.
+    func resetDictationTriggers() {
+        applyDictationTriggers(pushToTalk: [.keyboard(.optionSpace)], handsFree: [])
+    }
+
+    private func validateDictationTriggers() throws {
+        // The fixed double-tap already owns fn in hands-free mode, so a second listener would count one press twice.
+        guard !settings.handsFreeTriggers.contains(where: \.isFunctionTap) else {
+            throw ShortcutError.alreadyAssignedTrigger(.keyboard(.functionTap))
+        }
+        let all = settings.pushToTalkTriggers + settings.handsFreeTriggers
+        let reserved = [settings.cancelShortcut, settings.selectedTextShortcut, settings.formatShortcut].compactMap { $0 }
+        for (index, trigger) in all.enumerated() {
+            if case .keyboard(let shortcut) = trigger {
+                guard !reserved.contains(shortcut) else { throw ShortcutError.alreadyAssigned(shortcut) }
+            }
+            guard !all[(index + 1)...].contains(trigger) else { throw ShortcutError.alreadyAssignedTrigger(trigger) }
+        }
     }
 
     func changeCancelShortcut(_ shortcut: DictationShortcut?) {
@@ -468,7 +621,7 @@ final class AppModel {
         if let shortcut {
             do {
                 if shortcut.isModifierOnly { throw ShortcutError.needsKey }
-                if shortcut == settings.shortcut || shortcut == settings.selectedTextShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
+                if settings.dictationKeyboardShortcuts.contains(shortcut) || shortcut == settings.selectedTextShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
                 try customCancelShortcut.register(shortcut)
                 customCancelShortcut.unregister()
             } catch {
@@ -497,7 +650,7 @@ final class AppModel {
     }
 
     private var listeningStatus: String {
-        let shortcut = activeShortcut.displayName
+        let shortcut = activeTriggerName
         let finish = sendKeystroke != nil ? L10n.tr("send") : L10n.tr("finish")
         return isHeldSession ? L10n.tr("Listening. Release %@ to %@.", String(shortcut), String(finish)) : L10n.tr("Listening. Press %@ or click ✓ to %@.", String(shortcut), String(finish))
     }
@@ -561,7 +714,7 @@ final class AppModel {
             do {
                 if shortcut.isModifierOnly { throw ShortcutError.needsKey }
                 if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
-                if shortcut == settings.shortcut || shortcut == settings.cancelShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
+                if settings.dictationKeyboardShortcuts.contains(shortcut) || shortcut == settings.cancelShortcut || shortcut == settings.formatShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
                 try selectedTextShortcut.register(shortcut)
             } catch {
                 registerShortcut()
@@ -580,7 +733,7 @@ final class AppModel {
         do {
             if shortcut.isModifierOnly, shortcut.modifiers.isEmpty { throw ShortcutError.needsKey }
             if shortcut.keyCode == UInt32(kVK_Escape) { throw ShortcutError.cancelsDictation }
-            if [settings.shortcut, settings.cancelShortcut, settings.selectedTextShortcut].contains(shortcut) { throw ShortcutError.alreadyAssigned(shortcut) }
+            if settings.dictationKeyboardShortcuts.contains(shortcut) || shortcut == settings.cancelShortcut || shortcut == settings.selectedTextShortcut { throw ShortcutError.alreadyAssigned(shortcut) }
             try formatShortcut.register(shortcut)
         } catch {
             registerShortcut()
@@ -1893,10 +2046,15 @@ final class AppModel {
         }
     }
 
-    /// Shift with the dictation shortcut is only taken from other apps while something would send after pasting.
+    /// Shift with a dictation shortcut is only taken from other apps while something would send after pasting.
     private func syncShiftShortcut() {
-        guard startsServices, !isBusy, globalShortcut.isRegistered, wantsShiftShortcut(for: settings.shortcut) != globalShortcut.wantsShift else { return }
-        registerShortcut()
+        guard startsServices, !isBusy, pushToTalkShortcuts.contains(where: { $0.shortcut.isRegistered }) else { return }
+        let mismatch = pushToTalkShortcuts.contains { entry in
+            guard case .keyboard(let shortcut) = entry.trigger else { return false }
+            return wantsShiftShortcut(for: shortcut) != entry.shortcut.wantsShift
+        }
+        guard mismatch else { return }
+        registerDictationTriggers()
     }
 
     func saveSettings() {
@@ -2017,8 +2175,19 @@ final class AppModel {
         refreshCalendars()
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         let previouslyGranted = accessibilityGranted
+        let previousFunctionKeyAction = functionKeySystemAction
+        let previouslyMonitoring = inputMonitoringGranted
         accessibilityGranted = AXIsProcessTrusted()
-        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly || settings.formatShortcut.isModifierOnly, !isBusy { registerShortcut() }
+        functionKeySystemAction = FunctionKeySystemAction.current()
+        inputMonitoringGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+        if previouslyGranted != accessibilityGranted || previousFunctionKeyAction != functionKeySystemAction || previouslyMonitoring != inputMonitoringGranted, !isBusy { registerShortcut() }
+    }
+
+    /// Asks macOS for Input Monitoring, which hearing the function key and other keyboard events needs. The system
+    /// prompt points at System Settings > Privacy & Security > Input Monitoring, where the toggle lives.
+    func requestInputMonitoring() {
+        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        inputMonitoringGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     }
 
     private func refreshCalendars() {

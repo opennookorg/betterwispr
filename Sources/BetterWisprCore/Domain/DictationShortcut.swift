@@ -25,7 +25,7 @@ public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     public var spokenNames: [String] { activeNames.map(\.spoken) }
 }
 
-public struct DictationShortcut: Codable, Equatable, Sendable {
+public struct DictationShortcut: Codable, Equatable, Hashable, Sendable {
     public let keyCode: UInt32
     public let modifiers: ShortcutModifiers
     public let key: String
@@ -33,6 +33,8 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
     public static let optionSpace = DictationShortcut(validKeyCode: 49, modifiers: .option, key: "Space")
     /// Fn and Control held together, the second-mode shortcut other dictation apps use.
     public static let fnControl = DictationShortcut(validKeyCode: UInt32(kVK_Control), modifiers: .function, key: "Left Control")
+    /// The function key alone, which holds push to talk and carries the fixed double-tap hands-free trigger.
+    public static let functionTap = DictationShortcut(validKeyCode: UInt32(kVK_Function), modifiers: [], key: "Fn")
     private static let functionKeyCodes = Set([kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
                                                kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19,
                                                kVK_F20].map(UInt32.init))

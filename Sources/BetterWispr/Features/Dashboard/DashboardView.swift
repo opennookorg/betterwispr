@@ -120,7 +120,7 @@ struct DashboardView: View {
         case .vocabulary: VocabularyView(model: model)
         case .style: StyleView(model: model)
         case .settings: SettingsView(model: model)
-        case .about: AboutView(updater: model.updater, shortcut: model.settings.shortcut)
+        case .about: AboutView(updater: model.updater, shortcut: model.settings.primaryShortcut)
         }
     }
 

@@ -153,22 +153,24 @@ import Testing
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
     model.settings.soundEffects = false
+    model.applyDictationTriggers(pushToTalk: [.keyboard(.functionTap)], handsFree: [])
     defer { model.discardRecording() }
 
-    model.shortcutPressed()
+    let fn = DictationTrigger.keyboard(.functionTap)
+    model.triggerPressed(fn)
     #expect(model.phase == .preparing && model.isHeldSession)
-    model.shortcutReleased()
+    model.triggerReleased(fn)
     #expect(model.phase == .preparing && !model.isHeldSession)
-    model.shortcutReleased()
+    model.triggerReleased(fn)
     #expect(model.phase == .preparing)
     model.cancelRecording()
     #expect(model.phase == .cancelled && !model.canUndoCancellation)
     #expect(model.cardDeadline != nil)
 
-    model.shortcutPressed()
+    model.triggerPressed(fn)
     model.cancelRecording()
     model.toggleRecording()
-    model.shortcutReleased()
+    model.triggerReleased(fn)
     #expect(model.phase == .preparing && !model.isHeldSession)
     #expect(model.cardDeadline == nil)
 }

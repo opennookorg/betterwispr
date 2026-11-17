@@ -64,7 +64,7 @@ struct HistoryView: View {
                     ContentUnavailableView(
                         L10n.tr("No Dictations"),
                         systemImage: "clock",
-                        description: Text(L10n.tr("Your saved dictations will appear here. Start speaking with %@.", String(model.settings.shortcut.displayName)))
+                        description: Text(L10n.tr("Your saved dictations will appear here. Start speaking with %@.", String(model.settings.primaryShortcut.displayName)))
                     )
                 } else {
                     ContentUnavailableView.search(text: query)
