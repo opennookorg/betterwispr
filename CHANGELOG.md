@@ -4,6 +4,11 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Fixed
+- Detect Google Meet calls whose browser window title uses a nonbreaking space in "Google Meet". Meeting detection now treats Unicode whitespace as ordinary spaces when matching window titles.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added
