@@ -4,6 +4,11 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [Unreleased]
+
+### Fixed
+- Offer the notetaker when a Teams call starts even if Core Audio only announces a change in general audio activity. BetterWispr checks that the app is using the microphone before offering to take notes.
+
 ## [0.1.6] - 2026-11-13
 
 ### Added

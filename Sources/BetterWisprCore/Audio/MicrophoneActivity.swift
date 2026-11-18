@@ -54,15 +54,17 @@ public final class MicrophoneActivityObserver {
         self.listener = nil
     }
 
-    /// Watches each process's input state, since the process list only changes when an app first uses audio or quits.
+    /// Some call apps notify Core Audio of general I/O changes only, so either event triggers a fresh input-state read.
     private func observe(_ current: Set<AudioObjectID>) {
         guard let listener else { return }
-        var input = AudioInputs.address(kAudioProcessPropertyIsRunningInput)
-        for process in processes.subtracting(current) {
-            AudioObjectRemovePropertyListenerBlock(process, &input, .main, listener)
-        }
-        for process in current.subtracting(processes) {
-            AudioObjectAddPropertyListenerBlock(process, &input, .main, listener)
+        for selector in [kAudioProcessPropertyIsRunningInput, kAudioProcessPropertyIsRunning] {
+            var property = AudioInputs.address(selector)
+            for process in processes.subtracting(current) {
+                AudioObjectRemovePropertyListenerBlock(process, &property, .main, listener)
+            }
+            for process in current.subtracting(processes) {
+                AudioObjectAddPropertyListenerBlock(process, &property, .main, listener)
+            }
         }
         processes = current
     }
