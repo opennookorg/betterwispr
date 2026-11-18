@@ -663,8 +663,10 @@ on by default and turned off by `AppSettings.detectMeetings`. It only reads
 local state and never records anything itself.
 
 1. `MicrophoneActivityObserver` listens to Core Audio's process object list and
-   to each process's `kAudioProcessPropertyIsRunningInput`. These are reported
-   from macOS 14.2. Older systems detect nothing.
+   to each process's `kAudioProcessPropertyIsRunningInput` and
+   `kAudioProcessPropertyIsRunning`. Teams can announce only the latter at a
+   call boundary. On either event the detector reads the actual input state.
+   These properties are available from macOS 14.2.
 2. `MeetingPlatform.app(recording:)` maps the recording processes to known apps.
    Helper processes such as `com.google.Chrome.helper` map to their app, and
    `com.apple.WebKit.GPU` maps to Safari. Unknown apps, BetterWispr included,

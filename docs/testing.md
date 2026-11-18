@@ -2149,6 +2149,9 @@ were not exercised in this UI pass.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or
   "BetterWispr Meeting Audio", including while a meeting is recording.
+- [ ] With BetterWispr already running, join a Teams desktop call with the mic
+  on. Dismiss the meeting prompt, leave the call, then start a second call
+  without quitting either app. Check that the prompt appears once in each call.
 - [ ] Meeting prompt position: with Top center chosen, join a Zoom call and a
   Google Meet call. "Meeting detected" appears top center below the menu bar
   and the notch, on the display holding the call window (try a second display
