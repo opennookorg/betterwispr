@@ -397,6 +397,18 @@ private actor FakeNotesModel: NotesLanguageModel {
     }
 }
 
+@Test(arguments: [
+    "Google Meet – abc-defg-hij – Camera and microphone recording - Google Chrome",
+    "Google\u{00A0}Meet – abc-defg-hij – Camera and microphone recording - Google Chrome",
+    "Google\u{202F}Meet – abc-defg-hij – Camera and microphone recording - Google Chrome",
+    "Meet\u{00A0}-\u{00A0}Daily Scrum - Google Chrome",
+    "Meet\u{202F}–\u{202F}Daily Scrum - Google Chrome",
+])
+func meetingDetectionRecognizesGoogleMeetWithNonbreakingSpaces(title: String) {
+    let meetings = MeetingPlatform.meetings(in: ["com.google.Chrome"]) { _ in [title] }
+    #expect(meetings == [DetectedMeeting(platform: .googleMeet, appID: "com.google.Chrome")])
+}
+
 @Test func meetingDetectionMapsRecordingHelpersToTheirAppAndRecognizesBrowserCallsByTitle() {
     #expect(MeetingPlatform.app(recording: "com.google.Chrome.helper") == "com.google.Chrome")
     #expect(MeetingPlatform.app(recording: "com.tinyspeck.slackmacgap.helper") == "com.tinyspeck.slackmacgap")

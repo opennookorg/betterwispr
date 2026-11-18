@@ -61,8 +61,9 @@ public enum MeetingPlatform: String, CaseIterable, Sendable {
 
     /// The meeting service a browser window shows, judged from a title such as "Meet - Daily Scrum - Google Chrome".
     static func page(titled title: String) -> MeetingPlatform? {
-        if title.hasPrefix("Meet - ") || title.hasPrefix("Meet – ") { return .googleMeet }
-        return pages.first { title.contains($0.fragment) }?.platform
+        let normalizedTitle = String(title.map { $0.isWhitespace ? " " : $0 })
+        if normalizedTitle.hasPrefix("Meet - ") || normalizedTitle.hasPrefix("Meet – ") { return .googleMeet }
+        return pages.first { normalizedTitle.contains($0.fragment) }?.platform
     }
 
     /// Calls among the recording apps; a browser counts only when one of its windows shows a meeting service.
