@@ -17,6 +17,7 @@ enum AskThread: Hashable {
 final class MeetingRun {
     let meetingID: UUID
     var phase: MeetingPhase
+    var callEnd: CallEndWatch?
     var pendingChunks = 0
     var generationStep: (Int, Int)?
     @ObservationIgnored var language: String?
@@ -125,7 +126,7 @@ final class MeetingModel {
 
     func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], replacements: [VocabularyEntry]? = nil, usesPhraseBooster: Bool = true,
                silenceThreshold: Float, microphone: AudioInputDevice?,
-               event: CalendarEvent? = nil, separateRoomVoices: Bool = false) {
+               event: CalendarEvent? = nil, separateRoomVoices: Bool = false, callApp: String? = nil) {
         guard capturing == nil, !isRecordingMyVoice else { return }
         var meeting = Meeting(title: event?.title ?? "", modelName: model.name, language: language ?? "auto")
         meeting.attendees = event?.attendees
@@ -142,6 +143,7 @@ final class MeetingModel {
         heard = (false, false)
         run.voices = SpeakerDetection.isInstalled() ? try? SpeakerRecording() : nil
         run.liveSpeakers = run.voices == nil ? nil : LiveSpeakerLabeller()
+        run.callEnd = callApp.map { CallEndWatch(appID: $0) }
         run.separatesRoomVoices = separateRoomVoices
         elapsed = 0
         let releasing = releasingRecorder
@@ -488,12 +490,24 @@ final class MeetingModel {
         }
     }
 
+    func updateCallActivity(_ active: Bool?, for run: MeetingRun, at now: ContinuousClock.Instant) {
+        guard owns(run), run.phase == .recording else { return }
+        if run.callEnd?.update(active: active, at: now) == true { stop() }
+    }
+
     private func startTicker(_ run: MeetingRun) {
         ticker?.cancel()
         ticker = Task { [weak self] in
+            var nextCallCheck = ContinuousClock.now
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
                 guard let self, self.owns(run), run.phase == .recording else { return }
+                let now = ContinuousClock.now
+                if let appID = run.callEnd?.appID, now >= nextCallCheck {
+                    nextCallCheck = now.advanced(by: .seconds(2))
+                    self.updateCallActivity(MicrophoneActivity.hasActiveAudio(for: appID), for: run, at: now)
+                    guard run.phase == .recording else { return }
+                }
                 self.elapsed = Date().timeIntervalSince(self.startedAt)
                 self.showsCallAudioHint = self.elapsed >= 20 && self.heard.me && !self.heard.them && self.systemAudioIssue == nil
             }

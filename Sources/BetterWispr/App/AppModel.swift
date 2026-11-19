@@ -1916,6 +1916,7 @@ final class AppModel {
             statusMessage = L10n.tr("Could not save settings: %@", String(error.localizedDescription))
         }
         applyAppearance()
+        if !settings.stopAfterCall { meetings.capturing?.callEnd = nil }
         if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
         meetingDetector.timeout = settings.meetingPromptTimeout.seconds
         meetings.remembersVoices = settings.rememberVoices

@@ -1212,3 +1212,7 @@
 "Maybe" = "Maybe";
 "Awaiting reply" = "Awaiting reply";
 "Organizer" = "Organizer";
+"Call audio ended. Recording will stop shortly." = "Call audio ended. Recording will stop shortly.";
+"Keep recording" = "Keep recording";
+"Stop when the call ends" = "Stop when the call ends";
+"Stop notes started during a recognized call after the call app releases its audio. You can keep recording from the meeting note." = "Stop notes started during a recognized call after the call app releases its audio. You can keep recording from the meeting note.";

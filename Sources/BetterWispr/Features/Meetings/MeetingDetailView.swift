@@ -155,6 +155,14 @@ struct MeetingDetailView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
             }
+            if isRecording, let run, run.callEnd?.isPending == true {
+                HStack {
+                    Text(L10n.tr("Call audio ended. Recording will stop shortly."))
+                    Spacer()
+                    Button(L10n.tr("Keep recording")) { run.callEnd = nil }
+                }
+                .font(.callout)
+            }
             switch run?.phase {
             case .starting:
                 controlBar {

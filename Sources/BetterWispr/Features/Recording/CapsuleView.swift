@@ -379,7 +379,7 @@ struct CapsuleView: View {
             HStack(spacing: 0) {
                 Button {
                     model.meetingDetector.dismiss()
-                    model.startNotetaker()
+                    model.startNotetaker(detectedCall: meeting)
                 } label: {
                     Text(L10n.tr("Start notetaker"))
                         .font(.system(size: 12, weight: .semibold))

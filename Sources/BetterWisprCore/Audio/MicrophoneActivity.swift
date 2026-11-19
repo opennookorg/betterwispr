@@ -5,7 +5,26 @@ import Foundation
 public enum MicrophoneActivity {
     /// Bundle IDs of every process recording audio input now; empty where macOS doesn't report process objects.
     public static func recordingBundleIDs() -> [String] {
-        processes().filter(isRecording).compactMap { AudioInputs.string(kAudioProcessPropertyBundleID, of: $0) }
+        processes().filter { running(kAudioProcessPropertyIsRunningInput, on: $0) == true }.compactMap { AudioInputs.string(kAudioProcessPropertyBundleID, of: $0) }
+    }
+
+    /// nil means Core Audio could not establish the call app's state. Output keeps a muted call alive.
+    public static func hasActiveAudio(for appID: String) -> Bool? {
+        let current = processes()
+        guard !current.isEmpty else { return nil }
+        var complete = true
+        for process in current {
+            guard let bundle = AudioInputs.string(kAudioProcessPropertyBundleID, of: process) else {
+                complete = false
+                continue
+            }
+            guard MeetingPlatform.app(recording: bundle) == appID else { continue }
+            let input = running(kAudioProcessPropertyIsRunningInput, on: process)
+            let output = running(kAudioProcessPropertyIsRunningOutput, on: process)
+            if input == true || output == true { return true }
+            if input == nil || output == nil { complete = false }
+        }
+        return complete ? false : nil
     }
 
     static func processes() -> Set<AudioObjectID> {
@@ -18,11 +37,12 @@ public enum MicrophoneActivity {
         return Set(ids.prefix(Int(size) / MemoryLayout<AudioObjectID>.size))
     }
 
-    private static func isRecording(_ process: AudioObjectID) -> Bool {
-        var property = AudioInputs.address(kAudioProcessPropertyIsRunningInput)
+    private static func running(_ selector: AudioObjectPropertySelector, on process: AudioObjectID) -> Bool? {
+        var property = AudioInputs.address(selector)
         var running: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
-        return AudioObjectGetPropertyData(process, &property, 0, nil, &size, &running) == noErr && running != 0
+        guard AudioObjectGetPropertyData(process, &property, 0, nil, &size, &running) == noErr else { return nil }
+        return running != 0
     }
 }
 
