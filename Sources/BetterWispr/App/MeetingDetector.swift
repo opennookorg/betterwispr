@@ -61,6 +61,15 @@ final class MeetingDetector {
         }
     }
 
+    /// Bind at the start of capture. A room recording must never attach to a call that starts later.
+    static func sourceApp(for prompt: DetectedMeeting?, recording: [String] = MicrophoneActivity.recordingBundleIDs(),
+                          windowTitles: (String) -> [String] = MeetingPlatform.windowTitles(of:)) -> String? {
+        let apps = Set(recording.compactMap(MeetingPlatform.app(recording:)))
+        if let prompt { return apps.contains(prompt.appID) ? prompt.appID : nil }
+        let calls = MeetingPlatform.meetings(in: apps, windowTitles: windowTitles)
+        return calls.count == 1 ? calls[0].appID : nil
+    }
+
     /// Forgets calls that ended, treats calls running alongside the notetaker as answered, and offers the first new one.
     func update(_ calls: [DetectedMeeting], recording: Set<String>) {
         answered.formIntersection(recording)

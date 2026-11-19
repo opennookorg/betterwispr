@@ -151,6 +151,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var mediaDefaultsVersion: Int = AppSettings.mediaDefaultsVersion
     /// Offers the notetaker when a known call app or web meeting starts recording.
     public var detectMeetings: Bool = true
+    public var stopAfterCall: Bool = true
     public var meetingPromptPosition: MeetingPromptPosition = .bottom
     public var meetingPromptTimeout: MeetingPromptTimeout = .thirtySeconds
     /// Names a meeting note after the Calendar event under way when recording starts and lists its invitees.
@@ -319,6 +320,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
             muteOtherAppsWhileDictating = true
             mediaDefaultsVersion = Self.mediaDefaultsVersion
         }
+        stopAfterCall = try container.decodeIfPresent(Bool.self, forKey: .stopAfterCall) ?? true
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         meetingPromptPosition = (try? container.decodeIfPresent(MeetingPromptPosition.self, forKey: .meetingPromptPosition)) ?? .bottom
         meetingPromptTimeout = (try? container.decodeIfPresent(MeetingPromptTimeout.self, forKey: .meetingPromptTimeout)) ?? .thirtySeconds

@@ -382,7 +382,7 @@ private extension Meeting {
 }
 
 extension AppModel {
-    func startMeeting(for chosen: CalendarEvent? = nil) async {
+    func startMeeting(for chosen: CalendarEvent? = nil, detectedCall: DetectedMeeting? = nil) async {
         let event = if let chosen { chosen } else if settings.useCalendar { await calendarEvents.current(excluding: settings.excludedCalendarIDs) } else { nil as CalendarEvent? }
         guard !isBusy, meetings.capturingID == nil else { return }
         let speechModel = selectedModel
@@ -392,16 +392,17 @@ extension AppModel {
             return
         }
         selectedPage = .meetings
+        let callApp = settings.stopAfterCall ? MeetingDetector.sourceApp(for: detectedCall) : nil
         meetings.start(model: speechModel, language: settings.language == "auto" ? nil : settings.language,
                        vocabulary: vocabulary, replacements: settings.replacements(vocabulary), usesPhraseBooster: settings.usePhraseBooster,
                        silenceThreshold: settings.silenceThreshold, microphone: settings.microphone, event: event,
-                       separateRoomVoices: settings.separateRoomVoices)
+                       separateRoomVoices: settings.separateRoomVoices, callApp: callApp)
     }
 
     /// Starts a meeting and docks its card beside the call.
-    func startNotetaker(for event: CalendarEvent? = nil) {
+    func startNotetaker(for event: CalendarEvent? = nil, detectedCall: DetectedMeeting? = nil) {
         Task {
-            await startMeeting(for: event)
+            await startMeeting(for: event, detectedCall: detectedCall)
             if let id = meetings.capturingID { onShowNotetaker?(id) } else { onShowDashboard?() }
         }
     }

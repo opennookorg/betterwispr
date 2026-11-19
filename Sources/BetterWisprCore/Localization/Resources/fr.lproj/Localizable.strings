@@ -1212,3 +1212,7 @@
 "Maybe" = "Peut-être";
 "Awaiting reply" = "En attente de réponse";
 "Organizer" = "Organisateur";
+"Call audio ended. Recording will stop shortly." = "L’audio de l’appel s’est arrêté. L’enregistrement va se terminer.";
+"Keep recording" = "Continuer l’enregistrement";
+"Stop when the call ends" = "Arrêter à la fin de l’appel";
+"Stop notes started during a recognized call after the call app releases its audio. You can keep recording from the meeting note." = "Si la prise de notes a commencé pendant un appel reconnu, elle s’arrête lorsque l’application libère l’audio. Vous pouvez poursuivre l’enregistrement depuis la note.";

@@ -254,6 +254,7 @@ struct SettingsView: View {
                         .disabled(model.settings.hideCapsuleWhileDictating)
                     RowDivider()
                     SettingToggle(L10n.tr("Detect meetings"), caption: L10n.tr("Offer the notetaker when Zoom, Google Meet, Teams, a Slack huddle or another call starts using the microphone. Calls in a browser need Accessibility."), isOn: setting(\.detectMeetings))
+                    SettingToggle(L10n.tr("Stop when the call ends"), caption: L10n.tr("Stop notes started during a recognized call after the call app releases its audio. You can keep recording from the meeting note."), isOn: setting(\.stopAfterCall))
                     if model.settings.detectMeetings {
                         RowDivider()
                         SettingRow(L10n.tr("Meeting prompt position"), caption: L10n.tr("Where “Meeting detected” appears, on the screen showing the call. At the top it sits below the menu bar and camera.")) {
