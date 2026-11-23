@@ -23,6 +23,37 @@ enum SpeechAudio {
         return wav(AudioProcessor.convertBufferToArray(buffer: buffer))
     }
 
+    /// 16 kHz mono AAC in an MPEG-4 container, about an eighth of the WAV size, so uploads over slow links finish sooner. Nil when encoding fails.
+    nonisolated static func aac(_ samples: [Float]) -> Data? {
+        guard !samples.isEmpty,
+              let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channel = buffer.floatChannelData?[0] else { return nil }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { source in
+            for index in 0..<samples.count { channel[index] = source[index].isFinite ? min(1, max(-1, source[index])) : 0 }
+        }
+        let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-upload-\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            let settings: [String: Any] = [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 16_000,
+                                           AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 32_000]
+            // The file is finalized when it leaves this scope.
+            let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+            try file.write(from: buffer)
+        } catch { return nil }
+        guard let data = try? Data(contentsOf: url), data.count > 64 else { return nil }
+        return data
+    }
+
+    /// Samples of a 16-bit mono WAV made by `wav(_:)`.
+    nonisolated static func samples(fromWAV wav: Data) -> [Float] {
+        guard wav.count > 44 else { return [] }
+        return wav.dropFirst(44).withUnsafeBytes { raw in
+            raw.bindMemory(to: Int16.self).map { Float(Int16(littleEndian: $0)) / Float(Int16.max) }
+        }
+    }
+
     nonisolated static func wav(_ samples: [Float]) -> Data {
         let pcm = samples.map { sample in
             Int16((min(1, max(-1, sample.isFinite ? sample : 0)) * Float(Int16.max)).rounded()).littleEndian

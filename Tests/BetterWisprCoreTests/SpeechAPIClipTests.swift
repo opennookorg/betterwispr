@@ -400,7 +400,7 @@ private final class ClipEndpoint: Sendable {
     func provider(requestTimeout: TimeInterval = 60) async throws -> APISpeechProvider {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [ClipStub.self]
-        let provider = APISpeechProvider(configuration: config, requestTimeout: requestTimeout, key: { _ in "" })
+        let provider = APISpeechProvider(configuration: config, requestTimeout: requestTimeout, compressesUploads: false, key: { _ in "" })
         try await provider.prepare(model: connection.speechModel, download: false)
         return provider
     }

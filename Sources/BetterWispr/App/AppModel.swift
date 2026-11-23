@@ -736,6 +736,15 @@ final class AppModel {
         self.live = live
         var onSamples: (@Sendable ([Float]) -> Void)?
         if let live { onSamples = { samples in Task { @MainActor in live.append(samples) } } }
+        // API dictation uploads finished pieces while the user speaks; the buffer keeps capture order without hopping threads.
+        let liveAudio = model.engine == .api ? LiveAudioBuffer() : nil
+        if let liveAudio {
+            let preview = onSamples
+            onSamples = { samples in
+                liveAudio.append(samples)
+                preview?(samples)
+            }
+        }
         operation = Task { [weak self, onSamples] in
             guard let self else { return }
             do {
@@ -750,6 +759,9 @@ final class AppModel {
                 self.recorder.silenceThreshold = self.settings.silenceThreshold
                 self.recorder.microphone = self.settings.microphone
                 self.statusMessage = L10n.tr("Starting microphone…")
+                if let liveAudio, let api = self.provider as? APISpeechProvider, self.preparedModelID == model.id {
+                    api.beginLiveUpload(liveAudio, language: self.settings.language == "auto" ? nil : self.settings.language)
+                }
                 try await self.recorder.start(onSamples: onSamples)
                 let url = await website?.value
                 try Task.checkCancellation()

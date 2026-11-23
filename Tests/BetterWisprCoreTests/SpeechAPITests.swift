@@ -240,3 +240,53 @@ private final class SpeechEndpointStub: URLProtocol, @unchecked Sendable {
     #expect(chunks.count == 12)
     #expect(chunks.reduce(0) { $0 + ($1.count - 44) / 2 } == 1_500 * 16_000)
 }
+
+@Test func speechAPICompressesUploadsToAACWithoutLosingAudio() throws {
+    let samples = (0..<(16_000 * 10)).map { 0.2 * sin(Float($0) * 0.05) }
+    let aac = try #require(SpeechAudio.aac(samples))
+    let wav = SpeechAudio.wav(samples)
+    #expect(aac.count * 4 < wav.count)
+    let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-aac-test-\(UUID()).m4a")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try aac.write(to: url)
+    let file = try AVAudioFile(forReading: url)
+    let seconds = Double(file.length) / file.processingFormat.sampleRate
+    #expect(abs(seconds - 10) < 0.2)
+    #expect(SpeechAudio.samples(fromWAV: wav).count == samples.count)
+    let request = try APISpeechProvider.request(SpeechConnection(api: .openAICompatible), key: "", audio: aac,
+                                                filename: "audio.m4a", mimeType: "audio/mp4", language: nil)
+    let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+    #expect(body.contains("filename=\"audio.m4a\"\r\nContent-Type: audio/mp4"))
+}
+
+@Test func liveUploadCutsAtTheQuietestPoint() {
+    var samples = [Float](repeating: 0.3, count: 16_000 * 10)
+    for index in (16_000 * 6)..<(16_000 * 6 + 800) { samples[index] = 0 }
+    #expect(APISpeechProvider.quietestFrame(samples, frame: 800) == 16_000 * 6)
+}
+
+@MainActor
+@Test func liveUploadSendsPiecesWhileRecordingAndJoinsThemInOrder() async throws {
+    let samples = (0..<(16_000 * 62)).map { 0.1 * sin(Float($0) * 0.01) }
+    let audio = FileManager.default.temporaryDirectory.appending(path: "betterwispr-live-test-\(UUID()).wav")
+    defer { try? FileManager.default.removeItem(at: audio) }
+    try SpeechAudio.wav(samples).write(to: audio)
+    var connection = SpeechConnection(api: .openAICompatible)
+    connection.endpoint = "https://speech.example/\(UUID())/ok"
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [SpeechEndpointStub.self]
+    let provider = APISpeechProvider(configuration: config, key: { _ in "test-key" })
+    try await provider.prepare(model: connection.speechModel, download: false)
+    let buffer = LiveAudioBuffer()
+    provider.beginLiveUpload(buffer, language: "en")
+    buffer.append(samples)
+    // 62 s becomes several live pieces of 9 to 15 s plus the tail, joined in order.
+    let words = try await provider.transcribe(audioURL: audio, language: "en", vocabulary: []).split(separator: " ")
+    #expect(words.count >= 4 && words.allSatisfy { $0 == "Hello" })
+
+    // A live copy that doesn't match the saved file is ignored and the file is uploaded instead.
+    let short = LiveAudioBuffer()
+    provider.beginLiveUpload(short, language: "en")
+    short.append(Array(samples.prefix(16_000 * 5)))
+    #expect(try await provider.transcribe(audioURL: audio, language: "en", vocabulary: []) == "Hello")
+}
